@@ -1,6 +1,0 @@
-entity,type,strength,strategy
-Alice,corporation,0.85,aggressive
-Bob,corporation,0.70,defensive
-Charlie,startup,0.45,innovative
-Market,environment,0.90,volatile
-Regulation,constraint,0.60,tightening
