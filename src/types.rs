@@ -1,22 +1,18 @@
-use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
-/// A node in the prediction graph.
+/// A single data point in a chart series.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphNode {
-    pub id: String,
-    pub label: String,
-    pub embedding: Vec<f64>,
-    pub metadata: std::collections::HashMap<String, String>,
+pub struct DataPoint {
+    pub index: f64,
+    pub value: f64,
 }
 
-/// An edge in the prediction graph.
+/// A named series of data points with optional metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphEdge {
-    pub source: String,
-    pub target: String,
-    pub weight: OrderedFloat<f64>,
-    pub relation: String,
+pub struct ChartSeries {
+    pub name: String,
+    pub points: Vec<DataPoint>,
+    pub metadata: std::collections::HashMap<String, String>,
 }
 
 /// A payoff entry in a game theory matrix.
