@@ -6,6 +6,7 @@ import type {
   Memory,
   Action,
   SimEvent,
+  ChatMessage,
 } from './types';
 
 const BASE = '/api';
@@ -22,6 +23,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export async function getSimulations(): Promise<SimulationState[]> {
+  return request('/simulations');
+}
+
 export async function createSimulation(config?: Partial<SimulationConfig>): Promise<SimulationState> {
   return request('/simulations', {
     method: 'POST',
@@ -33,7 +38,7 @@ export async function getSimulation(id: string): Promise<SimulationState> {
   return request(`/simulations/${id}`);
 }
 
-export async function stepSimulation(id: string): Promise<{ events: SimEvent[]; state: SimulationState }> {
+export async function stepSimulation(id: string): Promise<{ events: SimEvent[]; state: SimulationState; chat_messages: ChatMessage[] }> {
   return request(`/simulations/${id}/step`, { method: 'POST' });
 }
 
@@ -74,4 +79,9 @@ export async function getReasoning(simId: string, charId: string): Promise<{ rea
 export async function getEvents(simId: string, sinceTick?: number): Promise<SimEvent[]> {
   const query = sinceTick !== undefined ? `?since_tick=${sinceTick}` : '';
   return request(`/simulations/${simId}/events${query}`);
+}
+
+export async function getChat(simId: string, sinceTick?: number): Promise<ChatMessage[]> {
+  const query = sinceTick !== undefined ? `?since_tick=${sinceTick}` : '';
+  return request(`/simulations/${simId}/chat${query}`);
 }

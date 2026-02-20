@@ -14,9 +14,19 @@ const TRAIT_COLORS: Record<keyof PersonalityTraits, string> = {
   neuroticism: 'neon-red',
 };
 
+const TRAIT_ABBREV: Record<keyof PersonalityTraits, string> = {
+  openness: 'OPN',
+  conscientiousness: 'CSC',
+  extraversion: 'EXT',
+  agreeableness: 'AGR',
+  neuroticism: 'NEU',
+};
+
 const TEMPLATES = [
   {
-    label: 'The Diplomat',
+    label: 'DIPLOMAT',
+    icon: '♦',
+    color: 'neon-cyan',
     data: {
       name: 'The Diplomat',
       profile: 'A skilled negotiator who values peace and alliance-building above all. Masters the art of compromise and sees every conflict as an opportunity for collaboration.',
@@ -26,7 +36,9 @@ const TEMPLATES = [
     },
   },
   {
-    label: 'The Warrior',
+    label: 'WARRIOR',
+    icon: '⚔',
+    color: 'neon-red',
     data: {
       name: 'The Warrior',
       profile: 'A fierce combatant driven by honor and the desire to prove strength in battle. Protects the weak but challenges the strong.',
@@ -36,7 +48,9 @@ const TEMPLATES = [
     },
   },
   {
-    label: 'The Trickster',
+    label: 'TRICKSTER',
+    icon: '★',
+    color: 'neon-magenta',
     data: {
       name: 'The Trickster',
       profile: 'A cunning manipulator who thrives on chaos and misdirection. Always three steps ahead, weaving webs of deception.',
@@ -46,7 +60,9 @@ const TEMPLATES = [
     },
   },
   {
-    label: 'The Scholar',
+    label: 'SCHOLAR',
+    icon: '◆',
+    color: 'neon-gold',
     data: {
       name: 'The Scholar',
       profile: 'A curious mind devoted to understanding the world through observation and analysis. Knowledge is the ultimate currency.',
@@ -62,6 +78,7 @@ export default function CharacterCreator() {
   const [name, setName] = useState('');
   const [profile, setProfile] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [traits, setTraits] = useState<PersonalityTraits>({
     openness: 0.5,
     conscientiousness: 0.5,
@@ -75,12 +92,13 @@ export default function CharacterCreator() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  function applyTemplate(t: typeof TEMPLATES[0]['data']) {
-    setName(t.name);
-    setProfile(t.profile);
-    setTraits(t.traits);
-    setGoals(t.goals);
-    setMotivations(t.motivations);
+  function applyTemplate(t: typeof TEMPLATES[0]) {
+    setSelectedTemplate(t.label);
+    setName(t.data.name);
+    setProfile(t.data.profile);
+    setTraits(t.data.traits);
+    setGoals(t.data.goals);
+    setMotivations(t.data.motivations);
   }
 
   function addGoal() { setGoals([...goals, '']); }
@@ -123,67 +141,74 @@ export default function CharacterCreator() {
     .sort((a, b) => b[1] - a[1])[0];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      <h1 className="text-2xl font-bold mb-1">
-        <span className="bg-gradient-to-r from-neon-magenta to-neon-cyan bg-clip-text text-transparent">
-          Character Creator
-        </span>
-      </h1>
-      <p className="text-xs text-gray-500 mb-8">Design agents with unique personalities, goals, and motivations</p>
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="pixel-panel p-4 mb-4">
+        <h1 className="text-pixel-lg text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+          CHARACTER CREATOR
+        </h1>
+        <div className="text-pixel-xs text-gray-500 mt-1">
+          Design agents with unique personalities, goals, and motivations
+        </div>
+      </div>
 
-      <div className="mb-6">
-        <h3 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Templates</h3>
+      <div className="pixel-panel p-4 mb-4">
+        <div className="text-pixel-xs text-gray-500 mb-3 tracking-wider">TEMPLATES</div>
         <div className="grid grid-cols-4 gap-3">
           {TEMPLATES.map((t) => (
             <button
               key={t.label}
-              onClick={() => applyTemplate(t.data)}
-              className={`p-3 glass rounded-xl text-left hover:bg-white/5 transition-all ${
-                name === t.data.name ? 'glow-border-cyan' : 'border border-white/5'
+              onClick={() => applyTemplate(t)}
+              className={`pixel-panel p-3 text-left transition-all hover:bg-white/5 ${
+                selectedTemplate === t.label ? 'border-neon-cyan' : ''
               }`}
+              style={selectedTemplate === t.label ? { borderColor: '#00e5ff', boxShadow: '0 0 8px rgba(0,229,255,0.3), 4px 4px 0 #000' } : {}}
             >
-              <div className="text-xs font-bold text-gray-300 mb-1">{t.label}</div>
-              <div className="text-[10px] text-gray-500 line-clamp-2">{t.data.profile.slice(0, 80)}...</div>
+              <div className={`text-pixel-lg text-${t.color} mb-2 text-center`}>
+                {t.icon}
+              </div>
+              <div className={`text-pixel-xs text-${t.color} text-center`} style={{ textShadow: '0 0 4px currentColor' }}>
+                {t.label}
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
-          <div className="glass rounded-xl p-5 space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-2 space-y-4">
+          <div className="pixel-panel p-4 space-y-4">
             <div>
-              <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Name</label>
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">NAME</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter character name..."
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-200 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700 transition-colors"
+                className="pixel-input text-pixel-sm w-full"
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Profile / Bio</label>
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">BIO</label>
               <textarea
                 value={profile}
                 onChange={(e) => setProfile(e.target.value)}
-                placeholder="Describe this character's backstory, personality, and role..."
+                placeholder="Describe this character..."
                 rows={4}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-200 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700 resize-none transition-colors"
+                className="pixel-input text-pixel-xs w-full resize-none"
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Image URL</label>
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">IMAGE URL</label>
               <input
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-200 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700 transition-colors"
+                className="pixel-input text-pixel-xs w-full"
               />
             </div>
           </div>
 
-          <div className="glass rounded-xl p-5">
-            <h3 className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Personality Traits (Big Five)</h3>
+          <div className="pixel-panel p-4">
+            <div className="text-pixel-xs text-gray-500 tracking-wider mb-4">TRAITS</div>
             <div className="space-y-4">
               {(Object.entries(traits) as [keyof PersonalityTraits, number][]).map(([key, val]) => (
                 <TraitSlider
@@ -198,23 +223,26 @@ export default function CharacterCreator() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="glass rounded-xl p-5">
+            <div className="pixel-panel p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[10px] text-gray-500 uppercase tracking-widest">Goals</h3>
-                <button onClick={addGoal} className="text-[10px] text-neon-cyan hover:text-neon-cyan/80 transition-colors">+ Add</button>
+                <span className="text-pixel-xs text-gray-500 tracking-wider">GOALS</span>
+                <button onClick={addGoal} className="pixel-btn pixel-btn-green text-pixel-xs px-2 py-1">
+                  + ADD
+                </button>
               </div>
               <div className="space-y-2">
                 {goals.map((g, i) => (
-                  <div key={i} className="flex gap-2">
+                  <div key={i} className="flex gap-2 items-center">
+                    <span className="text-neon-green text-pixel-xs">&gt;</span>
                     <input
                       value={g}
                       onChange={(e) => updateGoal(i, e.target.value)}
                       placeholder={`Goal ${i + 1}...`}
-                      className="flex-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-gray-300 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700"
+                      className="pixel-input text-pixel-xs flex-1 py-1.5"
                     />
                     {goals.length > 1 && (
-                      <button onClick={() => removeGoal(i)} className="text-gray-600 hover:text-neon-red text-xs transition-colors">
-                        ×
+                      <button onClick={() => removeGoal(i)} className="text-neon-red text-pixel-xs hover:text-neon-red/80 px-1">
+                        x
                       </button>
                     )}
                   </div>
@@ -222,23 +250,26 @@ export default function CharacterCreator() {
               </div>
             </div>
 
-            <div className="glass rounded-xl p-5">
+            <div className="pixel-panel p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[10px] text-gray-500 uppercase tracking-widest">Motivations</h3>
-                <button onClick={addMotivation} className="text-[10px] text-neon-cyan hover:text-neon-cyan/80 transition-colors">+ Add</button>
+                <span className="text-pixel-xs text-gray-500 tracking-wider">MOTIVATIONS</span>
+                <button onClick={addMotivation} className="pixel-btn pixel-btn-cyan text-pixel-xs px-2 py-1">
+                  + ADD
+                </button>
               </div>
               <div className="space-y-2">
                 {motivations.map((m, i) => (
-                  <div key={i} className="flex gap-2">
+                  <div key={i} className="flex gap-2 items-center">
+                    <span className="text-neon-cyan text-pixel-xs">&gt;</span>
                     <input
                       value={m}
                       onChange={(e) => updateMotivation(i, e.target.value)}
                       placeholder={`Motivation ${i + 1}...`}
-                      className="flex-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-gray-300 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700"
+                      className="pixel-input text-pixel-xs flex-1 py-1.5"
                     />
                     {motivations.length > 1 && (
-                      <button onClick={() => removeMotivation(i)} className="text-gray-600 hover:text-neon-red text-xs transition-colors">
-                        ×
+                      <button onClick={() => removeMotivation(i)} className="text-neon-red text-pixel-xs hover:text-neon-red/80 px-1">
+                        x
                       </button>
                     )}
                   </div>
@@ -247,66 +278,70 @@ export default function CharacterCreator() {
             </div>
           </div>
 
-          <div className="glass rounded-xl p-5">
-            <div className="flex items-center gap-4">
+          <div className="pixel-panel p-4">
+            <div className="flex items-end gap-4">
               <div className="flex-1">
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Simulation ID (optional)</label>
+                <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">SIM ID (OPTIONAL)</label>
                 <input
                   value={simId}
                   onChange={(e) => setSimId(e.target.value)}
-                  placeholder="Leave empty to create a new simulation"
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-300 outline-none focus:border-neon-cyan/30 placeholder:text-gray-700 font-mono"
+                  placeholder="Leave empty to create new simulation"
+                  className="pixel-input text-pixel-xs w-full"
                 />
               </div>
               <button
                 onClick={handleSubmit}
                 disabled={!name.trim() || submitting}
-                className={`px-6 py-2.5 text-xs font-bold tracking-widest rounded-xl transition-all disabled:opacity-30 ${
-                  success
-                    ? 'bg-neon-green/20 text-neon-green glow-border-green'
-                    : 'bg-gradient-to-r from-neon-cyan/10 to-neon-magenta/10 text-neon-cyan glow-border-cyan hover:from-neon-cyan/20 hover:to-neon-magenta/20'
+                className={`pixel-btn text-pixel-sm px-6 py-3 ${
+                  success ? 'pixel-btn-green' : 'pixel-btn-cyan'
                 }`}
               >
-                {success ? 'CREATED!' : submitting ? 'CREATING...' : 'ADD TO SIMULATION'}
+                {success ? 'CREATED!' : submitting ? 'CREATING...' : '▶ CREATE CHARACTER'}
               </button>
             </div>
           </div>
         </div>
 
         <div>
-          <div className="sticky top-20">
-            <h3 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Live Preview</h3>
-            <div className="glass-strong rounded-2xl p-5 glow-border-cyan">
+          <div className="sticky top-14">
+            <div className="text-pixel-xs text-gray-500 tracking-wider mb-2">PREVIEW</div>
+            <div className="pixel-panel p-4" style={{ borderColor: '#00e5ff', boxShadow: '0 0 8px rgba(0,229,255,0.2), 4px 4px 0 #000' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-neon-cyan/20 to-neon-magenta/20 flex items-center justify-center border border-white/10 text-2xl">
+                <div className="w-12 h-12 border-2 border-[#3a3a5c] bg-pixel-bg flex items-center justify-center text-pixel-lg">
                   {imageUrl ? (
-                    <img src={imageUrl} alt="" className="w-full h-full rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <img src={imageUrl} alt="" className="w-full h-full object-cover" style={{ imageRendering: 'pixelated' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
-                    <span className="text-gray-400">{name ? name.charAt(0).toUpperCase() : '?'}</span>
+                    <span className="text-neon-cyan">{name ? name.charAt(0).toUpperCase() : '?'}</span>
                   )}
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-gray-200">
+                  <div className="text-pixel-sm text-gray-200">
                     {name || 'Unnamed Agent'}
                   </div>
-                  <div className="text-[10px] text-gray-500">
-                    {dominantTrait ? `Primary: ${dominantTrait[0]}` : 'Balanced'}
+                  <div className="text-pixel-xs text-gray-600 mt-0.5">
+                    {dominantTrait ? `${TRAIT_ABBREV[dominantTrait[0]]} ${Math.round(dominantTrait[1] * 100)}%` : 'Balanced'}
                   </div>
                 </div>
               </div>
 
               {profile && (
-                <p className="text-[11px] text-gray-400 leading-relaxed mb-4 line-clamp-4">{profile}</p>
+                <p className="text-pixel-xs text-gray-400 leading-relaxed mb-4 line-clamp-3">{profile}</p>
               )}
 
-              <div className="space-y-2 mb-4">
+              <div className="space-y-1.5 mb-4">
                 {(Object.entries(traits) as [keyof PersonalityTraits, number][]).map(([key, val]) => (
                   <div key={key} className="flex items-center gap-2">
-                    <span className="text-[9px] text-gray-600 w-20 uppercase">{key.slice(0, 6)}</span>
-                    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <span className="text-pixel-xs text-gray-600 w-10">{TRAIT_ABBREV[key]}</span>
+                    <div className="pixel-bar-container flex-1">
                       <div
-                        className="h-full rounded-full bg-neon-cyan/60 transition-all duration-300"
-                        style={{ width: `${val * 100}%` }}
+                        className="pixel-bar-fill"
+                        style={{
+                          width: `${val * 100}%`,
+                          backgroundColor: key === 'openness' ? '#00e5ff' :
+                            key === 'conscientiousness' ? '#00ff88' :
+                            key === 'extraversion' ? '#ffd700' :
+                            key === 'agreeableness' ? '#ff00aa' : '#ff3366',
+                        }}
                       />
                     </div>
                   </div>
@@ -315,22 +350,25 @@ export default function CharacterCreator() {
 
               {goals.filter((g) => g.trim()).length > 0 && (
                 <div className="mb-3">
-                  <div className="text-[9px] text-gray-600 uppercase tracking-wider mb-1">Goals</div>
+                  <div className="text-pixel-xs text-gray-600 tracking-wider mb-1">GOALS</div>
                   {goals.filter((g) => g.trim()).map((g, i) => (
-                    <div key={i} className="text-[10px] text-gray-400 flex items-start gap-1.5">
-                      <span className="text-neon-green mt-0.5">›</span> {g}
+                    <div key={i} className="text-pixel-xs text-gray-400 flex items-start gap-1.5">
+                      <span className="text-neon-green">&gt;</span> {g}
                     </div>
                   ))}
                 </div>
               )}
 
               {motivations.filter((m) => m.trim()).length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {motivations.filter((m) => m.trim()).map((m, i) => (
-                    <span key={i} className="text-[9px] px-1.5 py-0.5 bg-neon-purple/10 text-neon-purple rounded">
-                      {m}
-                    </span>
-                  ))}
+                <div>
+                  <div className="text-pixel-xs text-gray-600 tracking-wider mb-1">MOTIVATIONS</div>
+                  <div className="flex flex-wrap gap-1">
+                    {motivations.filter((m) => m.trim()).map((m, i) => (
+                      <span key={i} className="text-pixel-xs px-2 py-0.5 bg-neon-purple/10 text-neon-purple border border-neon-purple/20">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

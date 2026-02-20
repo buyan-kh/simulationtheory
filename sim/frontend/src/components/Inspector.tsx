@@ -28,7 +28,7 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
         .catch(() => setMemory(null))
         .finally(() => setLoadingMemory(false));
     }
-    if (inspectorTab === 'reasoning') {
+    if (inspectorTab === 'mind') {
       setLoadingReasoning(true);
       getReasoning(simId, character.id)
         .then(setReasoning)
@@ -38,10 +38,10 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
   }, [inspectorTab, character.id, simId]);
 
   const tabs = [
-    { key: 'emotions' as const, label: 'Emotions' },
+    { key: 'stats' as const, label: 'Stats' },
     { key: 'memory' as const, label: 'Memory' },
-    { key: 'relationships' as const, label: 'Relations' },
-    { key: 'reasoning' as const, label: 'Reasoning' },
+    { key: 'relations' as const, label: 'Relations' },
+    { key: 'mind' as const, label: 'Mind' },
   ];
 
   const relEntries = Object.entries(character.relationships);
@@ -76,7 +76,7 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {inspectorTab === 'emotions' && (
+        {inspectorTab === 'stats' && (
           <div className="grid grid-cols-2 gap-6">
             <div>
               <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Emotional State</h4>
@@ -211,7 +211,7 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
           </div>
         )}
 
-        {inspectorTab === 'relationships' && (
+        {inspectorTab === 'relations' && (
           <div className="space-y-4">
             <div>
               <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Relationships</h4>
@@ -272,7 +272,7 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
           </div>
         )}
 
-        {inspectorTab === 'reasoning' && (
+        {inspectorTab === 'mind' && (
           <div className="space-y-4">
             {loadingReasoning ? (
               <div className="text-xs text-gray-500 animate-pulse">Loading reasoning...</div>

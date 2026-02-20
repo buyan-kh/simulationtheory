@@ -61,7 +61,7 @@ export interface Character {
 export interface CharacterCreate {
   name: string;
   profile?: string;
-  traits?: PersonalityTraits;
+  traits?: Partial<PersonalityTraits>;
   goals?: string[];
   motivations?: string[];
   image_url?: string | null;
@@ -111,4 +111,18 @@ export interface SimulationState {
   config: SimulationConfig;
   running: boolean;
   created_at: number;
+  chat_log: ChatMessage[];
+}
+
+export interface ChatMessage {
+  id: string;
+  tick: number;
+  speaker_id: string;
+  speaker_name: string;
+  content: string;
+  tone: string;
+  target_id: string | null;
+  target_name: string | null;
+  is_thought: boolean;
+  action_context: string;
 }
