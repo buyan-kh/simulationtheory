@@ -1,4 +1,4 @@
-"""NL ingestor — uses LLM to extract semantic factors from natural language."""
+"""NL ingestor — uses LLM to extract narrative timelines from natural language."""
 
 from __future__ import annotations
 
@@ -14,30 +14,31 @@ from sp26.types import DataPoint, DataSeries, IngestResult, RawInput
 
 logger = logging.getLogger(__name__)
 
-TEMPORAL_LABELS = ["past", "present", "near_future", "far_future"]
-
 EXTRACTION_PROMPT = """\
-You are a semantic analysis engine. Given natural language text, extract the key \
-underlying factors/variables at play and score them across a temporal dimension.
+You are a narrative-to-chart engine. Given natural language, extract one or more \
+data series that represent the key themes, emotions, or variables described. \
+Each series is a timeline of events with a numeric score.
 
-For each factor, provide:
-- name: a short snake_case identifier (e.g., "career_risk", "emotional_distress")
-- description: a one-sentence description of what this factor represents
-- scores: exactly 4 float values between 0.0 and 1.0, representing:
-  [0] = past state (before the described situation)
-  [1] = present state (current situation as described)
-  [2] = near future (likely next development)
-  [3] = far future (longer-term trajectory)
+For each series, produce an ordered list of events/moments. Each event has:
+- label: a SHORT phrase describing what happened at this point (max 6 words)
+- value: a float between 0.0 and 1.0 representing the intensity/level at this point
 
-Extract at most {max_factors} factors. Focus on the most significant dynamics.
+The events should follow the narrative order. Extract the real meaning — if someone \
+says "things got worse", that's a drop in value. If they say "I recovered", that's a rise.
 
-Respond with ONLY a JSON object in this exact format, no other text:
+Extract at most {max_factors} series. Each series should have between 3 and 12 events.
+Focus on the most meaningful dimensions the user is describing.
+
+Respond with ONLY a JSON object, no other text:
 {{
-  "factors": [
+  "series": [
     {{
-      "name": "factor_name",
-      "description": "What this factor represents",
-      "scores": [0.1, 0.5, 0.7, 0.8]
+      "name": "short_name",
+      "events": [
+        {{"label": "Starting point", "value": 0.5}},
+        {{"label": "Something happened", "value": 0.8}},
+        {{"label": "Things changed", "value": 0.3}}
+      ]
     }}
   ]
 }}
@@ -47,7 +48,7 @@ Text to analyze:
 
 
 class NLIngestor:
-    """Extracts semantic factors from natural language using an LLM."""
+    """Extracts narrative timelines from natural language using an LLM."""
 
     def __init__(self, config: SP26Config) -> None:
         self._config = config
@@ -64,19 +65,19 @@ class NLIngestor:
             return self._fallback.ingest(raw_input)
 
         try:
-            factors = self._extract_factors(text)
+            extracted = self._extract_series(text)
         except Exception:
             logger.exception("NL extraction failed; falling back to TextIngestor")
             return self._fallback.ingest(raw_input)
 
-        if not factors:
-            logger.warning("No factors extracted; falling back to TextIngestor")
+        if not extracted:
+            logger.warning("No series extracted; falling back to TextIngestor")
             return self._fallback.ingest(raw_input)
 
-        series = self._factors_to_series(factors)
+        series = self._build_series(extracted)
         return IngestResult(series=series, raw_text=text)
 
-    def _extract_factors(self, text: str) -> list[dict]:
+    def _extract_series(self, text: str) -> list[dict]:
         prompt = EXTRACTION_PROMPT.format(
             max_factors=self._config.nl_max_factors,
             text=text,
@@ -104,30 +105,38 @@ class NLIngestor:
             data = response.json()
 
         response_text = data["content"][0]["text"]
-        return self._parse_factors(response_text)
+        return self._parse_response(response_text)
 
-    def _parse_factors(self, text: str) -> list[dict]:
+    def _parse_response(self, text: str) -> list[dict]:
         # Strip markdown code fences if present
         cleaned = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
         cleaned = re.sub(r"\n?```\s*$", "", cleaned)
 
         parsed = json.loads(cleaned)
-        raw_factors = parsed.get("factors", [])
+        raw_series = parsed.get("series", [])
 
-        valid_factors: list[dict] = []
+        valid: list[dict] = []
         seen_names: set[str] = set()
 
-        for f in raw_factors[: self._config.nl_max_factors]:
-            name = self._sanitize_name(f.get("name", ""))
-            description = str(f.get("description", ""))
-            scores = f.get("scores", [])
+        for s in raw_series[: self._config.nl_max_factors]:
+            name = self._sanitize_name(s.get("name", ""))
+            events = s.get("events", [])
 
-            if not name or not isinstance(scores, list) or len(scores) != 4:
+            if not name or not isinstance(events, list) or len(events) < 2:
                 continue
 
-            try:
-                scores = [max(0.0, min(1.0, float(s))) for s in scores]
-            except (ValueError, TypeError):
+            # Validate events
+            valid_events: list[dict] = []
+            for e in events[:12]:
+                label = str(e.get("label", "")).strip()
+                try:
+                    value = max(0.0, min(1.0, float(e.get("value", 0.5))))
+                except (ValueError, TypeError):
+                    continue
+                if label:
+                    valid_events.append({"label": label, "value": value})
+
+            if len(valid_events) < 2:
                 continue
 
             # Handle duplicate names
@@ -138,36 +147,31 @@ class NLIngestor:
                 counter += 1
             seen_names.add(name)
 
-            valid_factors.append({
-                "name": name,
-                "description": description,
-                "scores": scores,
-            })
+            valid.append({"name": name, "events": valid_events})
 
-        return valid_factors
+        return valid
 
     @staticmethod
     def _sanitize_name(name: str) -> str:
-        """Convert a name to a valid snake_case identifier."""
         name = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())
         name = re.sub(r"_+", "_", name).strip("_")
         return name[:50]
 
     @staticmethod
-    def _factors_to_series(factors: list[dict]) -> list[DataSeries]:
+    def _build_series(extracted: list[dict]) -> list[DataSeries]:
         series: list[DataSeries] = []
-        for factor in factors:
+        for s in extracted:
             points = [
-                DataPoint(index=float(i), value=score)
-                for i, score in enumerate(factor["scores"])
+                DataPoint(
+                    index=float(i),
+                    value=event["value"],
+                    label=event["label"],
+                )
+                for i, event in enumerate(s["events"])
             ]
             series.append(DataSeries(
-                name=factor["name"],
+                name=s["name"],
                 points=points,
-                metadata={
-                    "source": "nl_extraction",
-                    "description": factor["description"],
-                    "temporal_labels": TEMPORAL_LABELS,
-                },
+                metadata={"source": "nl_extraction"},
             ))
         return series

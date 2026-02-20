@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct DataPoint {
     pub index: f64,
     pub value: f64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
 }
 
 /// A named series of data points with optional metadata.

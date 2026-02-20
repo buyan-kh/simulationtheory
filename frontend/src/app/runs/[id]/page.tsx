@@ -97,7 +97,7 @@ interface BackendResult {
 
 interface ChartSeries {
   name: string;
-  points: { index: number; value: number }[];
+  points: { index: number; value: number; label?: string }[];
 }
 
 const CHART_COLORS = ["#6366f1", "#06b6d4", "#f59e0b", "#10b981", "#f43f5e", "#8b5cf6", "#ec4899", "#14b8a6"];

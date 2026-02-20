@@ -28,6 +28,7 @@ class DataPoint(BaseModel):
     """A single data point in a series."""
     index: float
     value: float
+    label: str = ""
 
 
 class DataSeries(BaseModel):
