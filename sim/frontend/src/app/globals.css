@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background: #0a0a1a;
+    color: #e0e0f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(21, 21, 48, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .glass-strong {
+    background: rgba(21, 21, 48, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glow-border-cyan {
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.3), inset 0 0 6px rgba(0, 240, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+  }
+
+  .glow-border-magenta {
+    box-shadow: 0 0 6px rgba(255, 0, 170, 0.3), inset 0 0 6px rgba(255, 0, 170, 0.05);
+    border: 1px solid rgba(255, 0, 170, 0.3);
+  }
+
+  .glow-border-green {
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.3), inset 0 0 6px rgba(0, 255, 136, 0.05);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+  }
+
+  .glow-border-gold {
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.3), inset 0 0 6px rgba(255, 215, 0, 0.05);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+  }
+
+  .text-glow-magenta {
+    text-shadow: 0 0 8px rgba(255, 0, 170, 0.6);
+  }
+
+  .text-glow-green {
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+  }
+}
+
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 30% 65%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1.5px 1.5px at 50% 10%, rgba(0,240,255,0.5), transparent),
+    radial-gradient(1px 1px at 70% 40%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 85% 75%, rgba(255,0,170,0.4), transparent),
+    radial-gradient(1px 1px at 15% 80%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1.5px 1.5px at 60% 90%, rgba(0,255,136,0.4), transparent),
+    radial-gradient(1px 1px at 90% 15%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 40% 35%, rgba(255,215,0,0.3), transparent),
+    radial-gradient(1px 1px at 25% 50%, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 200%;
+  animation: drift-stars 90s linear infinite;
+}
+
+.starfield::after {
+  background-image:
+    radial-gradient(1px 1px at 5% 45%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 22% 12%, rgba(0,240,255,0.3), transparent),
+    radial-gradient(1px 1px at 45% 55%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 65% 28%, rgba(255,0,170,0.3), transparent),
+    radial-gradient(1px 1px at 78% 85%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 92% 52%, rgba(0,255,136,0.3), transparent),
+    radial-gradient(1px 1px at 35% 92%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 55% 72%, rgba(255,215,0,0.3), transparent);
+  background-size: 180% 180%;
+  animation: drift-stars 120s linear infinite reverse;
+}
+
+@keyframes drift-stars {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 26, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.45);
+}
