@@ -7,11 +7,11 @@ import TraitSlider from '@/components/TraitSlider';
 import { createSimulation, addCharacter } from '@/lib/api';
 
 const TRAIT_COLORS: Record<keyof PersonalityTraits, string> = {
-  openness: 'neon-cyan',
-  conscientiousness: 'neon-green',
-  extraversion: 'neon-gold',
-  agreeableness: 'neon-magenta',
-  neuroticism: 'neon-red',
+  openness: 'cyan',
+  conscientiousness: 'green',
+  extraversion: 'gold',
+  agreeableness: 'magenta',
+  neuroticism: 'red',
 };
 
 const TRAIT_ABBREV: Record<keyof PersonalityTraits, string> = {
