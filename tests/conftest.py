@@ -6,13 +6,13 @@ import pytest
 
 from sp26.config import SP26Config
 from sp26.types import (
+    DataPoint,
+    DataSeries,
     EmbedResult,
-    EmbeddedEntity,
-    Entity,
+    EmbeddedSeries,
     IngestResult,
     Prediction,
     PredictionResult,
-    Relationship,
 )
 
 
@@ -31,30 +31,43 @@ def config() -> SP26Config:
 
 
 @pytest.fixture
-def sample_entities() -> list[Entity]:
+def sample_series() -> list[DataSeries]:
     return [
-        Entity(id="e1", label="Alice", entity_type="person"),
-        Entity(id="e2", label="Bob", entity_type="person"),
-        Entity(id="e3", label="Charlie", entity_type="person"),
+        DataSeries(
+            name="price",
+            points=[
+                DataPoint(index=0.0, value=100.0),
+                DataPoint(index=1.0, value=105.0),
+                DataPoint(index=2.0, value=110.0),
+            ],
+            metadata={"source": "csv"},
+        ),
+        DataSeries(
+            name="volume",
+            points=[
+                DataPoint(index=0.0, value=1000.0),
+                DataPoint(index=1.0, value=1200.0),
+                DataPoint(index=2.0, value=900.0),
+            ],
+            metadata={"source": "csv"},
+        ),
+        DataSeries(
+            name="sentiment",
+            points=[
+                DataPoint(index=0.0, value=0.8),
+                DataPoint(index=1.0, value=0.6),
+                DataPoint(index=2.0, value=0.9),
+            ],
+            metadata={"source": "csv"},
+        ),
     ]
 
 
 @pytest.fixture
-def sample_relationships() -> list[Relationship]:
-    return [
-        Relationship(source_id="e1", target_id="e2", relation="knows"),
-        Relationship(source_id="e2", target_id="e3", relation="knows"),
-    ]
-
-
-@pytest.fixture
-def sample_ingest_result(
-    sample_entities: list[Entity], sample_relationships: list[Relationship]
-) -> IngestResult:
+def sample_ingest_result(sample_series: list[DataSeries]) -> IngestResult:
     return IngestResult(
-        entities=sample_entities,
-        relationships=sample_relationships,
-        raw_text="Alice knows Bob. Bob knows Charlie.",
+        series=sample_series,
+        raw_text="price,volume,sentiment\n100,1000,0.8\n105,1200,0.6\n110,900,0.9",
     )
 
 
@@ -69,21 +82,19 @@ def sample_embeddings() -> list[list[float]]:
 
 @pytest.fixture
 def sample_embed_result(
-    sample_entities: list[Entity],
-    sample_relationships: list[Relationship],
+    sample_series: list[DataSeries],
     sample_embeddings: list[list[float]],
 ) -> EmbedResult:
     return EmbedResult(
-        entities=[
-            EmbeddedEntity(
-                id=e.id,
-                label=e.label,
-                entity_type=e.entity_type,
+        series=[
+            EmbeddedSeries(
+                name=s.name,
+                points=s.points,
                 embedding=emb,
+                metadata=s.metadata,
             )
-            for e, emb in zip(sample_entities, sample_embeddings)
+            for s, emb in zip(sample_series, sample_embeddings)
         ],
-        relationships=sample_relationships,
         dimension=4,
     )
 
@@ -93,21 +104,21 @@ def sample_predictions() -> list[Prediction]:
     return [
         Prediction(
             id="p1",
-            description="Alice and Bob will interact",
+            description="price and volume will move together",
             confidence=0.8,
             reasoning="High similarity",
-            source_entities=["e1", "e2"],
+            source_series=["price", "volume"],
         ),
         Prediction(
             id="p2",
-            description="Charlie acts independently",
+            description="sentiment acts independently",
             confidence=0.5,
             reasoning="Low cluster overlap",
-            source_entities=["e3"],
+            source_series=["sentiment"],
         ),
     ]
 
 
 @pytest.fixture
 def sample_prediction_result(sample_predictions: list[Prediction]) -> PredictionResult:
-    return PredictionResult(predictions=sample_predictions, graph_id=1)
+    return PredictionResult(predictions=sample_predictions, chart_id=1)

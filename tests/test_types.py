@@ -1,10 +1,12 @@
 """Tests for Pydantic types."""
 
 from sp26.types import (
+    ChartResult,
     Cluster,
+    DataPoint,
+    DataSeries,
     DecodedOutput,
-    EmbeddedEntity,
-    Entity,
+    EmbeddedSeries,
     Equilibrium,
     ExploredPath,
     GameTheoryResult,
@@ -18,7 +20,6 @@ from sp26.types import (
     PredictionResult,
     RandomizedResult,
     RawInput,
-    Relationship,
     SimilarityPair,
     SimilarityResult,
     Strategy,
@@ -36,42 +37,55 @@ def test_raw_input_explicit_format():
     assert ri.format == InputFormat.CSV
 
 
-def test_entity_serialization():
-    e = Entity(id="e1", label="Test", entity_type="noun")
-    data = e.model_dump()
-    assert data["id"] == "e1"
-    assert data["label"] == "Test"
-    e2 = Entity.model_validate(data)
-    assert e2 == e
+def test_data_point():
+    dp = DataPoint(index=0.0, value=42.5)
+    assert dp.index == 0.0
+    assert dp.value == 42.5
 
 
-def test_relationship():
-    r = Relationship(source_id="a", target_id="b", relation="knows", weight=0.9)
-    assert r.weight == 0.9
+def test_data_series():
+    ds = DataSeries(
+        name="price",
+        points=[DataPoint(index=0.0, value=100.0), DataPoint(index=1.0, value=105.0)],
+    )
+    assert ds.name == "price"
+    assert len(ds.points) == 2
+
+
+def test_data_series_serialization():
+    ds = DataSeries(name="test", points=[DataPoint(index=0.0, value=1.0)])
+    data = ds.model_dump()
+    assert data["name"] == "test"
+    ds2 = DataSeries.model_validate(data)
+    assert ds2 == ds
 
 
 def test_ingest_result():
     ir = IngestResult(
-        entities=[Entity(id="e1", label="A")],
-        relationships=[],
+        series=[DataSeries(name="s1", points=[])],
         raw_text="test",
     )
-    assert len(ir.entities) == 1
+    assert len(ir.series) == 1
 
 
-def test_embedded_entity():
-    ee = EmbeddedEntity(id="e1", label="Test", embedding=[1.0, 2.0, 3.0])
-    assert len(ee.embedding) == 3
+def test_embedded_series():
+    es = EmbeddedSeries(name="test", embedding=[1.0, 2.0, 3.0])
+    assert len(es.embedding) == 3
+
+
+def test_chart_result():
+    cr = ChartResult(chart_id=1, series_count=3, total_points=10)
+    assert cr.series_count == 3
 
 
 def test_similarity_pair():
-    sp = SimilarityPair(entity_a="a", entity_b="b", score=0.95)
+    sp = SimilarityPair(series_a="a", series_b="b", score=0.95)
     assert sp.metric == "cosine"
 
 
 def test_cluster():
-    c = Cluster(cluster_id=0, entity_ids=["a", "b"])
-    assert len(c.entity_ids) == 2
+    c = Cluster(cluster_id=0, series_names=["a", "b"])
+    assert len(c.series_names) == 2
 
 
 def test_prediction_confidence_bounds():

@@ -38,7 +38,7 @@ class TestDecoder:
                     predictions=[
                         Prediction(id="p1", description="test", confidence=0.5),
                     ],
-                    graph_id=1,
+                    chart_id=1,
                 ),
             )
 
@@ -57,7 +57,7 @@ class TestDecoder:
 
             result = await decoder.decode(
                 GameTheoryResult(),
-                PredictionResult(predictions=[], graph_id=1),
+                PredictionResult(predictions=[], chart_id=1),
             )
 
             # Should use the first 200 chars as fallback summary
@@ -73,10 +73,43 @@ class TestDecoder:
                 predictions=[
                     Prediction(id="p1", description="Market goes up", confidence=0.7),
                 ],
-                graph_id=1,
+                chart_id=1,
             ),
         )
 
         assert "Market goes up" in prompt
         assert "70%" in prompt
         assert "2.5" in prompt
+
+    def test_build_prompt_with_context(self):
+        config = SP26Config()
+        decoder = Decoder(config)
+
+        prompt = decoder._build_prompt(
+            GameTheoryResult(),
+            PredictionResult(
+                predictions=[
+                    Prediction(id="p1", description="career_risk rising", confidence=0.8),
+                ],
+                chart_id=1,
+            ),
+            context="I slept with my coworker Amy, it feels weird at work.",
+        )
+
+        assert "I slept with my coworker" in prompt
+        assert "Original Context" in prompt
+
+    def test_build_prompt_without_context(self):
+        """Existing behavior preserved when no context is given."""
+        config = SP26Config()
+        decoder = Decoder(config)
+
+        prompt = decoder._build_prompt(
+            GameTheoryResult(),
+            PredictionResult(
+                predictions=[Prediction(id="p1", description="test", confidence=0.5)],
+                chart_id=1,
+            ),
+        )
+
+        assert "Original Context" not in prompt

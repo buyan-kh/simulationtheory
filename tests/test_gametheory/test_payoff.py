@@ -6,8 +6,8 @@ from sp26.types import Prediction
 
 def test_build_payoff_matrix_basic():
     predictions = [
-        Prediction(id="p1", description="A", confidence=0.8, source_entities=["e1"]),
-        Prediction(id="p2", description="B", confidence=0.6, source_entities=["e2"]),
+        Prediction(id="p1", description="A", confidence=0.8, source_series=["s1"]),
+        Prediction(id="p2", description="B", confidence=0.6, source_series=["s2"]),
     ]
     rows, cols, p1, p2 = build_payoff_matrix(predictions)
     assert rows == 2
@@ -27,10 +27,10 @@ def test_build_payoff_matrix_empty():
 
 def test_build_payoff_overlap():
     predictions = [
-        Prediction(id="p1", description="A", confidence=0.8, source_entities=["e1", "e2"]),
-        Prediction(id="p2", description="B", confidence=0.6, source_entities=["e2", "e3"]),
+        Prediction(id="p1", description="A", confidence=0.8, source_series=["s1", "s2"]),
+        Prediction(id="p2", description="B", confidence=0.6, source_series=["s2", "s3"]),
     ]
     rows, cols, p1, p2 = build_payoff_matrix(predictions)
     # Off-diagonal P2 payoffs should reflect partial overlap
-    # p1 occurs, agent prepared for p2: overlap={e2}, union={e1,e2,e3} → 0.6 * 1/3
+    # p1 occurs, agent prepared for p2: overlap={s2}, union={s1,s2,s3} → 0.6 * 1/3
     assert abs(p2[1] - 0.6 * 1 / 3) < 1e-10

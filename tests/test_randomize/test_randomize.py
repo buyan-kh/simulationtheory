@@ -18,10 +18,10 @@ class TestMonteCarloRandomizer:
 
         predictions = PredictionResult(
             predictions=[
-                Prediction(id="p1", description="A", confidence=0.9, source_entities=["e1"]),
-                Prediction(id="p2", description="B", confidence=0.1, source_entities=["e2"]),
+                Prediction(id="p1", description="A", confidence=0.9, source_series=["s1"]),
+                Prediction(id="p2", description="B", confidence=0.1, source_series=["s2"]),
             ],
-            graph_id=1,
+            chart_id=1,
         )
 
         result = randomizer.randomize(
@@ -40,7 +40,7 @@ class TestMonteCarloRandomizer:
         result = randomizer.randomize(
             GameTheoryResult(),
             PathResult(paths=[]),
-            PredictionResult(predictions=[], graph_id=1),
+            PredictionResult(predictions=[], chart_id=1),
         )
         assert result.sampled_outcomes == []
 
@@ -53,7 +53,7 @@ class TestMonteCarloRandomizer:
                 Prediction(id="p1", description="A", confidence=0.5),
                 Prediction(id="p2", description="B", confidence=0.5),
             ],
-            graph_id=1,
+            chart_id=1,
         )
 
         result = randomizer.randomize(
@@ -74,7 +74,7 @@ class TestEpsilonGreedyRandomizer:
                 Prediction(id="p1", description="Best", confidence=0.95),
                 Prediction(id="p2", description="Worst", confidence=0.05),
             ],
-            graph_id=1,
+            chart_id=1,
         )
 
         result = randomizer.select(predictions, num_selections=100)
@@ -95,7 +95,7 @@ class TestEpsilonGreedyRandomizer:
                 Prediction(id="p1", description="Best", confidence=0.9),
                 Prediction(id="p2", description="Other", confidence=0.1),
             ],
-            graph_id=1,
+            chart_id=1,
         )
 
         result = randomizer.select(predictions, num_selections=50)
@@ -110,7 +110,7 @@ class TestEpsilonGreedyRandomizer:
         randomizer = EpsilonGreedyRandomizer(config)
 
         result = randomizer.select(
-            PredictionResult(predictions=[], graph_id=1)
+            PredictionResult(predictions=[], chart_id=1)
         )
         assert result.sampled_outcomes == []
 
@@ -122,7 +122,7 @@ class TestEpsilonGreedyRandomizer:
             predictions=[
                 Prediction(id="p1", description="A", confidence=0.7),
             ],
-            graph_id=1,
+            chart_id=1,
         )
 
         result = randomizer.select(predictions)
