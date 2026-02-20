@@ -7,16 +7,16 @@ interface EventLogProps {
   events: SimEvent[];
 }
 
-const EVENT_STYLES: Record<EventType, { color: string; icon: string; label: string }> = {
-  interaction: { color: 'text-neon-cyan border-neon-cyan/20', icon: '💬', label: 'Interaction' },
-  environmental: { color: 'text-neon-gold border-neon-gold/20', icon: '🌍', label: 'Environment' },
-  decision: { color: 'text-gray-300 border-gray-600/20', icon: '🧠', label: 'Decision' },
-  emergent: { color: 'text-neon-magenta border-neon-magenta/20', icon: '✨', label: 'Emergent' },
-  alliance_formed: { color: 'text-neon-green border-neon-green/20', icon: '🤝', label: 'Alliance' },
-  conflict: { color: 'text-neon-red border-neon-red/20', icon: '⚔️', label: 'Conflict' },
-  negotiation: { color: 'text-neon-orange border-neon-orange/20', icon: '🗣️', label: 'Negotiation' },
-  resource_change: { color: 'text-neon-blue border-neon-blue/20', icon: '📦', label: 'Resources' },
-  emotional_shift: { color: 'text-neon-purple border-neon-purple/20', icon: '💜', label: 'Emotion' },
+const EVENT_STYLES: Record<EventType, { color: string; icon: string }> = {
+  conflict: { color: '#ff3366', icon: '⚔' },
+  alliance_formed: { color: '#00ff88', icon: '🛡' },
+  negotiation: { color: '#ff8844', icon: '🤝' },
+  interaction: { color: '#00e5ff', icon: '💬' },
+  environmental: { color: '#ffd700', icon: '☁' },
+  emergent: { color: '#ff00aa', icon: '✦' },
+  resource_change: { color: '#4488ff', icon: '💎' },
+  decision: { color: '#d0d0e0', icon: '►' },
+  emotional_shift: { color: '#aa44ff', icon: '💜' },
 };
 
 export default function EventLog({ events }: EventLogProps) {
@@ -27,53 +27,68 @@ export default function EventLog({ events }: EventLogProps) {
   const sorted = [...filtered].sort((a, b) => b.tick - a.tick || b.importance - a.importance);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-        <span className="text-[10px] text-gray-600 uppercase tracking-widest">Events</span>
+    <div className="pixel-panel flex flex-col h-full">
+      <div className="pixel-panel-title flex items-center justify-between">
+        <span>Events</span>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as EventType | 'all')}
-          className="text-[10px] bg-transparent border border-white/10 rounded px-1.5 py-0.5 text-gray-400 outline-none focus:border-neon-cyan/30"
+          className="pixel-select"
+          style={{ fontSize: '8px', padding: '2px 6px' }}
         >
-          <option value="all">All</option>
-          {Object.entries(EVENT_STYLES).map(([type, cfg]) => (
-            <option key={type} value={type}>{cfg.label}</option>
+          <option value="all">ALL</option>
+          {Object.keys(EVENT_STYLES).map((type) => (
+            <option key={type} value={type}>{type.toUpperCase()}</option>
           ))}
         </select>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 pixel-scrollbar">
         {sorted.length === 0 && (
-          <div className="text-center py-8 text-xs text-gray-600">
+          <div className="text-center py-8 font-pixel text-pixel-text-dim" style={{ fontSize: '8px' }}>
             No events yet
           </div>
         )}
         {sorted.map((event) => {
           const style = EVENT_STYLES[event.type] || EVENT_STYLES.decision;
           const isExpanded = expanded === event.id;
+          const isImportant = event.importance > 0.7;
 
           return (
             <div
               key={event.id}
-              className={`animate-slide-in-right rounded-lg p-2 glass cursor-pointer transition-all border-l-2 ${style.color} ${
-                event.importance > 0.7 ? 'bg-white/[0.03]' : ''
-              }`}
+              className={`p-2 cursor-pointer ${isImportant ? 'glow-gold' : ''}`}
               onClick={() => setExpanded(isExpanded ? null : event.id)}
+              style={{
+                background: '#0a0a1a',
+                border: `1px solid ${isImportant ? style.color : '#2a2a5a'}`,
+                boxShadow: isImportant ? `0 0 6px ${style.color}40` : 'none',
+              }}
             >
               <div className="flex items-start gap-2">
-                <span className="text-xs mt-0.5 shrink-0">{style.icon}</span>
+                <span style={{ fontSize: '10px' }}>{style.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-300 truncate">{event.title}</span>
-                    <span className="text-[9px] text-gray-600 font-mono shrink-0">t{event.tick}</span>
+                    <span className="font-pixel truncate" style={{ fontSize: '8px', color: style.color }}>
+                      {event.title}
+                    </span>
+                    <span className="font-pixel text-pixel-text-dim shrink-0" style={{ fontSize: '7px' }}>
+                      T{event.tick}
+                    </span>
                   </div>
                   {isExpanded && (
-                    <div className="mt-1.5 space-y-1 animate-fade-in">
-                      <p className="text-[11px] text-gray-400 leading-relaxed">{event.description}</p>
+                    <div className="mt-2 space-y-1">
+                      <p className="font-pixel text-pixel-text-dim leading-relaxed" style={{ fontSize: '7px' }}>
+                        {event.description}
+                      </p>
                       {event.outcomes.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {event.outcomes.map((o, i) => (
-                            <span key={i} className="text-[9px] px-1.5 py-0.5 bg-white/5 rounded text-gray-500">
+                            <span
+                              key={i}
+                              className="pixel-badge font-pixel"
+                              style={{ fontSize: '6px', borderColor: '#2a2a5a', color: '#6a6a8a' }}
+                            >
                               {o}
                             </span>
                           ))}
@@ -82,8 +97,8 @@ export default function EventLog({ events }: EventLogProps) {
                     </div>
                   )}
                 </div>
-                {event.importance > 0.7 && (
-                  <span className="text-[8px] text-neon-magenta uppercase tracking-wider shrink-0">!</span>
+                {isImportant && (
+                  <span className="font-pixel animate-pixel-blink" style={{ fontSize: '8px', color: '#ff00aa' }}>!</span>
                 )}
               </div>
             </div>

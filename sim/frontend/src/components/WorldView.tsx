@@ -1,201 +1,230 @@
 'use client';
 
-import type { Character, Location } from '@/lib/types';
+import type { Character, Location, ChatMessage } from '@/lib/types';
 import { getMoodColor } from './EmotionDisplay';
+import ChatBubble from './ChatBubble';
 
 interface WorldViewProps {
   characters: Record<string, Character>;
   locations: Location[];
   selectedCharacterId: string | null;
   onSelectCharacter: (id: string) => void;
-}
-
-const SCALE = 1.8;
-
-function toIso(x: number, y: number): { ix: number; iy: number } {
-  return {
-    ix: (x - y) * SCALE,
-    iy: (x + y) * (SCALE * 0.5),
-  };
+  chatMessages: ChatMessage[];
+  currentTick: number;
 }
 
 const LOCATION_ICONS: Record<string, string> = {
-  trade: '\u{1F3EA}',
-  conflict: '\u{2694}',
-  diplomacy: '\u{1F3DB}',
-  exploration: '\u{1F332}',
-  knowledge: '\u{1F4DA}',
+  trade: '🏪',
+  market: '🏪',
+  conflict: '⚔',
+  arena: '⚔',
+  diplomacy: '🏛',
+  council: '🏛',
+  exploration: '🌲',
+  wilderness: '🌲',
+  knowledge: '📚',
+  library: '📚',
 };
 
-export default function WorldView({ characters, locations, selectedCharacterId, onSelectCharacter }: WorldViewProps) {
+const LOCATION_TILES: Record<string, string> = {
+  trade: 'tile-market',
+  market: 'tile-market',
+  conflict: 'tile-arena',
+  arena: 'tile-arena',
+  diplomacy: 'tile-stone',
+  council: 'tile-stone',
+  exploration: 'tile-grass',
+  wilderness: 'tile-grass',
+  knowledge: 'tile-library',
+  library: 'tile-library',
+};
+
+const WORLD_W = 600;
+const WORLD_H = 400;
+
+function worldToPixel(x: number, y: number): { px: number; py: number } {
+  return {
+    px: (x / 100) * WORLD_W + WORLD_W / 2,
+    py: (y / 100) * WORLD_H + WORLD_H / 2,
+  };
+}
+
+export default function WorldView({
+  characters,
+  locations,
+  selectedCharacterId,
+  onSelectCharacter,
+  chatMessages,
+  currentTick,
+}: WorldViewProps) {
   const chars = Object.values(characters);
-
-  const allPoints = [
-    ...chars.map((c) => toIso(c.position.x, c.position.y)),
-    ...locations.map((l) => toIso(l.x, l.y)),
-  ];
-
-  const padding = 60;
-  const isoMinX = allPoints.length ? Math.min(...allPoints.map((p) => p.ix)) - padding : -200;
-  const isoMaxX = allPoints.length ? Math.max(...allPoints.map((p) => p.ix)) + padding : 200;
-  const isoMinY = allPoints.length ? Math.min(...allPoints.map((p) => p.iy)) - padding : -150;
-  const isoMaxY = allPoints.length ? Math.max(...allPoints.map((p) => p.iy)) + padding : 150;
-  const viewWidth = isoMaxX - isoMinX;
-  const viewHeight = isoMaxY - isoMinY;
-
   const selectedChar = selectedCharacterId ? characters[selectedCharacterId] : null;
-
-  const gridLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
-  const gridStep = 50;
-  for (let i = -200; i <= 200; i += gridStep) {
-    const a = toIso(i, -200);
-    const b = toIso(i, 200);
-    gridLines.push({ x1: a.ix, y1: a.iy, x2: b.ix, y2: b.iy });
-    const c = toIso(-200, i);
-    const d = toIso(200, i);
-    gridLines.push({ x1: c.ix, y1: c.iy, x2: d.ix, y2: d.iy });
-  }
+  const recentMessages = chatMessages.filter((m) => currentTick - m.tick <= 2);
 
   return (
-    <div className="w-full h-full glass rounded-xl overflow-hidden relative">
-      <div className="absolute top-2 left-3 text-[10px] text-gray-600 uppercase tracking-widest z-10">
-        World View
-      </div>
-
-      <svg
-        viewBox={`${isoMinX} ${isoMinY} ${viewWidth} ${viewHeight}`}
-        className="w-full h-full"
-        preserveAspectRatio="xMidYMid meet"
+    <div
+      className="pixel-panel w-full h-full overflow-auto relative"
+      style={{
+        background: '#0a0a1a',
+        backgroundImage:
+          'linear-gradient(rgba(42,42,90,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(42,42,90,0.15) 1px, transparent 1px)',
+        backgroundSize: '16px 16px',
+      }}
+    >
+      <div
+        className="relative"
+        style={{ width: WORLD_W, height: WORLD_H, margin: '0 auto' }}
       >
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {gridLines.map((line, i) => (
-          <line
-            key={`grid-${i}`}
-            x1={line.x1} y1={line.y1}
-            x2={line.x2} y2={line.y2}
-            stroke="rgba(255,255,255,0.03)"
-            strokeWidth="0.5"
-          />
-        ))}
-
         {locations.map((loc) => {
-          const { ix, iy } = toIso(loc.x, loc.y);
-          const icon = LOCATION_ICONS[loc.type] || '\u{1F4CD}';
-          const halfW = 20;
-          const halfH = 12;
+          const { px, py } = worldToPixel(loc.x, loc.y);
+          const tileClass = LOCATION_TILES[loc.type] || LOCATION_TILES[loc.name.toLowerCase()] || 'tile-grass';
+          const icon = LOCATION_ICONS[loc.type] || LOCATION_ICONS[loc.name.toLowerCase()] || '📍';
+
           return (
-            <g key={loc.name}>
-              <polygon
-                points={`${ix},${iy - halfH} ${ix + halfW},${iy} ${ix},${iy + halfH} ${ix - halfW},${iy}`}
-                fill="rgba(255,215,0,0.06)"
-                stroke="rgba(255,215,0,0.15)"
-                strokeWidth="0.5"
-              />
-              <text x={ix} y={iy + 2} textAnchor="middle" fontSize="10" dominantBaseline="middle">
-                {icon}
-              </text>
-              <text
-                x={ix}
-                y={iy + 16}
-                textAnchor="middle"
-                fontSize="5"
-                fill="rgba(255,215,0,0.6)"
-                fontFamily="monospace"
+            <div
+              key={loc.name}
+              className={`absolute ${tileClass}`}
+              style={{
+                left: px - 40,
+                top: py - 30,
+                width: 80,
+                height: 60,
+                border: '2px solid #2a2a5a',
+                boxShadow: '2px 2px 0 0 rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1,
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>{icon}</span>
+              <span
+                className="font-pixel text-pixel-text-dim text-center"
+                style={{ fontSize: '6px', marginTop: '2px' }}
               >
                 {loc.name}
-              </text>
-            </g>
+              </span>
+            </div>
           );
         })}
 
-        {selectedChar && chars.map((c) => {
-          if (c.id === selectedCharacterId) return null;
-          const rel = selectedChar.relationships[c.id];
-          if (rel === undefined) return null;
-          const from = toIso(selectedChar.position.x, selectedChar.position.y);
-          const to = toIso(c.position.x, c.position.y);
-          const color = rel > 0 ? `rgba(0,255,136,${Math.min(1, Math.abs(rel))})` : `rgba(255,51,102,${Math.min(1, Math.abs(rel))})`;
-          return (
-            <line
-              key={`rel-${c.id}`}
-              x1={from.ix}
-              y1={from.iy}
-              x2={to.ix}
-              y2={to.iy}
-              stroke={color}
-              strokeWidth="1"
-              strokeDasharray={rel < 0 ? '4,4' : 'none'}
-              opacity="0.5"
-              filter="url(#glow)"
-            />
-          );
-        })}
+        {selectedChar && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            style={{ width: WORLD_W, height: WORLD_H, zIndex: 2 }}
+          >
+            {chars.map((c) => {
+              if (c.id === selectedCharacterId) return null;
+              const rel = selectedChar.relationships[c.id];
+              if (rel === undefined || rel === 0) return null;
+              const from = worldToPixel(selectedChar.position.x, selectedChar.position.y);
+              const to = worldToPixel(c.position.x, c.position.y);
+              const isPositive = rel > 0;
+              const strength = Math.min(1, Math.abs(rel));
+              return (
+                <line
+                  key={`rel-${c.id}`}
+                  x1={from.px}
+                  y1={from.py}
+                  x2={to.px}
+                  y2={to.py}
+                  stroke={isPositive ? '#00ff88' : '#ff3366'}
+                  strokeWidth={1 + strength * 2}
+                  strokeDasharray={isPositive ? 'none' : '4,4'}
+                  opacity={0.4 + strength * 0.3}
+                />
+              );
+            })}
+          </svg>
+        )}
 
         {chars.map((c) => {
-          const { ix, iy } = toIso(c.position.x, c.position.y);
-          const color = getMoodColor(c.emotional_state);
+          const { px, py } = worldToPixel(c.position.x, c.position.y);
+          const moodColor = getMoodColor(c.emotional_state);
           const isSelected = c.id === selectedCharacterId;
+          const isDead = !c.alive;
+          const charMessages = recentMessages.filter((m) => m.speaker_id === c.id);
+          const latestMessage = charMessages[charMessages.length - 1];
 
           return (
-            <g
+            <div
               key={c.id}
+              className="absolute cursor-pointer"
+              style={{
+                left: px - 20,
+                top: py - 20,
+                width: 40,
+                height: 40,
+                transition: 'left 0.5s ease, top 0.5s ease',
+                zIndex: isSelected ? 10 : 5,
+              }}
               onClick={() => onSelectCharacter(c.id)}
-              className="cursor-pointer"
             >
-              {isSelected && (
-                <circle cx={ix} cy={iy} r="10" fill="none" stroke={color} strokeWidth="0.5" opacity="0.5">
-                  <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.5;0.2;0.5" dur="2s" repeatCount="indefinite" />
-                </circle>
+              {latestMessage && (
+                <ChatBubble message={latestMessage} characterName={c.name} />
               )}
-              <circle
-                cx={ix}
-                cy={iy}
-                r="6"
-                fill={color}
-                opacity={c.alive ? 0.9 : 0.3}
-                filter="url(#glow)"
-              />
-              <circle
-                cx={ix}
-                cy={iy}
-                r="3"
-                fill="white"
-                opacity={c.alive ? 0.7 : 0.2}
-              />
-              <text
-                x={ix}
-                y={iy - 10}
-                textAnchor="middle"
-                fontSize="5"
-                fill={color}
-                fontFamily="monospace"
-                fontWeight="bold"
+
+              <div
+                className={`relative w-full h-full flex items-center justify-center ${isDead ? '' : 'animate-pixel-float'}`}
+                style={{
+                  background: isDead ? '#1a1a1a' : '#12122a',
+                  border: `3px solid ${isSelected ? '#ffd700' : moodColor}`,
+                  boxShadow: isSelected
+                    ? `0 0 10px rgba(255,215,0,0.5), 2px 2px 0 0 rgba(0,0,0,0.4)`
+                    : `2px 2px 0 0 rgba(0,0,0,0.4)`,
+                  imageRendering: 'pixelated',
+                  filter: isDead ? 'grayscale(100%)' : 'none',
+                  opacity: isDead ? 0.5 : 1,
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -3,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 12,
+                    height: 5,
+                    background: moodColor,
+                    border: '1px solid rgba(0,0,0,0.3)',
+                  }}
+                />
+                {isDead ? (
+                  <span className="font-pixel text-neon-red" style={{ fontSize: '10px' }}>X</span>
+                ) : (
+                  <span className="font-pixel" style={{ fontSize: '10px', color: moodColor }}>
+                    {c.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div
+                className="font-pixel text-center truncate"
+                style={{
+                  fontSize: '6px',
+                  color: isSelected ? '#ffd700' : '#6a6a8a',
+                  marginTop: '2px',
+                  width: '100%',
+                }}
               >
                 {c.name}
-              </text>
-            </g>
+              </div>
+            </div>
           );
         })}
-      </svg>
 
-      {chars.length === 0 && locations.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-2xl mb-2 opacity-30">{'\u{1F30C}'}</div>
-            <div className="text-xs text-gray-600">Empty world — add characters to begin</div>
+        {chars.length === 0 && locations.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <div className="font-pixel text-pixel-text-dim" style={{ fontSize: '16px', marginBottom: '8px' }}>🌌</div>
+              <div className="font-pixel text-pixel-text-dim" style={{ fontSize: '8px' }}>
+                Empty world — add characters to begin
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

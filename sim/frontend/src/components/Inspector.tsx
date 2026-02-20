@@ -5,6 +5,7 @@ import type { Character, Memory } from '@/lib/types';
 import { useSimStore } from '@/lib/store';
 import EmotionDisplay from './EmotionDisplay';
 import TraitSlider from './TraitSlider';
+import ResourceBar from './ResourceBar';
 import { getMemory, getReasoning } from '@/lib/api';
 
 interface InspectorProps {
@@ -13,6 +14,8 @@ interface InspectorProps {
   simId: string;
 }
 
+type TabKey = 'stats' | 'memory' | 'relations' | 'mind';
+
 export default function Inspector({ character, allCharacters, simId }: InspectorProps) {
   const { inspectorTab, setInspectorTab } = useSimStore();
   const [memory, setMemory] = useState<Memory | null>(null);
@@ -20,190 +23,210 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
   const [loadingMemory, setLoadingMemory] = useState(false);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
 
+  const tab = (['stats', 'memory', 'relations', 'mind'].includes(inspectorTab) ? inspectorTab : 'stats') as TabKey;
+
   useEffect(() => {
-    if (inspectorTab === 'memory') {
+    if (tab === 'memory') {
       setLoadingMemory(true);
       getMemory(simId, character.id)
         .then(setMemory)
         .catch(() => setMemory(null))
         .finally(() => setLoadingMemory(false));
     }
-    if (inspectorTab === 'mind') {
+    if (tab === 'mind') {
       setLoadingReasoning(true);
       getReasoning(simId, character.id)
         .then(setReasoning)
         .catch(() => setReasoning(null))
         .finally(() => setLoadingReasoning(false));
     }
-  }, [inspectorTab, character.id, simId]);
+  }, [tab, character.id, simId]);
 
-  const tabs = [
-    { key: 'stats' as const, label: 'Stats' },
-    { key: 'memory' as const, label: 'Memory' },
-    { key: 'relations' as const, label: 'Relations' },
-    { key: 'mind' as const, label: 'Mind' },
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: 'stats', label: 'Stats' },
+    { key: 'memory', label: 'Memory' },
+    { key: 'relations', label: 'Relations' },
+    { key: 'mind', label: 'Mind' },
   ];
 
   const relEntries = Object.entries(character.relationships);
+  const resourceColors = ['cyan', 'gold', 'green', 'magenta', 'blue', 'orange'];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-neon-cyan/20 to-neon-magenta/20 flex items-center justify-center text-[10px] font-bold border border-white/10">
-            {character.name.charAt(0)}
-          </div>
-          <span className="text-sm font-bold text-gray-200">{character.name}</span>
+    <div className="pixel-panel flex flex-col h-full">
+      <div className="pixel-panel-title flex items-center gap-2">
+        <div
+          className="flex items-center justify-center font-pixel"
+          style={{
+            width: 20,
+            height: 20,
+            background: '#1a1a3a',
+            border: '2px solid #4a4a8a',
+            fontSize: '8px',
+            color: '#00e5ff',
+          }}
+        >
+          {character.name.charAt(0)}
         </div>
-
-        <div className="flex-1" />
-
-        <div className="flex gap-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setInspectorTab(tab.key)}
-              className={`px-2.5 py-1 text-[10px] rounded-md transition-colors uppercase tracking-wider ${
-                inspectorTab === tab.key
-                  ? 'bg-neon-cyan/10 text-neon-cyan'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <span>{character.name}</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {inspectorTab === 'stats' && (
-          <div className="grid grid-cols-2 gap-6">
+      <div className="flex" style={{ borderBottom: '2px solid #2a2a5a' }}>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setInspectorTab(t.key as typeof inspectorTab)}
+            className={`pixel-tab ${tab === t.key ? 'pixel-tab-active' : ''}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 pixel-scrollbar">
+        {tab === 'stats' && (
+          <div className="space-y-4">
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Emotional State</h4>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Personality</div>
+              <div className="space-y-2">
+                <TraitSlider label="Open" value={character.traits.openness} onChange={() => {}} readOnly color="purple" />
+                <TraitSlider label="Consc" value={character.traits.conscientiousness} onChange={() => {}} readOnly color="cyan" />
+                <TraitSlider label="Extra" value={character.traits.extraversion} onChange={() => {}} readOnly color="gold" />
+                <TraitSlider label="Agree" value={character.traits.agreeableness} onChange={() => {}} readOnly color="green" />
+                <TraitSlider label="Neuro" value={character.traits.neuroticism} onChange={() => {}} readOnly color="red" />
+              </div>
+            </div>
+
+            <div className="pixel-divider" />
+
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Emotions</div>
               <EmotionDisplay emotions={character.emotional_state} />
             </div>
+
+            <div className="pixel-divider" />
+
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Personality</h4>
-              <div className="space-y-3">
-                <TraitSlider label="Openness" value={character.traits.openness} onChange={() => {}} readOnly color="neon-cyan" />
-                <TraitSlider label="Conscientiousness" value={character.traits.conscientiousness} onChange={() => {}} readOnly color="neon-green" />
-                <TraitSlider label="Extraversion" value={character.traits.extraversion} onChange={() => {}} readOnly color="neon-gold" />
-                <TraitSlider label="Agreeableness" value={character.traits.agreeableness} onChange={() => {}} readOnly color="neon-magenta" />
-                <TraitSlider label="Neuroticism" value={character.traits.neuroticism} onChange={() => {}} readOnly color="neon-red" />
-              </div>
-            </div>
-            <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Goals</h4>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Goals</div>
               <div className="space-y-1">
                 {character.goals.map((g, i) => (
-                  <div key={i} className="text-xs text-gray-400 flex items-start gap-2">
-                    <span className="text-neon-cyan mt-0.5">›</span>
-                    <span>{g}</span>
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="font-pixel text-neon-gold" style={{ fontSize: '7px' }}>►</span>
+                    <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{g}</span>
                   </div>
                 ))}
-                {character.goals.length === 0 && <span className="text-xs text-gray-600">No goals set</span>}
+                {character.goals.length === 0 && (
+                  <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No goals set</span>
+                )}
               </div>
             </div>
+
+            <div className="pixel-divider" />
+
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Last Action</h4>
-              {character.last_action ? (
-                <div className="glass rounded-lg p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-1.5 py-0.5 bg-neon-cyan/10 text-neon-cyan rounded uppercase">
-                      {character.last_action.type}
-                    </span>
-                    {character.last_action.target_id && (
-                      <span className="text-[10px] text-gray-500">
-                        → {allCharacters[character.last_action.target_id]?.name || character.last_action.target_id}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400">{character.last_action.detail}</p>
-                </div>
-              ) : (
-                <span className="text-xs text-gray-600">No action taken</span>
-              )}
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Resources</div>
+              <div className="space-y-2">
+                {Object.entries(character.resources).map(([key, val], i) => (
+                  <ResourceBar key={key} label={key} value={val} color={resourceColors[i % resourceColors.length]} />
+                ))}
+                {Object.keys(character.resources).length === 0 && (
+                  <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No resources</span>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {inspectorTab === 'memory' && (
+        {tab === 'memory' && (
           <div className="space-y-4">
             {loadingMemory ? (
-              <div className="text-xs text-gray-500 animate-pulse">Loading memory...</div>
+              <div className="font-pixel text-pixel-text-dim animate-pixel-blink" style={{ fontSize: '8px' }}>
+                Loading memory...
+              </div>
             ) : memory ? (
               <>
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Beliefs</h4>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Beliefs</div>
+                  <div className="flex flex-wrap gap-1">
                     {Object.entries(memory.beliefs).map(([k, v]) => (
-                      <span key={k} className="text-[10px] px-2 py-1 glass rounded-md text-gray-400">
-                        <span className="text-neon-gold">{k}:</span> {v}
+                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ffd700', color: '#ffd700' }}>
+                        {k}: {v}
                       </span>
                     ))}
                     {Object.keys(memory.beliefs).length === 0 && (
-                      <span className="text-xs text-gray-600">No beliefs recorded</span>
+                      <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No beliefs</span>
                     )}
                   </div>
                 </div>
+                <div className="pixel-divider" />
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Short-Term Memory</h4>
-                  <div className="space-y-1.5">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Short-term</div>
+                  <div className="space-y-1">
                     {memory.short_term.map((m) => (
-                      <div key={m.id} className="glass rounded-lg p-2 border-l-2 border-neon-cyan/20">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[9px] text-gray-600 font-mono">t{m.tick}</span>
-                          <span className="text-[9px] text-neon-gold font-mono">imp:{(m.importance * 100).toFixed(0)}%</span>
+                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #00e5ff' }}>
+                        <div className="flex gap-2 mb-1">
+                          <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
+                          <span className="font-pixel text-neon-gold" style={{ fontSize: '6px' }}>
+                            IMP:{Math.round(m.importance * 100)}%
+                          </span>
                         </div>
-                        <p className="text-[11px] text-gray-400">{m.content}</p>
+                        <p className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{m.content}</p>
                       </div>
                     ))}
-                    {memory.short_term.length === 0 && <span className="text-xs text-gray-600">Empty</span>}
+                    {memory.short_term.length === 0 && (
+                      <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>Empty</span>
+                    )}
                   </div>
                 </div>
+                <div className="pixel-divider" />
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Long-Term Memory</h4>
-                  <div className="space-y-1.5">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Long-term</div>
+                  <div className="space-y-1">
                     {memory.long_term.slice(0, 10).map((m) => (
-                      <div key={m.id} className="glass rounded-lg p-2 border-l-2 border-neon-magenta/20">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[9px] text-gray-600 font-mono">t{m.tick}</span>
-                          <span className="text-[9px] text-neon-gold font-mono">imp:{(m.importance * 100).toFixed(0)}%</span>
+                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #ff00aa' }}>
+                        <div className="flex gap-2 mb-1">
+                          <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
+                          <span className="font-pixel text-neon-gold" style={{ fontSize: '6px' }}>
+                            IMP:{Math.round(m.importance * 100)}%
+                          </span>
                         </div>
-                        <p className="text-[11px] text-gray-400">{m.content}</p>
+                        <p className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{m.content}</p>
                       </div>
                     ))}
-                    {memory.long_term.length === 0 && <span className="text-xs text-gray-600">Empty</span>}
+                    {memory.long_term.length === 0 && (
+                      <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>Empty</span>
+                    )}
                   </div>
                 </div>
               </>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Beliefs (local)</h4>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Beliefs (local)</div>
+                  <div className="flex flex-wrap gap-1">
                     {Object.entries(character.memory.beliefs).map(([k, v]) => (
-                      <span key={k} className="text-[10px] px-2 py-1 glass rounded-md text-gray-400">
-                        <span className="text-neon-gold">{k}:</span> {v}
+                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ffd700', color: '#ffd700' }}>
+                        {k}: {v}
                       </span>
                     ))}
                     {Object.keys(character.memory.beliefs).length === 0 && (
-                      <span className="text-xs text-gray-600">No beliefs</span>
+                      <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No beliefs</span>
                     )}
                   </div>
                 </div>
+                <div className="pixel-divider" />
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Recent Memories</h4>
-                  <div className="space-y-1.5">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Recent Memories</div>
+                  <div className="space-y-1">
                     {character.memory.short_term.map((m) => (
-                      <div key={m.id} className="glass rounded-lg p-2 border-l-2 border-neon-cyan/20">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[9px] text-gray-600 font-mono">t{m.tick}</span>
-                        </div>
-                        <p className="text-[11px] text-gray-400">{m.content}</p>
+                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #00e5ff' }}>
+                        <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
+                        <p className="font-pixel text-pixel-text mt-1" style={{ fontSize: '7px' }}>{m.content}</p>
                       </div>
                     ))}
-                    {character.memory.short_term.length === 0 && <span className="text-xs text-gray-600">No memories</span>}
+                    {character.memory.short_term.length === 0 && (
+                      <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No memories</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -211,12 +234,12 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
           </div>
         )}
 
-        {inspectorTab === 'relations' && (
+        {tab === 'relations' && (
           <div className="space-y-4">
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Relationships</h4>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Relationships</div>
               {relEntries.length === 0 ? (
-                <span className="text-xs text-gray-600">No relationships</span>
+                <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No relationships</span>
               ) : (
                 <div className="space-y-2">
                   {relEntries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([id, value]) => {
@@ -224,28 +247,50 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
                     const name = other?.name || id;
                     const isPositive = value >= 0;
                     return (
-                      <div key={id} className="flex items-center gap-3">
-                        <span className="text-xs text-gray-300 w-24 truncate">{name}</span>
-                        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden relative">
-                          <div className="absolute inset-0 flex">
-                            <div className="w-1/2" />
-                            <div className="w-px bg-white/10 z-10" />
-                            <div className="w-1/2" />
-                          </div>
+                      <div key={id} className="flex items-center gap-2">
+                        <span className="font-pixel text-pixel-text w-20 truncate" style={{ fontSize: '7px' }}>{name}</span>
+                        <div className="flex-1 relative" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: 0,
+                              width: '1px',
+                              height: '100%',
+                              background: '#4a4a8a',
+                            }}
+                          />
                           {isPositive ? (
                             <div
-                              className="absolute top-0 h-full bg-neon-green rounded-r-full transition-all duration-300"
-                              style={{ left: '50%', width: `${Math.abs(value) * 50}%`, opacity: 0.7 }}
+                              style={{
+                                position: 'absolute',
+                                left: '50%',
+                                top: 0,
+                                height: '100%',
+                                width: `${Math.abs(value) * 50}%`,
+                                background: '#00ff88',
+                                transition: 'width 0.3s steps(8)',
+                              }}
                             />
                           ) : (
                             <div
-                              className="absolute top-0 h-full bg-neon-red rounded-l-full transition-all duration-300"
-                              style={{ right: '50%', width: `${Math.abs(value) * 50}%`, opacity: 0.7 }}
+                              style={{
+                                position: 'absolute',
+                                right: '50%',
+                                top: 0,
+                                height: '100%',
+                                width: `${Math.abs(value) * 50}%`,
+                                background: '#ff3366',
+                                transition: 'width 0.3s steps(8)',
+                              }}
                             />
                           )}
                         </div>
-                        <span className={`text-[10px] font-mono w-10 text-right ${isPositive ? 'text-neon-green' : 'text-neon-red'}`}>
-                          {value > 0 ? '+' : ''}{(value * 100).toFixed(0)}
+                        <span
+                          className="font-pixel w-8 text-right"
+                          style={{ fontSize: '7px', color: isPositive ? '#00ff88' : '#ff3366' }}
+                        >
+                          {value > 0 ? '+' : ''}{Math.round(value * 100)}
                         </span>
                       </div>
                     );
@@ -254,16 +299,22 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
               )}
             </div>
 
+            <div className="pixel-divider" />
+
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Resources</h4>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Resources</div>
               {Object.keys(character.resources).length === 0 ? (
-                <span className="text-xs text-gray-600">No resources</span>
+                <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No resources</span>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   {Object.entries(character.resources).map(([key, val]) => (
-                    <div key={key} className="glass rounded-lg p-2 text-center">
-                      <div className="text-sm font-bold text-neon-gold">{Math.round(val)}</div>
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider">{key}</div>
+                    <div
+                      key={key}
+                      className="text-center p-2"
+                      style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                    >
+                      <div className="font-pixel text-neon-gold" style={{ fontSize: '10px' }}>{Math.round(val)}</div>
+                      <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>{key}</div>
                     </div>
                   ))}
                 </div>
@@ -272,68 +323,82 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
           </div>
         )}
 
-        {inspectorTab === 'mind' && (
+        {tab === 'mind' && (
           <div className="space-y-4">
             {loadingReasoning ? (
-              <div className="text-xs text-gray-500 animate-pulse">Loading reasoning...</div>
+              <div className="font-pixel text-pixel-text-dim animate-pixel-blink" style={{ fontSize: '8px' }}>
+                Loading reasoning...
+              </div>
             ) : reasoning ? (
               <>
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Current Action</h4>
-                  <div className="glass rounded-lg p-3">
-                    <span className="text-[10px] px-1.5 py-0.5 bg-neon-cyan/10 text-neon-cyan rounded uppercase">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Current Action</div>
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#00e5ff', color: '#00e5ff' }}>
                       {reasoning.action.type}
                     </span>
-                    <p className="text-xs text-gray-400 mt-1.5">{reasoning.action.detail}</p>
+                    <p className="font-pixel text-pixel-text mt-2" style={{ fontSize: '7px' }}>{reasoning.action.detail}</p>
                   </div>
                 </div>
+                <div className="pixel-divider" />
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Reasoning Trace</h4>
-                  <div className="glass rounded-lg p-3">
-                    <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">{reasoning.reasoning}</p>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Reasoning Trace</div>
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                    <p className="font-pixel text-pixel-text leading-relaxed whitespace-pre-wrap" style={{ fontSize: '7px' }}>
+                      {reasoning.reasoning}
+                    </p>
                   </div>
                 </div>
               </>
             ) : character.last_action ? (
               <>
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Last Action</h4>
-                  <div className="glass rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 bg-neon-cyan/10 text-neon-cyan rounded uppercase">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Last Action</div>
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#00e5ff', color: '#00e5ff' }}>
                         {character.last_action.type}
                       </span>
                       {character.last_action.target_id && (
-                        <span className="text-[10px] text-gray-500">
+                        <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>
                           → {allCharacters[character.last_action.target_id]?.name || character.last_action.target_id}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400">{character.last_action.detail}</p>
+                    <p className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{character.last_action.detail}</p>
                   </div>
                 </div>
+                <div className="pixel-divider" />
                 <div>
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Reasoning</h4>
-                  <div className="glass rounded-lg p-3">
-                    <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Reasoning</div>
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                    <p className="font-pixel text-pixel-text leading-relaxed whitespace-pre-wrap" style={{ fontSize: '7px' }}>
                       {character.last_action.reasoning || character.last_reasoning || 'No reasoning available'}
                     </p>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="text-xs text-gray-600">No action taken yet</div>
+              <div className="font-pixel text-pixel-text-dim" style={{ fontSize: '8px' }}>No action taken yet</div>
             )}
 
+            <div className="pixel-divider" />
+
             <div>
-              <h4 className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Motivations</h4>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Motivations</div>
+              <div className="flex flex-wrap gap-1">
                 {character.motivations.map((m, i) => (
-                  <span key={i} className="text-[10px] px-2 py-1 glass rounded-md text-neon-purple">
+                  <span
+                    key={i}
+                    className="pixel-badge font-pixel"
+                    style={{ fontSize: '6px', borderColor: '#aa44ff', color: '#aa44ff' }}
+                  >
                     {m}
                   </span>
                 ))}
-                {character.motivations.length === 0 && <span className="text-xs text-gray-600">None</span>}
+                {character.motivations.length === 0 && (
+                  <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>None</span>
+                )}
               </div>
             </div>
           </div>

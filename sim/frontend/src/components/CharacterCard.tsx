@@ -1,8 +1,9 @@
 'use client';
 
 import type { Character } from '@/lib/types';
-import { getDominantEmotion, getMoodColor } from './EmotionDisplay';
+import { getMoodEmoji, getMoodColor } from './EmotionDisplay';
 import ResourceBar from './ResourceBar';
+import CharacterSprite from './CharacterSprite';
 
 interface CharacterCardProps {
   character: Character;
@@ -10,51 +11,55 @@ interface CharacterCardProps {
   onClick: () => void;
 }
 
-const RESOURCE_COLORS = ['neon-cyan', 'neon-green', 'neon-gold', 'neon-magenta', 'neon-blue'];
+const RESOURCE_COLORS = ['cyan', 'gold', 'green', 'magenta', 'blue'];
 
 export default function CharacterCard({ character, selected, onClick }: CharacterCardProps) {
-  const dominant = getDominantEmotion(character.emotional_state);
-  const moodColor = getMoodColor(character.emotional_state);
   const resourceEntries = Object.entries(character.resources).slice(0, 3);
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-3 rounded-xl transition-all duration-200 ${
-        selected
-          ? 'glass-strong glow-border-cyan bg-neon-cyan/5'
-          : 'glass hover:bg-white/5'
+      className={`w-full text-left p-2 pixel-panel transition-all ${
+        selected ? 'glow-gold' : ''
       } ${!character.alive ? 'opacity-40' : ''}`}
+      style={{
+        borderColor: selected ? '#ffd700' : undefined,
+      }}
     >
       <div className="flex items-start gap-3">
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
-          style={{
-            background: `linear-gradient(135deg, ${moodColor}22, ${moodColor}08)`,
-            border: `1px solid ${moodColor}44`,
-            boxShadow: selected ? `0 0 12px ${moodColor}33` : 'none',
-          }}
-        >
-          {character.image_url ? (
-            <img src={character.image_url} alt="" className="w-full h-full rounded-lg object-cover" />
-          ) : (
-            <span className="text-base">{character.name.charAt(0).toUpperCase()}</span>
-          )}
-        </div>
+        <CharacterSprite
+          character={character}
+          selected={selected}
+          onClick={() => {}}
+          compact
+          showName={false}
+        />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-gray-200 truncate">{character.name}</span>
-            <span className="text-xs" title={dominant.label}>{dominant.emoji}</span>
+            <span className="font-pixel text-pixel-text truncate" style={{ fontSize: '8px' }}>
+              {character.name}
+            </span>
+            <span style={{ fontSize: '10px' }}>{getMoodEmoji(character.emotional_state)}</span>
             {!character.alive && (
-              <span className="text-[10px] text-neon-red uppercase tracking-wider">Dead</span>
+              <span className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ff3366', color: '#ff3366' }}>
+                DEAD
+              </span>
             )}
           </div>
 
           {character.last_action && (
-            <div className="text-[10px] text-gray-500 mt-0.5 truncate">
-              {character.last_action.type}
-              {character.last_action.target_id && ` → ${character.last_action.target_id}`}
+            <div className="mt-1">
+              <span
+                className="pixel-badge font-pixel"
+                style={{
+                  fontSize: '6px',
+                  borderColor: getMoodColor(character.emotional_state),
+                  color: getMoodColor(character.emotional_state),
+                }}
+              >
+                {character.last_action.type}
+              </span>
             </div>
           )}
 

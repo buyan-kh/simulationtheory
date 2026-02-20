@@ -7,13 +7,13 @@ export const metadata: Metadata = {
   description: 'Multi-Agent Simulation Platform',
 };
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="px-4 py-2 text-sm text-gray-400 hover:text-neon-cyan transition-colors duration-200 hover:bg-white/5 rounded-lg"
+      className="font-pixel text-pixel-xs text-pixel-text-dim hover:text-neon-cyan px-3 py-2 border-2 border-transparent hover:border-pixel-border transition-colors"
     >
-      {children}
+      &gt;{label}
     </Link>
   );
 }
@@ -21,25 +21,32 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-space-dark antialiased">
-        <div className="starfield" />
-        <nav className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
-          <div className="max-w-[1800px] mx-auto px-4 h-12 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center text-xs font-bold text-space-dark">
+      <body className="min-h-screen bg-pixel-bg scanlines">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-pixel-panel border-b-3 border-pixel-border-light"
+          style={{
+            boxShadow: 'inset 0 -2px 0 0 #2a2a5a, 0 4px 0 0 rgba(0,0,0,0.3)',
+            borderBottom: '3px solid #4a4a8a',
+          }}
+        >
+          <div className="max-w-[1800px] mx-auto px-4 h-10 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-6 h-6 bg-neon-cyan border-2 border-pixel-border-highlight flex items-center justify-center font-pixel text-pixel-xs text-pixel-bg font-bold"
+                style={{ boxShadow: '2px 2px 0 0 rgba(0,0,0,0.4)' }}
+              >
                 N
               </div>
-              <span className="font-bold text-sm tracking-widest text-neon-cyan text-glow-cyan">
+              <span className="font-pixel text-pixel-sm text-neon-cyan tracking-widest">
                 NEXUS SIM
               </span>
             </Link>
             <div className="flex items-center gap-1">
-              <NavLink href="/">Dashboard</NavLink>
-              <NavLink href="/characters">Characters</NavLink>
+              <NavLink href="/" label="HOME" />
+              <NavLink href="/characters" label="CHARACTERS" />
+              <NavLink href="/about" label="ABOUT" />
             </div>
           </div>
         </nav>
-        <main className="pt-12 min-h-screen">
+        <main className="pt-10 min-h-screen">
           {children}
         </main>
       </body>
