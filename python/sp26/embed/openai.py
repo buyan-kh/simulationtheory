@@ -6,11 +6,11 @@ import httpx
 
 from sp26.config import SP26Config
 from sp26.embed.cache import EmbeddingCache
-from sp26.types import EmbedResult, EmbeddedEntity, IngestResult
+from sp26.types import DataSeries, EmbedResult, EmbeddedSeries, IngestResult
 
 
 class OpenAIEmbedder:
-    """Embeds text using the OpenAI embeddings API."""
+    """Embeds series descriptions using the OpenAI embeddings API."""
 
     def __init__(self, config: SP26Config) -> None:
         self._config = config
@@ -18,7 +18,8 @@ class OpenAIEmbedder:
         self._base_url = "https://api.openai.com/v1/embeddings"
 
     async def embed(self, ingest_result: IngestResult) -> EmbedResult:
-        texts = [e.label for e in ingest_result.entities]
+        # Build a text summary per series for embedding
+        texts = [self._summarize_series(s) for s in ingest_result.series]
 
         # Check cache for all texts
         uncached_texts: list[str] = []
@@ -35,23 +36,54 @@ class OpenAIEmbedder:
                 self._cache.put(text, embedding)
 
         # Build result
-        embedded_entities: list[EmbeddedEntity] = []
-        for entity in ingest_result.entities:
-            embedding = self._cache.get(entity.label)
+        embedded_series: list[EmbeddedSeries] = []
+        for series, text in zip(ingest_result.series, texts):
+            embedding = self._cache.get(text)
             if embedding is None:
-                raise RuntimeError(f"Missing embedding for {entity.label!r}")
-            embedded_entities.append(EmbeddedEntity(
-                id=entity.id,
-                label=entity.label,
-                entity_type=entity.entity_type,
+                raise RuntimeError(f"Missing embedding for series {series.name!r}")
+            embedded_series.append(EmbeddedSeries(
+                name=series.name,
+                points=series.points,
                 embedding=embedding,
-                attributes=entity.attributes,
+                metadata=series.metadata,
             ))
 
         return EmbedResult(
-            entities=embedded_entities,
-            relationships=ingest_result.relationships,
+            series=embedded_series,
             dimension=self._config.embedding_dimension,
+        )
+
+    @staticmethod
+    def _summarize_series(series: DataSeries) -> str:
+        """Build a text summary of a series for embedding."""
+        n = len(series.points)
+        if n == 0:
+            return f"Data series '{series.name}': empty series"
+
+        values = [p.value for p in series.points]
+        min_val = min(values)
+        max_val = max(values)
+        mean_val = sum(values) / n
+
+        # Determine trend
+        if n >= 2:
+            first_half = values[: n // 2]
+            second_half = values[n // 2 :]
+            first_mean = sum(first_half) / len(first_half)
+            second_mean = sum(second_half) / len(second_half)
+            if second_mean > first_mean * 1.05:
+                trend = "rising"
+            elif second_mean < first_mean * 0.95:
+                trend = "falling"
+            else:
+                trend = "stable"
+        else:
+            trend = "single point"
+
+        return (
+            f"Data series '{series.name}': {n} points, "
+            f"range [{min_val:.4g}, {max_val:.4g}], "
+            f"mean {mean_val:.4g}, trend {trend}"
         )
 
     async def _fetch_embeddings(self, texts: list[str]) -> list[list[float]]:

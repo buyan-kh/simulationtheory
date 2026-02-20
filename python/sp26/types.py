@@ -24,71 +24,64 @@ class RawInput(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class Entity(BaseModel):
-    """An extracted entity from ingested data."""
-    id: str
-    label: str
-    entity_type: str = "unknown"
-    attributes: dict[str, Any] = Field(default_factory=dict)
+class DataPoint(BaseModel):
+    """A single data point in a series."""
+    index: float
+    value: float
 
 
-class Relationship(BaseModel):
-    """A relationship between two entities."""
-    source_id: str
-    target_id: str
-    relation: str = "related"
-    weight: float = 1.0
-    attributes: dict[str, Any] = Field(default_factory=dict)
+class DataSeries(BaseModel):
+    """A named series of data points."""
+    name: str
+    points: list[DataPoint] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class IngestResult(BaseModel):
     """Output of the ingestion stage."""
-    entities: list[Entity]
-    relationships: list[Relationship]
+    series: list[DataSeries]
     raw_text: str = ""
 
 
 # ── Stage 2: Embedding ──────────────────────────────────────────────
 
-class EmbeddedEntity(BaseModel):
-    """An entity with its embedding vector."""
-    id: str
-    label: str
-    entity_type: str = "unknown"
+class EmbeddedSeries(BaseModel):
+    """A data series with its embedding vector."""
+    name: str
+    points: list[DataPoint] = Field(default_factory=list)
     embedding: list[float]
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EmbedResult(BaseModel):
     """Output of the embedding stage."""
-    entities: list[EmbeddedEntity]
-    relationships: list[Relationship]
+    series: list[EmbeddedSeries]
     dimension: int
 
 
-# ── Stage 3: Graph ──────────────────────────────────────────────────
+# ── Stage 3: Chart ─────────────────────────────────────────────────
 
-class GraphResult(BaseModel):
-    """Output of the graph construction stage."""
-    graph_id: int
-    node_count: int
-    edge_count: int
+class ChartResult(BaseModel):
+    """Output of the chart construction stage."""
+    chart_id: int
+    series_count: int
+    total_points: int
 
 
 # ── Stage 4: Similarity ─────────────────────────────────────────────
 
 class SimilarityPair(BaseModel):
-    """A pair of entities with their similarity score."""
-    entity_a: str
-    entity_b: str
+    """A pair of series with their similarity score."""
+    series_a: str
+    series_b: str
     score: float
     metric: str = "cosine"
 
 
 class Cluster(BaseModel):
-    """A cluster of entities."""
+    """A cluster of series."""
     cluster_id: int
-    entity_ids: list[str]
+    series_names: list[str]
     centroid: list[float] | None = None
 
 
@@ -96,7 +89,7 @@ class SimilarityResult(BaseModel):
     """Output of the similarity stage."""
     pairs: list[SimilarityPair]
     clusters: list[Cluster]
-    graph_id: int
+    chart_id: int
 
 
 # ── Stage 5: Prediction ─────────────────────────────────────────────
@@ -107,13 +100,13 @@ class Prediction(BaseModel):
     description: str
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = ""
-    source_entities: list[str] = Field(default_factory=list)
+    source_series: list[str] = Field(default_factory=list)
 
 
 class PredictionResult(BaseModel):
     """Output of the prediction stage."""
     predictions: list[Prediction]
-    graph_id: int
+    chart_id: int
 
 
 # ── Stage 6: Game Theory ────────────────────────────────────────────

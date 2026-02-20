@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import os
+
 from pydantic import BaseModel, Field
+
+
+def _env(key: str, default: str = "") -> str:
+    return os.environ.get(key, default)
 
 
 class SP26Config(BaseModel):
     """Configuration for the SP26 pipeline."""
 
-    # API keys
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
+    # API keys (read from environment by default)
+    openai_api_key: str = Field(default_factory=lambda: _env("OPENAI_API_KEY"))
+    anthropic_api_key: str = Field(default_factory=lambda: _env("ANTHROPIC_API_KEY"))
 
     # Embedding
     embedding_model: str = "text-embedding-3-small"
@@ -37,6 +43,11 @@ class SP26Config(BaseModel):
     # Clustering
     num_clusters: int = 5
     kmeans_max_iters: int = 100
+
+    # NL Ingestion
+    nl_ingest_model: str = "claude-sonnet-4-5-20250929"
+    nl_max_factors: int = 8
+    nl_max_ingest_tokens: int = 1024
 
     # Decode
     decode_model: str = "claude-sonnet-4-5-20250929"

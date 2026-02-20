@@ -1,48 +1,76 @@
-"""CSV ingestor — extracts entities and relationships from CSV data."""
+"""CSV ingestor — converts numeric columns into data series."""
 
 from __future__ import annotations
 
 import csv
 import io
-import uuid
 
-from sp26.types import Entity, IngestResult, RawInput, Relationship
+from sp26.types import DataPoint, DataSeries, IngestResult, RawInput
 
 
 class CsvIngestor:
-    """Parses CSV data into entities (rows) and relationships (column-based)."""
+    """Parses CSV data: each numeric column becomes a DataSeries."""
 
     def ingest(self, raw_input: RawInput) -> IngestResult:
         text = raw_input.content.strip()
         if not text:
-            return IngestResult(entities=[], relationships=[], raw_text=text)
+            return IngestResult(series=[], raw_text=text)
 
         reader = csv.DictReader(io.StringIO(text))
-        entities: list[Entity] = []
-        relationships: list[Relationship] = []
-        prev_id: str | None = None
+        rows = list(reader)
+        if not rows:
+            return IngestResult(series=[], raw_text=text)
 
-        for row in reader:
-            eid = str(uuid.uuid4())[:8]
-            label = " | ".join(f"{k}={v}" for k, v in row.items() if v)
-            entities.append(Entity(
-                id=eid,
-                label=label[:100],
-                entity_type="row",
-                attributes=dict(row),
+        fieldnames = list(rows[0].keys())
+
+        # Identify numeric columns
+        numeric_cols: list[str] = []
+        for col in fieldnames:
+            if _all_numeric(rows, col):
+                numeric_cols.append(col)
+
+        # If no purely numeric columns, try to parse all columns as best-effort
+        if not numeric_cols:
+            numeric_cols = [
+                col for col in fieldnames if _any_numeric(rows, col)
+            ]
+
+        series: list[DataSeries] = []
+        for col in numeric_cols:
+            points: list[DataPoint] = []
+            for i, row in enumerate(rows):
+                val = _try_float(row.get(col, ""))
+                if val is not None:
+                    points.append(DataPoint(index=float(i), value=val))
+            if points:
+                series.append(DataSeries(
+                    name=col,
+                    points=points,
+                    metadata={"source": "csv", "column": col},
+                ))
+
+        # If still no series, create a row_count series as fallback
+        if not series:
+            points = [DataPoint(index=float(i), value=1.0) for i in range(len(rows))]
+            series.append(DataSeries(
+                name="row_count",
+                points=points,
+                metadata={"source": "csv", "note": "no numeric columns found"},
             ))
 
-            # Sequential relationship between consecutive rows
-            if prev_id is not None:
-                relationships.append(Relationship(
-                    source_id=prev_id,
-                    target_id=eid,
-                    relation="next_row",
-                ))
-            prev_id = eid
+        return IngestResult(series=series, raw_text=text)
 
-        return IngestResult(
-            entities=entities,
-            relationships=relationships,
-            raw_text=text,
-        )
+
+def _try_float(val: str) -> float | None:
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _all_numeric(rows: list[dict], col: str) -> bool:
+    return all(_try_float(row.get(col, "")) is not None for row in rows if row.get(col, ""))
+
+
+def _any_numeric(rows: list[dict], col: str) -> bool:
+    return any(_try_float(row.get(col, "")) is not None for row in rows)

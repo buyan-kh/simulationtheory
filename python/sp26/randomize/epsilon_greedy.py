@@ -51,7 +51,7 @@ class EpsilonGreedyRandomizer:
                     description=pred.description,
                     confidence=count / num_selections,
                     reasoning=f"Epsilon-greedy: selected {count}/{num_selections} times. {pred.reasoning}",
-                    source_entities=pred.source_entities,
+                    source_series=pred.source_series,
                 ))
 
         selections.sort(key=lambda p: p.confidence, reverse=True)

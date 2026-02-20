@@ -32,13 +32,13 @@ def build_payoff_matrix(
             if i == j:
                 p2_payoffs.append(predictions[j].confidence)
             else:
-                # Partial credit based on shared source entities
+                # Partial credit based on shared source series
                 overlap = len(
-                    set(predictions[i].source_entities) & set(predictions[j].source_entities)
+                    set(predictions[i].source_series) & set(predictions[j].source_series)
                 )
                 total = max(
                     1,
-                    len(set(predictions[i].source_entities) | set(predictions[j].source_entities)),
+                    len(set(predictions[i].source_series) | set(predictions[j].source_series)),
                 )
                 p2_payoffs.append(predictions[j].confidence * overlap / total)
 

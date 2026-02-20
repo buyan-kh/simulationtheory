@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from sp26.config import SP26Config
 from sp26.types import (
+    ChartResult,
     DecodedOutput,
     EmbedResult,
     GameTheoryResult,
-    GraphResult,
     IngestResult,
     PathResult,
     PipelineResult,
@@ -18,7 +18,7 @@ from sp26.types import (
 )
 from sp26.ingest.auto import AutoIngestor
 from sp26.embed.openai import OpenAIEmbedder
-from sp26.graph.builder import GraphBuilder
+from sp26.chart.builder import ChartBuilder
 from sp26.similarity.engine import SimilarityEngine
 from sp26.predict.predictor import Predictor
 from sp26.gametheory.engine import GameTheoryEngine
@@ -32,9 +32,9 @@ class Pipeline:
 
     def __init__(self, config: SP26Config | None = None) -> None:
         self.config = config or SP26Config()
-        self._ingestor = AutoIngestor()
+        self._ingestor = AutoIngestor(self.config)
         self._embedder = OpenAIEmbedder(self.config)
-        self._graph_builder = GraphBuilder(self.config)
+        self._chart_builder = ChartBuilder(self.config)
         self._similarity = SimilarityEngine(self.config)
         self._predictor = Predictor(self.config)
         self._game_theory = GameTheoryEngine(self.config)
@@ -50,12 +50,12 @@ class Pipeline:
         # Stage 2: Embed
         embed_result: EmbedResult = await self._embedder.embed(ingest_result)
 
-        # Stage 3: Graph
-        graph_result: GraphResult = self._graph_builder.build(embed_result)
+        # Stage 3: Chart
+        chart_result: ChartResult = self._chart_builder.build(embed_result)
 
         # Stage 4: Similarity
         similarity_result: SimilarityResult = self._similarity.compute(
-            embed_result, graph_result
+            embed_result, chart_result
         )
 
         # Stage 5: Predict
@@ -75,10 +75,14 @@ class Pipeline:
             game_result = self._game_theory.analyze(current_predictions)
 
             # Stage 7: Decode
-            decoded = await self._decoder.decode(game_result, current_predictions)
+            decoded = await self._decoder.decode(
+                game_result, current_predictions, context=ingest_result.raw_text
+            )
 
             # Stage 8: Paths
-            path_result = self._path_explorer.explore(game_result, graph_result)
+            path_result = self._path_explorer.explore(
+                game_result, chart_result, similarity_result
+            )
 
             # Stage 9: Randomize (feeds back into game theory on next iteration)
             randomized = self._randomizer.randomize(
@@ -89,7 +93,7 @@ class Pipeline:
             if randomized.sampled_outcomes:
                 current_predictions = PredictionResult(
                     predictions=randomized.sampled_outcomes,
-                    graph_id=graph_result.graph_id,
+                    chart_id=chart_result.chart_id,
                 )
 
         return PipelineResult(

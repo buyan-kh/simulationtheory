@@ -59,7 +59,7 @@ class MonteCarloRandomizer:
                     description=pred.description,
                     confidence=adjusted_confidence,
                     reasoning=f"Monte Carlo: {count}/{self._config.monte_carlo_samples} samples ({adjusted_confidence:.1%}). Original: {pred.reasoning}",
-                    source_entities=pred.source_entities,
+                    source_series=pred.source_series,
                 ))
 
         # Sort by adjusted confidence

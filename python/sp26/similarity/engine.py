@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from sp26.config import SP26Config
 from sp26.types import (
+    ChartResult,
     Cluster,
     EmbedResult,
-    GraphResult,
     SimilarityPair,
     SimilarityResult,
 )
@@ -23,15 +23,15 @@ class SimilarityEngine:
     def __init__(self, config: SP26Config) -> None:
         self._config = config
 
-    def compute(self, embed_result: EmbedResult, graph_result: GraphResult) -> SimilarityResult:
+    def compute(self, embed_result: EmbedResult, chart_result: ChartResult) -> SimilarityResult:
         if _sim is None:
             raise RuntimeError("Rust _core module not available. Run `maturin develop` first.")
 
-        entities = embed_result.entities
-        if not entities:
-            return SimilarityResult(pairs=[], clusters=[], graph_id=graph_result.graph_id)
+        all_series = embed_result.series
+        if not all_series:
+            return SimilarityResult(pairs=[], clusters=[], chart_id=chart_result.chart_id)
 
-        vectors = [e.embedding for e in entities]
+        vectors = [s.embedding for s in all_series]
 
         # Compute pairwise cosine similarity
         n = len(vectors)
@@ -43,8 +43,8 @@ class SimilarityEngine:
                 score = flat_sim[i * n + j]
                 if score >= self._config.similarity_threshold:
                     pairs.append(SimilarityPair(
-                        entity_a=entities[i].id,
-                        entity_b=entities[j].id,
+                        series_a=all_series[i].name,
+                        series_b=all_series[j].name,
                         score=score,
                         metric="cosine",
                     ))
@@ -55,15 +55,15 @@ class SimilarityEngine:
 
         clusters_map: dict[int, list[str]] = {}
         for idx, cluster_id in enumerate(assignments):
-            clusters_map.setdefault(cluster_id, []).append(entities[idx].id)
+            clusters_map.setdefault(cluster_id, []).append(all_series[idx].name)
 
         clusters = [
-            Cluster(cluster_id=cid, entity_ids=eids)
-            for cid, eids in sorted(clusters_map.items())
+            Cluster(cluster_id=cid, series_names=names)
+            for cid, names in sorted(clusters_map.items())
         ]
 
         return SimilarityResult(
             pairs=pairs,
             clusters=clusters,
-            graph_id=graph_result.graph_id,
+            chart_id=chart_result.chart_id,
         )

@@ -12,5 +12,5 @@ class Embedder(Protocol):
     """Protocol for embedding providers."""
 
     async def embed(self, ingest_result: IngestResult) -> EmbedResult:
-        """Embed all entities from an ingest result."""
+        """Embed all series from an ingest result."""
         ...

@@ -19,8 +19,9 @@ class Decoder:
         self,
         game_result: GameTheoryResult,
         prediction_result: PredictionResult,
+        context: str = "",
     ) -> DecodedOutput:
-        prompt = self._build_prompt(game_result, prediction_result)
+        prompt = self._build_prompt(game_result, prediction_result, context)
         response_text = await self._call_api(prompt)
         return self._parse_response(response_text)
 
@@ -28,6 +29,7 @@ class Decoder:
         self,
         game_result: GameTheoryResult,
         prediction_result: PredictionResult,
+        context: str = "",
     ) -> str:
         predictions_text = "\n".join(
             f"- [{p.confidence:.0%}] {p.description}" for p in prediction_result.predictions[:10]
@@ -46,7 +48,19 @@ class Decoder:
             if strat:
                 dom_text += f"\n  {player}: {strat}"
 
+        context_section = ""
+        if context:
+            context_section = f"""
+## Original Context
+The user provided the following input:
+\"\"\"{context[:2000]}\"\"\"
+
+When generating your analysis, refer to the user's actual situation and use natural, human-readable language.
+Instead of referring to series names like "career_risk", say things like "your career risk".
+"""
+
         return f"""Analyze the following game-theoretic prediction results and provide a clear, concise summary.
+{context_section}
 
 ## Predictions
 {predictions_text}

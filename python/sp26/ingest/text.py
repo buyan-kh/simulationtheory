@@ -1,70 +1,68 @@
-"""Text ingestor — extracts entities and relationships from plain text."""
+"""Text ingestor — derives data series from text properties."""
 
 from __future__ import annotations
 
 import re
-import uuid
+from collections import Counter
 
-from sp26.types import Entity, IngestResult, RawInput, Relationship
+from sp26.types import DataPoint, DataSeries, IngestResult, RawInput
 
 
 class TextIngestor:
-    """Extracts entities from natural language text using simple heuristics."""
+    """Extracts data series from natural language text properties."""
 
     def ingest(self, raw_input: RawInput) -> IngestResult:
         text = raw_input.content.strip()
         if not text:
-            return IngestResult(entities=[], relationships=[], raw_text=text)
+            return IngestResult(series=[], raw_text=text)
 
         sentences = re.split(r'[.!?]+', text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
-        entities: list[Entity] = []
-        relationships: list[Relationship] = []
-        seen_labels: dict[str, str] = {}  # label → id
+        if not sentences:
+            return IngestResult(series=[], raw_text=text)
 
-        for sentence in sentences:
-            # Extract capitalized words as potential entities
-            words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sentence)
-            for word in words:
-                if word not in seen_labels:
-                    eid = str(uuid.uuid4())[:8]
-                    seen_labels[word] = eid
-                    entities.append(Entity(
-                        id=eid,
-                        label=word,
-                        entity_type="noun_phrase",
-                    ))
+        series: list[DataSeries] = []
 
-            # Create relationships between entities that co-occur in a sentence
-            sentence_entities = [seen_labels[w] for w in words if w in seen_labels]
-            for i, src in enumerate(sentence_entities):
-                for tgt in sentence_entities[i + 1:]:
-                    if src != tgt:
-                        relationships.append(Relationship(
-                            source_id=src,
-                            target_id=tgt,
-                            relation="co_occurs",
-                        ))
+        # Series 1: sentence_length — character count per sentence
+        length_points = [
+            DataPoint(index=float(i), value=float(len(s)))
+            for i, s in enumerate(sentences)
+        ]
+        series.append(DataSeries(
+            name="sentence_length",
+            points=length_points,
+            metadata={"source": "text", "unit": "characters"},
+        ))
 
-        # If no capitalized entities found, treat each sentence as an entity
-        if not entities:
-            for i, sentence in enumerate(sentences):
-                eid = str(uuid.uuid4())[:8]
-                entities.append(Entity(
-                    id=eid,
-                    label=sentence[:100],
-                    entity_type="statement",
-                ))
-                if i > 0:
-                    relationships.append(Relationship(
-                        source_id=entities[i - 1].id,
-                        target_id=eid,
-                        relation="follows",
-                    ))
+        # Series 2: entity_density — count of capitalized phrases per sentence
+        density_points = []
+        for i, s in enumerate(sentences):
+            entities = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', s)
+            density_points.append(DataPoint(index=float(i), value=float(len(entities))))
+        series.append(DataSeries(
+            name="entity_density",
+            points=density_points,
+            metadata={"source": "text", "unit": "entities_per_sentence"},
+        ))
 
-        return IngestResult(
-            entities=entities,
-            relationships=relationships,
-            raw_text=text,
-        )
+        # Series 3+: freq_{word} — top-10 word frequencies by sentence position
+        all_words: list[str] = []
+        for s in sentences:
+            all_words.extend(w.lower() for w in re.findall(r'\b\w+\b', s))
+        word_counts = Counter(all_words)
+        top_words = [w for w, _ in word_counts.most_common(10)]
+
+        for word in top_words:
+            points = []
+            for i, s in enumerate(sentences):
+                sentence_words = [w.lower() for w in re.findall(r'\b\w+\b', s)]
+                count = sentence_words.count(word)
+                points.append(DataPoint(index=float(i), value=float(count)))
+            series.append(DataSeries(
+                name=f"freq_{word}",
+                points=points,
+                metadata={"source": "text", "word": word},
+            ))
+
+        return IngestResult(series=series, raw_text=text)
