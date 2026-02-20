@@ -136,12 +136,26 @@ class SimulationConfig(BaseModel):
     max_ticks: int = 1000
 
 
+class ChatMessage(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tick: int
+    speaker_id: str
+    speaker_name: str
+    content: str
+    tone: str = "neutral"
+    target_id: str | None = None
+    target_name: str | None = None
+    is_thought: bool = False
+    action_context: str = ""
+
+
 class SimulationState(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     tick: int = 0
     characters: dict[str, Character] = {}
     environment: Environment = Field(default_factory=Environment)
     events: list[Event] = []
+    chat_log: list[ChatMessage] = []
     config: SimulationConfig = Field(default_factory=SimulationConfig)
     running: bool = False
     created_at: float = Field(default_factory=time.time)

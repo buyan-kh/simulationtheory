@@ -1,9 +1,9 @@
 import random
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
-    Action, Event, Environment,
+    Action, Event, Environment, ChatMessage,
 )
-from agents import AgentBrain
+from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
 
 
@@ -13,6 +13,7 @@ class SimulationEngine:
         self.simulations: dict[str, SimulationState] = {}
         self.brain = AgentBrain()
         self.event_gen = EventGenerator()
+        self.dialogue = DialogueGenerator()
 
     def create_simulation(self, config: SimulationConfig | None = None) -> SimulationState:
         sim = SimulationState()
@@ -37,11 +38,13 @@ class SimulationEngine:
         sim.characters[char.id] = char
         return char
 
-    def step(self, sim_id: str) -> list[Event]:
+    def step(self, sim_id: str) -> tuple[list[Event], list[ChatMessage]]:
         sim = self.simulations[sim_id]
 
         if sim.tick >= sim.config.max_ticks:
-            return []
+            return [], []
+
+        chat_messages: list[ChatMessage] = []
 
         actions: dict[str, Action] = {}
         for char_id, char in sim.characters.items():
@@ -49,6 +52,13 @@ class SimulationEngine:
                 continue
             action = self.brain.decide(char, sim)
             actions[char_id] = action
+
+        for char_id, action in actions.items():
+            char = sim.characters[char_id]
+            target = sim.characters.get(action.target_id) if action.target_id else None
+            msg = self.dialogue.generate_action_dialogue(char, action, target, sim)
+            if msg:
+                chat_messages.append(msg)
 
         interaction_events = self.event_gen.resolve_actions(sim.characters, actions, sim)
         environmental_events = self.event_gen.generate_environmental_events(sim)
@@ -64,11 +74,16 @@ class SimulationEngine:
                 continue
             self.brain.update_emotions(char, all_events)
             self.brain.consolidate_memory(char, all_events, sim.tick)
+            for event in all_events:
+                msg = self.dialogue.generate_reaction_dialogue(char, event, sim)
+                if msg:
+                    chat_messages.append(msg)
 
         sim.events.extend(all_events)
+        sim.chat_log.extend(chat_messages)
         sim.tick += 1
 
-        return all_events
+        return all_events, chat_messages
 
     def get_state(self, sim_id: str) -> SimulationState:
         return self.simulations[sim_id]

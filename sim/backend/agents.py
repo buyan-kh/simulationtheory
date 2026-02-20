@@ -2,7 +2,7 @@ import math
 import random
 from models import (
     Character, SimulationState, Action, ActionType, Event, EventType,
-    MemoryEntry, EmotionalState,
+    MemoryEntry, EmotionalState, ChatMessage,
 )
 
 
@@ -479,3 +479,800 @@ class AgentBrain:
 
         ctx = ", ".join(parts) if parts else "general assessment"
         return f"Chose to {action_type.value} based on {ctx}. Score: {score:.2f}"
+
+
+DIALOGUE_TEMPLATES: dict[str, dict[str, list[str]]] = {
+    "cooperate": {
+        "friendly": [
+            "Hey {target}, let's team up! Together we're unstoppable.",
+            "I've been thinking, {target}... we could accomplish a lot more side by side.",
+            "{target}, what do you say we pool our efforts? I think we'd make a great team.",
+            "You know what, {target}? I trust you. Let's work together on this.",
+            "Two heads are better than one, right {target}? Let's do this!",
+            "I'd love to work with you, {target}. I think we complement each other well.",
+            "{target}! Perfect timing. I was just thinking we should join forces.",
+            "There's strength in numbers, {target}. Shall we?",
+        ],
+        "hostile": [
+            "Fine, {target}. I'll work with you. But don't think this makes us friends.",
+            "Listen, {target}, I don't like this any more than you do. But we need each other right now.",
+            "Temporary arrangement, {target}. The moment this is done, we go our separate ways.",
+            "Don't get comfortable, {target}. This alliance is purely practical.",
+            "I'm working with you, {target}. Not for you. Remember that.",
+            "{target}, I'll cooperate. But cross me and you'll regret it.",
+        ],
+        "nervous": [
+            "Um, {target}? I-I was hoping maybe we could... work together?",
+            "I know this might be weird, {target}, but I think we should cooperate...",
+            "Please don't say no, {target}... I really think we need each other right now.",
+            "{target}, I'm not good at this, but... partners?",
+            "I hope I'm not overstepping, {target}, but would you consider working together?",
+        ],
+        "excited": [
+            "Oh this is gonna be GREAT, {target}! You and me, taking on the world!",
+            "{target}!! Let's do this! I've got so many ideas for us!",
+            "YES! {target}, I was hoping you'd be up for teaming up! Let's GO!",
+            "This is the best decision ever, {target}! We're gonna crush it together!",
+            "{target}, you won't regret this! I promise we'll be an incredible team!",
+        ],
+        "formal": [
+            "I propose a collaborative arrangement, {target}. One that serves both our interests.",
+            "{target}, I believe a structured cooperation would benefit us mutually.",
+            "If you're amenable, {target}, I'd like to formalize a working relationship.",
+            "{target}, the logical course of action is cooperation. Shall we proceed?",
+            "I've analyzed our situation, {target}. Cooperation yields the optimal outcome for both parties.",
+        ],
+    },
+    "attack": {
+        "aggressive": [
+            "This ends now, {target}!",
+            "You've pushed me too far, {target}. Defend yourself!",
+            "Prepare yourself, {target}!",
+            "I've had enough of you, {target}. Time to settle this!",
+            "You want a fight, {target}? You've got one!",
+            "No more games, {target}. This is it!",
+            "You brought this on yourself, {target}!",
+            "{target}! Face me, you coward!",
+        ],
+        "nervous": [
+            "I-I have to do this, {target}... I'm sorry.",
+            "Don't make this harder than it needs to be...",
+            "I wish there was another way, {target}... but there isn't.",
+            "Forgive me, {target}. I have no choice.",
+            "My hands are shaking, but I have to do this, {target}...",
+            "I don't want to hurt you, {target}, but you leave me no choice...",
+        ],
+        "sarcastic": [
+            "Oh {target}, this is going to be fun. For me, anyway.",
+            "Nothing personal, {target}. Well, maybe a little personal.",
+            "Let's see how tough you really are, {target}. My bet? Not very.",
+            "Sorry {target}, but someone has to put you in your place.",
+            "Don't worry, {target}. This will only hurt... a lot.",
+            "{target}, you should've stayed out of my way. Rookie mistake.",
+        ],
+        "threatening": [
+            "Last chance to walk away, {target}. You won't get another.",
+            "I'm going to make an example of you, {target}.",
+            "Everyone will know what happens when you cross me, {target}.",
+            "{target}, remember this moment. It's the last time you'll feel safe.",
+            "I warned you, {target}. Now you'll see what I'm capable of.",
+            "You should be afraid, {target}. Very afraid.",
+        ],
+        "cold": [
+            "Nothing personal, {target}.",
+            "This is simply necessary, {target}.",
+            "I take no pleasure in this, {target}. It's just business.",
+            "{target}. This was inevitable.",
+            "You were always going to end up here, {target}. Accept it.",
+        ],
+    },
+    "betray": {
+        "sarcastic": [
+            "Sorry {target}, nothing personal... actually, it kind of is.",
+            "Did you really think I was your friend, {target}? How naive.",
+            "Surprise, {target}! Bet you didn't see this coming.",
+            "Oh {target}, you made this too easy. Trusting me was your first mistake.",
+            "Thanks for everything, {target}. Really. I couldn't have done this without you.",
+            "Here's a life lesson, {target}: trust no one. Especially me.",
+        ],
+        "nervous": [
+            "F-forgive me, {target}... I had no choice.",
+            "I didn't want it to come to this, {target}...",
+            "Please understand, {target}... I did what I had to do.",
+            "I'm sorry, {target}. I'm so, so sorry. But I need to survive.",
+            "You'll hate me, {target}. I know. But I can't... I just can't keep going like this.",
+            "Don't look at me like that, {target}... please...",
+        ],
+        "hostile": [
+            "You were a fool to trust me, {target}.",
+            "This is what happens when you let your guard down, {target}.",
+            "You thought we were allies, {target}? Think again.",
+            "I never needed you, {target}. You were just a stepping stone.",
+            "Goodbye, {target}. You served your purpose.",
+            "Consider this a lesson, {target}. The strong survive.",
+        ],
+        "cold": [
+            "Our arrangement has run its course, {target}.",
+            "I calculated the odds, {target}. This was the logical move.",
+            "Sentiment is a weakness, {target}. One I can't afford.",
+            "Don't take it personally, {target}. It's just survival.",
+            "I weighed our alliance against my interests, {target}. You lost.",
+        ],
+    },
+    "negotiate": {
+        "friendly": [
+            "Let's talk this out, {target}. I'm sure we can find common ground.",
+            "Hey {target}, I think if we put our heads together, we can make a deal that works for both of us.",
+            "{target}, I'd rather solve this with words than anything else. What do you think?",
+            "There's gotta be a win-win here, {target}. Let's figure it out.",
+            "I come in peace, {target}. Let's negotiate like civilized folks.",
+            "What if we could both walk away happy, {target}? Hear me out.",
+        ],
+        "formal": [
+            "I propose an arrangement, {target}. One that benefits us both.",
+            "{target}, I would like to discuss terms for a mutually beneficial agreement.",
+            "Let us be pragmatic, {target}. I have a proposition worth your consideration.",
+            "I've prepared an offer, {target}. I believe you'll find the terms favorable.",
+            "{target}, diplomacy is the mark of wisdom. Shall we negotiate?",
+            "I request a formal discussion, {target}. There is much to gain on both sides.",
+        ],
+        "cautious": [
+            "I'd like to talk, {target}. But let's set some ground rules first.",
+            "{target}, I'm willing to negotiate, but I need assurances.",
+            "Before we discuss terms, {target}, I need to know I can trust you.",
+            "Let's proceed carefully here, {target}. Too much is at stake for hasty deals.",
+            "I have a proposal, {target}. But I want to be clear about expectations.",
+        ],
+        "strategic": [
+            "I have something you need, {target}. And you have something I want.",
+            "Let's be real, {target}. We both know what's at stake. So let's deal.",
+            "{target}, I think you'll find my terms... very motivating.",
+            "Here's the situation, {target}: cooperation serves us both. Resistance serves neither.",
+            "Think of this as an investment, {target}. We both stand to profit.",
+            "I'm offering you a lifeline, {target}. I suggest you take it.",
+        ],
+    },
+    "ally": {
+        "excited": [
+            "An alliance! {target}, this is going to be legendary!",
+            "{target}!! We're going to be unstoppable together!",
+            "You and me, {target}! Best alliance this world has ever seen!",
+            "I can't believe it, {target}! We're actually doing this! ALLIES!",
+            "This is the start of something incredible, {target}!",
+            "Partners! {target}, I've been hoping for this!",
+        ],
+        "cautious": [
+            "I'd like to propose we join forces, {target}. Cautiously.",
+            "An alliance could work, {target}. But we need clear boundaries.",
+            "I'm willing to ally with you, {target}. But let's take this slow.",
+            "{target}, I think an alliance serves our mutual interests. Carefully managed.",
+            "Trust is earned, {target}. But I'm willing to start building it.",
+            "Let's try this, {target}. One step at a time.",
+        ],
+        "friendly": [
+            "I'd be honored to call you my ally, {target}.",
+            "What do you say, {target}? Watch each other's backs?",
+            "{target}, there's nobody I'd rather have at my side.",
+            "I think this could be the beginning of a beautiful alliance, {target}.",
+            "You've earned my respect, {target}. Let's make it official.",
+            "Friends protect friends, {target}. Let's be allies.",
+        ],
+        "formal": [
+            "I propose a formal alliance, {target}. With clear terms and mutual obligations.",
+            "{target}, I believe a strategic partnership would serve us both well.",
+            "An alliance is the wisest course, {target}. Shall we formalize it?",
+            "I extend a formal offer of alliance, {target}. Let us unite our strengths.",
+            "{target}, together we command greater influence. A formal pact is in order.",
+        ],
+    },
+    "explore": {
+        "curious": [
+            "*I wonder what lies beyond that ridge...*",
+            "*Something feels different about this area. I need to investigate.*",
+            "*What secrets are hidden out here? Only one way to find out.*",
+            "*There's so much of this world I haven't seen yet...*",
+            "*Curiosity may have killed the cat, but I'm not a cat.*",
+            "*The unknown calls to me. What wonders await?*",
+        ],
+        "adventurous": [
+            "*Time to venture into the unknown. Nothing ventured, nothing gained.*",
+            "*Adventure awaits! Let's see what's out there.*",
+            "*The wilderness calls, and I must answer.*",
+            "*Every step into the unknown is a step toward discovery.*",
+            "*Fortune favors the bold. Time to explore.*",
+            "*New horizons ahead. Let's push further.*",
+        ],
+        "philosophical": [
+            "*The map is not the territory. Time to learn the land firsthand.*",
+            "*To explore is to live. Stagnation is a slow death.*",
+            "*What lies beyond the edge of the known? Perhaps meaning itself.*",
+            "*Each journey changes the traveler. Who will I be when I return?*",
+            "*The world is vast and full of mystery. How can I sit still?*",
+        ],
+        "nervous": [
+            "*I don't know what's out there... but I have to look.*",
+            "*Every noise makes me jump. But I need to keep moving.*",
+            "*Please let this path be safe... please...*",
+            "*My heart pounds with every step. But I can't stay put forever.*",
+            "*Into the unknown... alone. Deep breaths...*",
+        ],
+    },
+    "rest": {
+        "tired": [
+            "*I need to catch my breath... these past turns have been exhausting.*",
+            "*Just... a few minutes. Just need to close my eyes...*",
+            "*My body aches. I can't keep going without rest.*",
+            "*Sleep. I need sleep. Everything else can wait.*",
+            "*I've pushed myself too hard. Time to recover.*",
+            "*Even warriors need rest. No shame in that.*",
+        ],
+        "relieved": [
+            "*Finally, a moment of peace. I earned this.*",
+            "*The quiet is nice for a change. Let me enjoy it.*",
+            "*No threats, no decisions, just... rest. Bliss.*",
+            "*I can feel my strength returning already.*",
+            "*A calm moment in the storm. I'll take it.*",
+        ],
+        "anxious": [
+            "*I should be doing something... but I can barely stand.*",
+            "*Resting feels wrong when there's so much at stake...*",
+            "*Am I wasting time? No... no, I need this.*",
+            "*What if something happens while I'm resting? What if—no. Rest.*",
+            "*I can't afford to rest, but I can't afford not to either.*",
+        ],
+    },
+    "gather": {
+        "focused": [
+            "*Resources are getting scarce. Better stock up while I can.*",
+            "*Need to be methodical about this. Every bit counts.*",
+            "*Focus. Gather what's needed. Stay efficient.*",
+            "*The more I gather now, the better off I'll be later.*",
+            "*One resource at a time. Stay disciplined.*",
+            "*Supply lines are everything. Time to build mine up.*",
+        ],
+        "determined": [
+            "*I won't go hungry. Not today, not ever.*",
+            "*Whatever it takes, I'm getting what I need to survive.*",
+            "*Scarcity won't defeat me. I'll find a way.*",
+            "*Every resource gathered is another day I survive.*",
+            "*I refuse to be caught unprepared.*",
+        ],
+        "anxious": [
+            "*Running low on everything... this is bad.*",
+            "*Please let there be enough. Please...*",
+            "*If I don't find resources soon, I'm in real trouble.*",
+            "*The others have more than me. I need to catch up, fast.*",
+            "*Scraping together whatever I can find. It's barely enough.*",
+        ],
+    },
+    "observe": {
+        "analytical": [
+            "*Interesting... {target} seems to be making alliances. I should keep watch.*",
+            "*Patterns. Everything has patterns. I just need to read them.*",
+            "*Let me assess the situation before making any moves.*",
+            "*Knowledge is power. And right now, I'm gathering plenty of it.*",
+            "*Everyone thinks they're being subtle. They're not. I see everything.*",
+            "*The dynamics are shifting. I need to understand how before I act.*",
+        ],
+        "curious": [
+            "*What are they up to over there? Something's going on...*",
+            "*I need to understand what's happening before I get involved.*",
+            "*There's more to this situation than meets the eye.*",
+            "*Fascinating... the way they interact tells me so much.*",
+            "*If I watch carefully enough, the truth always reveals itself.*",
+        ],
+        "paranoid": [
+            "*They're plotting something. I can feel it.*",
+            "*I don't trust any of them. Best to watch from a distance.*",
+            "*Everyone has an angle. I need to figure out theirs.*",
+            "*Something isn't right. I need to stay alert.*",
+            "*Are they watching me too? I need to be careful.*",
+            "*Trust no one. Observe everyone.*",
+        ],
+    },
+    "communicate": {
+        "friendly": [
+            "{target}! Good to see you. What news do you bring?",
+            "Hey {target}, got a minute? I wanted to catch up.",
+            "{target}, I've been meaning to talk to you! How are things?",
+            "There you are, {target}! I was hoping we'd cross paths.",
+            "Always good to see a familiar face, {target}. What's on your mind?",
+            "Let's chat, {target}. It's been too long since we talked.",
+        ],
+        "suspicious": [
+            "What do you want, {target}? And don't bother lying to me.",
+            "Talk, {target}. But choose your words carefully.",
+            "I have questions, {target}. And you'd better have honest answers.",
+            "Don't think I don't know what you've been up to, {target}.",
+            "{target}. We need to talk. And I want the truth.",
+            "I've been watching you, {target}. Care to explain yourself?",
+        ],
+        "excited": [
+            "{target}! You won't believe what I've discovered!",
+            "Oh {target}, I have SO much to tell you!",
+            "Quick, {target}! I've got incredible news!",
+            "{target}!! Come here, I need to share something amazing!",
+            "Wait till you hear this, {target}! This changes everything!",
+        ],
+        "formal": [
+            "A word, {target}, if you have a moment.",
+            "I wish to discuss a matter of importance with you, {target}.",
+            "{target}, there are developments we should address.",
+            "Might I have a moment of your time, {target}?",
+            "I believe we have matters to discuss, {target}.",
+        ],
+    },
+    "share": {
+        "generous": [
+            "Here, {target}, take some of my supplies. We look out for each other.",
+            "You look like you could use this, {target}. No strings attached.",
+            "{target}, take this. I've got more than I need right now.",
+            "I'd rather share than hoard, {target}. Here you go.",
+            "What's mine is yours, {target}. We're in this together.",
+            "I want you to have this, {target}. Everyone deserves a fair share.",
+        ],
+        "strategic": [
+            "Consider this a gift, {target}. And gifts... are remembered.",
+            "I'm investing in our relationship, {target}. Take these resources.",
+            "A little generosity goes a long way, {target}. Remember this.",
+            "Think of this as a down payment on future cooperation, {target}.",
+            "I'm sharing this with you, {target}. I trust you'll return the favor someday.",
+            "Take this, {target}. Let's just say... you'll owe me one.",
+        ],
+        "warm": [
+            "You've been so kind, {target}. Let me give something back.",
+            "Seeing you struggle hurts, {target}. Please, take these.",
+            "Friends share, {target}. And I consider you a friend.",
+            "I couldn't enjoy my surplus knowing you're in need, {target}.",
+            "It makes me happy to share with you, {target}. Truly.",
+        ],
+        "reluctant": [
+            "Fine, {target}. Take some. But don't make a habit of asking.",
+            "Here. Don't say I never gave you anything, {target}.",
+            "I suppose I can spare a little, {target}. Just this once.",
+            "Against my better judgment, {target}. Here. Take it.",
+            "You need this more than me. For now, {target}. Just for now.",
+        ],
+    },
+    "defend": {
+        "brave": [
+            "I won't let you through, {target}! Stand down!",
+            "You want a fight? You'll have to go through me, {target}!",
+            "I'll defend this ground with everything I have!",
+            "Come at me, {target}! I'm not afraid of you!",
+            "Not one step further, {target}! I stand my ground!",
+            "I won't back down. Not now, not ever!",
+        ],
+        "scared": [
+            "*Stay calm... stay calm... I just need to hold this position...*",
+            "*They're coming. Oh no, they're coming. I have to be brave...*",
+            "*My hands are trembling. But I can't let them see my fear.*",
+            "*Just hold the line. That's all I have to do. Hold the line...*",
+            "*I'm terrified. But running would be worse.*",
+            "*Please don't attack... please just go away...*",
+        ],
+        "determined": [
+            "This is my ground, {target}. You won't take it from me.",
+            "I've worked too hard to lose everything now. I'll defend what's mine.",
+            "You underestimate my resolve, {target}. I will not yield.",
+            "Every inch of this territory was earned. I'll defend every inch.",
+            "I didn't come this far to fall now. Bring it on.",
+        ],
+        "angry": [
+            "Try me, {target}! I dare you!",
+            "You think you can take what's mine?! Over my dead body!",
+            "Come on then, {target}! Let's see what you've got!",
+            "I'm done being pushed around! Nobody touches what's mine!",
+            "You picked the wrong target, {target}!",
+        ],
+    },
+    "compete": {
+        "competitive": [
+            "May the best one win, {target}!",
+            "Let's see what you're made of, {target}! Game on!",
+            "I've been looking forward to this, {target}. A real challenge!",
+            "Competition brings out the best in us, {target}. Let's go!",
+            "Ready to test your limits, {target}? Because I'm ready to test mine!",
+            "This should be interesting, {target}. Show me what you've got!",
+        ],
+        "trash_talk": [
+            "You don't stand a chance, {target}. Might as well give up now.",
+            "Oh please, {target}. I could do this in my sleep.",
+            "This is going to be embarrassing for you, {target}.",
+            "I almost feel bad for you, {target}. Almost.",
+            "Save yourself the humiliation, {target}. Just walk away.",
+            "You? Against me, {target}? That's adorable.",
+        ],
+        "determined": [
+            "I'm going to win this, {target}. I have to.",
+            "Everything's on the line, {target}. I won't lose.",
+            "This competition means everything to me. I'll give it my all.",
+            "I've prepared for this moment, {target}. Have you?",
+            "Victory or nothing, {target}. That's my only option.",
+        ],
+        "playful": [
+            "Race you to the top, {target}! Last one there's a rotten egg!",
+            "Friendly competition, {target}! No hard feelings, win or lose?",
+            "Let's make it interesting, {target}! What do you say?",
+            "I bet I can outdo you, {target}! Wanna find out?",
+            "This is gonna be fun, {target}! May the best competitor win!",
+        ],
+    },
+}
+
+REACTION_TEMPLATES: dict[str, dict[str, list[str]]] = {
+    "won_conflict": {
+        "proud": [
+            "That'll teach you to mess with me.",
+            "And let that be a lesson to anyone else who tries.",
+            "Victory. As expected.",
+            "Don't ever challenge me again.",
+            "I told you this would happen.",
+            "Another victory added to the record.",
+        ],
+        "relieved": [
+            "*Phew... that was close.*",
+            "*Thank goodness... I barely made it.*",
+            "*I won, but it cost me. I need to be more careful.*",
+            "*That could have gone either way. I got lucky.*",
+            "*My heart is still racing. But I survived.*",
+        ],
+        "humble": [
+            "*I didn't want it to come to this, but I had to protect myself.*",
+            "*No pleasure in this victory. Only necessity.*",
+            "*I hope they're okay. I didn't want to hurt anyone.*",
+            "*Winning doesn't feel as good as I thought it would.*",
+        ],
+    },
+    "lost_conflict": {
+        "angry": [
+            "This isn't over, {target}...",
+            "You got lucky, {target}. Next time will be different.",
+            "I'll remember this, {target}. And I won't forget.",
+            "Enjoy your victory, {target}. It won't last.",
+            "Mark my words, {target}. I'll be back.",
+        ],
+        "defeated": [
+            "*I need to get stronger...*",
+            "*How did I lose? What went wrong?*",
+            "*Maybe I'm not cut out for this...*",
+            "*Everything hurts. My pride most of all.*",
+            "*I have to pick myself up. Can't stay down forever.*",
+        ],
+        "scared": [
+            "*I can't go through that again. I need to avoid conflict.*",
+            "*They're too strong. I'm in over my head.*",
+            "*I need allies. I can't survive alone against that.*",
+            "*If they come back, I don't know if I'll make it.*",
+        ],
+    },
+    "was_betrayed": {
+        "furious": [
+            "I TRUSTED you, {target}!!",
+            "You traitor! I'll make you pay for this, {target}!",
+            "How could you, {target}?! After everything we've been through!",
+            "You're dead to me, {target}. DEAD!",
+            "I should have known, {target}! I should have KNOWN!",
+            "Betrayal. The worst crime there is. And you'll answer for it, {target}.",
+        ],
+        "heartbroken": [
+            "*I should have known... I should have known...*",
+            "*Why, {target}? I thought we were friends...*",
+            "*The trust is gone. It's all gone.*",
+            "*Everyone leaves. Everyone betrays. Why did I think this time would be different?*",
+            "*My heart aches more than my wounds...*",
+        ],
+        "cold": [
+            "Noted, {target}. I won't make this mistake twice.",
+            "*File that under 'lessons learned.' Trust no one.*",
+            "Interesting, {target}. Very interesting. I'll remember this.",
+            "*Fool me once, shame on you. There won't be a second time.*",
+            "*Emotion clouded my judgment. That ends now.*",
+        ],
+    },
+    "alliance_formed": {
+        "excited": [
+            "Together, we'll be unstoppable!",
+            "This alliance changes everything! I can feel it!",
+            "Best decision I've ever made!",
+            "The others don't stand a chance against us now!",
+            "Our combined strength is going to reshape everything!",
+        ],
+        "cautious": [
+            "*Finally, someone I can count on. I hope.*",
+            "*An ally. Good. But I'll keep my guard up, just in case.*",
+            "*Trust, but verify. That's my approach to this alliance.*",
+            "*This could be the turning point. Or the biggest mistake of my life.*",
+        ],
+        "warm": [
+            "*It feels good to not be alone anymore.*",
+            "*Having someone at my side gives me hope.*",
+            "*Maybe things will be okay after all. Together, we're strong.*",
+            "*A friend in this harsh world. That's worth more than gold.*",
+        ],
+    },
+    "resource_crisis": {
+        "panicked": [
+            "*Food is running low... this could get ugly.*",
+            "*We're running out of everything. I need to act fast!*",
+            "*This is bad. This is really, really bad.*",
+            "*If resources don't recover soon, it's going to be every person for themselves.*",
+            "*Scarcity breeds desperation. And desperate people are dangerous.*",
+        ],
+        "determined": [
+            "*Tight times call for tough decisions. I'll make it through.*",
+            "*Scarcity won't break me. I've survived worse.*",
+            "*Time to ration everything. Every bit counts now.*",
+            "*The strong adapt. I will adapt.*",
+        ],
+        "scheming": [
+            "*When resources are scarce, opportunity knocks for the clever.*",
+            "*Others will panic. I'll capitalize.*",
+            "*Scarcity means leverage. And I intend to have plenty.*",
+            "*Time to see who's really prepared. Spoiler: it's me.*",
+        ],
+    },
+    "successful_cooperation": {
+        "happy": [
+            "See? Working together pays off!",
+            "That went even better than I hoped! Great teamwork!",
+            "*This is how it should be. Cooperation over conflict.*",
+            "Together we accomplished what neither of us could alone!",
+            "I knew teaming up was the right call!",
+        ],
+        "grateful": [
+            "Thank you for working with me, {target}. It means a lot.",
+            "*I'm glad I'm not alone in this.*",
+            "We make a good team, {target}. I appreciate you.",
+            "*Not everyone would have cooperated. {target} is good people.*",
+        ],
+    },
+    "failed_negotiation": {
+        "frustrated": [
+            "*That negotiation went nowhere. What a waste of time.*",
+            "You're making a mistake by not dealing with me, {target}.",
+            "*Diplomacy failed. Time to consider other options.*",
+            "*I extended an olive branch and got nothing. Fine.*",
+        ],
+        "philosophical": [
+            "*Not every negotiation succeeds. But the attempt itself has value.*",
+            "*They weren't ready to deal. Perhaps next time.*",
+            "*Patience. The right deal will come eventually.*",
+        ],
+    },
+}
+
+
+class DialogueGenerator:
+
+    def _get_tone(self, character: Character) -> str:
+        emo = character.emotional_state
+        traits = character.traits
+
+        if emo.anger > 0.5:
+            if traits.agreeableness > 0.6:
+                return "frustrated"
+            return "aggressive"
+        if emo.fear > 0.5:
+            return "nervous"
+        if emo.happiness > 0.5:
+            if traits.extraversion > 0.6:
+                return "excited"
+            return "friendly"
+        if emo.sadness > 0.4:
+            return "sad"
+        if emo.trust < -0.3:
+            if traits.agreeableness < 0.4:
+                return "hostile"
+            return "suspicious"
+        if emo.trust > 0.3:
+            return "friendly"
+
+        if traits.agreeableness > 0.7:
+            return "friendly"
+        if traits.agreeableness < 0.3:
+            return "hostile"
+        if traits.neuroticism > 0.7:
+            return "nervous"
+        if traits.extraversion > 0.7:
+            return "excited"
+        if traits.openness > 0.7:
+            return "curious"
+        if traits.conscientiousness > 0.7:
+            return "formal"
+
+        return "neutral"
+
+    def _pick_template(self, action_type: str, tone: str, has_target: bool) -> str | None:
+        templates = DIALOGUE_TEMPLATES.get(action_type, {})
+        if not templates:
+            return None
+
+        if tone in templates:
+            return random.choice(templates[tone])
+
+        tone_map = {
+            "aggressive": ["hostile", "angry", "threatening"],
+            "hostile": ["aggressive", "cold", "sarcastic"],
+            "nervous": ["scared", "anxious", "cautious"],
+            "friendly": ["warm", "generous", "happy"],
+            "excited": ["friendly", "competitive", "playful"],
+            "suspicious": ["cautious", "paranoid", "cold"],
+            "sad": ["defeated", "heartbroken", "tired"],
+            "frustrated": ["angry", "hostile", "determined"],
+            "curious": ["analytical", "philosophical", "adventurous"],
+            "formal": ["strategic", "analytical", "cautious"],
+            "neutral": ["friendly", "formal", "cautious", "determined"],
+            "cold": ["hostile", "formal", "strategic"],
+            "warm": ["friendly", "generous", "happy"],
+        }
+
+        fallbacks = tone_map.get(tone, [])
+        for fb in fallbacks:
+            if fb in templates:
+                return random.choice(templates[fb])
+
+        all_options = []
+        for t_list in templates.values():
+            all_options.extend(t_list)
+        if all_options:
+            return random.choice(all_options)
+        return None
+
+    def _pick_reaction_template(self, reaction_type: str, tone: str) -> str | None:
+        templates = REACTION_TEMPLATES.get(reaction_type, {})
+        if not templates:
+            return None
+
+        if tone in templates:
+            return random.choice(templates[tone])
+
+        tone_map = {
+            "aggressive": ["angry", "furious"],
+            "hostile": ["angry", "furious", "cold"],
+            "nervous": ["scared", "panicked", "defeated"],
+            "friendly": ["happy", "warm", "grateful", "excited"],
+            "excited": ["happy", "proud", "excited"],
+            "suspicious": ["cautious", "cold", "scheming"],
+            "sad": ["defeated", "heartbroken"],
+            "frustrated": ["angry", "determined"],
+            "curious": ["philosophical", "cautious"],
+            "formal": ["cold", "cautious", "determined"],
+            "neutral": ["relieved", "cautious", "determined"],
+            "cold": ["cold", "determined"],
+            "warm": ["happy", "grateful", "warm"],
+        }
+
+        fallbacks = tone_map.get(tone, [])
+        for fb in fallbacks:
+            if fb in templates:
+                return random.choice(templates[fb])
+
+        all_options = []
+        for t_list in templates.values():
+            all_options.extend(t_list)
+        if all_options:
+            return random.choice(all_options)
+        return None
+
+    def generate_action_dialogue(
+        self, character: Character, action: Action, target: Character | None, state: SimulationState
+    ) -> ChatMessage | None:
+        rng = random.Random(hash(("dialogue", character.id, state.tick)))
+
+        solo_actions = {ActionType.EXPLORE, ActionType.REST, ActionType.GATHER, ActionType.OBSERVE}
+        is_solo = action.type in solo_actions
+
+        if is_solo:
+            if rng.random() > 0.7:
+                return None
+        else:
+            if rng.random() > 0.85:
+                return None
+
+        tone = self._get_tone(character)
+        action_key = action.type.value
+        template = self._pick_template(action_key, tone, target is not None)
+        if not template:
+            return None
+
+        target_name = target.name if target else ""
+        content = template.replace("{target}", target_name)
+
+        is_thought = content.startswith("*") and content.endswith("*")
+        if is_solo and not is_thought:
+            content = f"*{content}*"
+            is_thought = True
+
+        return ChatMessage(
+            tick=state.tick,
+            speaker_id=character.id,
+            speaker_name=character.name,
+            content=content,
+            tone=tone,
+            target_id=target.id if target else None,
+            target_name=target_name if target_name else None,
+            is_thought=is_thought,
+            action_context=action_key,
+        )
+
+    def generate_reaction_dialogue(
+        self, character: Character, event: Event, state: SimulationState
+    ) -> ChatMessage | None:
+        if character.id not in event.participants:
+            return None
+
+        rng = random.Random(hash(("reaction", character.id, event.id)))
+        if rng.random() > 0.6:
+            return None
+
+        tone = self._get_tone(character)
+        reaction_type = self._classify_event_reaction(character, event, state)
+        if not reaction_type:
+            return None
+
+        template = self._pick_reaction_template(reaction_type, tone)
+        if not template:
+            return None
+
+        other_id = None
+        other_name = ""
+        for pid in event.participants:
+            if pid != character.id and pid in state.characters:
+                other_id = pid
+                other_name = state.characters[pid].name
+                break
+
+        content = template.replace("{target}", other_name)
+        is_thought = content.startswith("*") and content.endswith("*")
+
+        return ChatMessage(
+            tick=state.tick,
+            speaker_id=character.id,
+            speaker_name=character.name,
+            content=content,
+            tone=tone,
+            target_id=other_id,
+            target_name=other_name if other_name else None,
+            is_thought=is_thought,
+            action_context=f"reaction_{event.type.value}",
+        )
+
+    def _classify_event_reaction(self, character: Character, event: Event, state: SimulationState) -> str | None:
+        if event.type == EventType.CONFLICT:
+            is_winner = any("wins" in o.lower() and character.name.lower() in o.lower() for o in event.outcomes)
+            return "won_conflict" if is_winner else "lost_conflict"
+
+        if event.type == EventType.ALLIANCE_FORMED:
+            return "alliance_formed"
+
+        if event.type == EventType.INTERACTION:
+            if "betray" in event.description.lower():
+                victim_names = []
+                for pid in event.participants:
+                    if pid != character.id and pid in state.characters:
+                        victim_names.append(state.characters[pid].name)
+                if "betray" in event.title.lower():
+                    parts = event.title.lower().split("betray")
+                    if len(parts) >= 2 and character.name.lower() in parts[1]:
+                        return "was_betrayed"
+                for o in event.outcomes:
+                    if "stole" in o.lower() and any(f"from {character.name.lower()}" in o.lower() for _ in [1]):
+                        return "was_betrayed"
+
+            if "cooperat" in event.description.lower():
+                return "successful_cooperation"
+
+            if "competit" in event.description.lower():
+                is_winner = any("wins" in o.lower() and character.name.lower() in o.lower() for o in event.outcomes)
+                return "won_conflict" if is_winner else "lost_conflict"
+
+        if event.type == EventType.NEGOTIATION:
+            if "preoccupied" in event.description.lower() or "yet to respond" in event.description.lower():
+                return "failed_negotiation"
+
+        if event.type == EventType.EMERGENT:
+            if "crisis" in event.title.lower() or "shortage" in event.title.lower() or "scarcity" in event.title.lower():
+                return "resource_crisis"
+
+        return None

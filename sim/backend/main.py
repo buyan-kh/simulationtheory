@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
-    Event, Memory,
+    Event, Memory, ChatMessage,
 )
 from engine import SimulationEngine
 
@@ -30,6 +30,7 @@ class CreateSimulationRequest(BaseModel):
 class StepResponse(BaseModel):
     events: list[Event]
     state: SimulationState
+    chat_messages: list[ChatMessage]
 
 
 @app.post("/api/simulations", response_model=SimulationState)
@@ -60,8 +61,8 @@ def get_simulation(sim_id: str):
 def step_simulation(sim_id: str):
     if sim_id not in engine.simulations:
         raise HTTPException(status_code=404, detail="Simulation not found")
-    events = engine.step(sim_id)
-    return StepResponse(events=events, state=engine.get_state(sim_id))
+    events, chat_messages = engine.step(sim_id)
+    return StepResponse(events=events, state=engine.get_state(sim_id), chat_messages=chat_messages)
 
 
 @app.patch("/api/simulations/{sim_id}/config", response_model=SimulationState)
@@ -140,3 +141,11 @@ def get_events(sim_id: str, since_tick: int = Query(default=0, ge=0)):
         raise HTTPException(status_code=404, detail="Simulation not found")
     sim = engine.get_state(sim_id)
     return [e for e in sim.events if e.tick >= since_tick]
+
+
+@app.get("/api/simulations/{sim_id}/chat", response_model=list[ChatMessage])
+def get_chat(sim_id: str, since_tick: int = Query(default=0, ge=0)):
+    if sim_id not in engine.simulations:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    sim = engine.get_state(sim_id)
+    return [m for m in sim.chat_log if m.tick >= since_tick]
