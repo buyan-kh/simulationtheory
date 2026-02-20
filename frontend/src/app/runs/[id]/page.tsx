@@ -407,35 +407,23 @@ export default function RunResultsPage() {
 
       {isCompleted && result && (
         <>
-          {/* 1. Data Series Charts - HERO section, big and prominent */}
+          {/* 1. Data Series Charts - HERO section, full-width stock charts */}
           {chartLoading ? (
             <motion.div variants={staggerItem}>
-              <Card><CardContent><Skeleton className="h-72 w-full" /></CardContent></Card>
+              <Skeleton className="h-80 w-full rounded-[var(--radius)]" />
             </motion.div>
           ) : chartSeries.length > 0 && (
-            <motion.div variants={staggerItem}>
-              <Card>
-                <CardContent>
-                  <div className="space-y-4">
-                    {chartSeries.map((s, i) => (
-                      <div key={s.name}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                          <span className="text-[10px] text-muted">{s.name}</span>
-                        </div>
-                        <div className="rounded-[var(--radius-sm)] border border-border bg-background/50 p-1">
-                          <SeriesChart
-                            data={s.points}
-                            name={s.name}
-                            color={CHART_COLORS[i % CHART_COLORS.length]}
-                            height={220}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            <motion.div variants={staggerItem} className="space-y-3">
+              {chartSeries.map((s, i) => (
+                <div key={s.name} className="rounded-[var(--radius)] overflow-hidden">
+                  <SeriesChart
+                    data={s.points}
+                    name={s.name}
+                    color={CHART_COLORS[i % CHART_COLORS.length]}
+                    height={340}
+                  />
+                </div>
+              ))}
             </motion.div>
           )}
 
