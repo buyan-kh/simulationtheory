@@ -33,6 +33,11 @@ class StepResponse(BaseModel):
     chat_messages: list[ChatMessage]
 
 
+@app.get("/api/simulations", response_model=list[SimulationState])
+def list_simulations():
+    return list(engine.simulations.values())
+
+
 @app.post("/api/simulations", response_model=SimulationState)
 def create_simulation(req: CreateSimulationRequest | None = None):
     config = None
