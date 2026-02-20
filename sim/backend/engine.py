@@ -60,6 +60,8 @@ class SimulationEngine:
             if msg:
                 chat_messages.append(msg)
 
+        self._move_characters(sim, actions)
+
         interaction_events = self.event_gen.resolve_actions(sim.characters, actions, sim)
         environmental_events = self.event_gen.generate_environmental_events(sim)
         all_events_so_far = interaction_events + environmental_events
@@ -100,3 +102,45 @@ class SimulationEngine:
     def delete_simulation(self, sim_id: str):
         if sim_id in self.simulations:
             del self.simulations[sim_id]
+
+    # Action type -> target location mapping
+    _ACTION_LOCATION_MAP = {
+        "cooperate": (0, 0),       # Market Square
+        "share": (0, 0),           # Market Square
+        "negotiate": (0, 0),       # Market Square
+        "attack": (100, 0),        # The Arena
+        "defend": (100, 0),        # The Arena
+        "compete": (100, 0),       # The Arena
+        "betray": (100, 0),        # The Arena
+        "ally": (0, 100),          # Council Hall
+        "communicate": (0, 100),   # Council Hall
+        "explore": (-100, -100),   # Wilderness
+        "gather": (-100, -100),    # Wilderness
+        "observe": (50, 50),       # Library
+        "rest": (50, 50),          # Library
+    }
+
+    def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
+        for char_id, action in actions.items():
+            char = sim.characters[char_id]
+            target = self._ACTION_LOCATION_MAP.get(action.type.value)
+            if target is None:
+                continue
+
+            target_x, target_y = target
+            dx = target_x - char.position["x"]
+            dy = target_y - char.position["y"]
+
+            speed = 0.3 + random.uniform(0, 0.2)
+            char.position["x"] += dx * speed
+            char.position["y"] += dy * speed
+
+            # Add random offset when near the target location
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist < 10:
+                char.position["x"] += random.uniform(-8, 8)
+                char.position["y"] += random.uniform(-8, 8)
+
+            # Clamp to world bounds
+            char.position["x"] = max(-120, min(120, char.position["x"]))
+            char.position["y"] = max(-120, min(120, char.position["y"]))
