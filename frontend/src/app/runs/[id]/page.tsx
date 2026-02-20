@@ -433,14 +433,15 @@ export default function RunResultsPage() {
             {sortedPredictions.length > 0 && (
               <Card>
                 <CardContent>
-                  <span className="text-[10px] uppercase tracking-wider text-muted block mb-3">predictions</span>
+                  <span className="text-[10px] uppercase tracking-wider text-muted block mb-3">
+                    predictions
+                    <span className="text-[9px] text-[#444] ml-2">top {Math.min(sortedPredictions.length, 8)}</span>
+                  </span>
                   <HBarChart
-                    items={sortedPredictions.map((p) => ({
-                      label: p.description.slice(0, 20),
+                    items={sortedPredictions.slice(0, 8).map((p) => ({
+                      label: p.description,
                       value: p.confidence,
                     }))}
-                    maxValue={1}
-                    height={24}
                   />
                 </CardContent>
               </Card>

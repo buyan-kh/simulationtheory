@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 
 interface HBarItem {
@@ -15,50 +16,81 @@ interface HBarChartProps {
   className?: string;
 }
 
-function getDefaultColor(value: number, max: number): string {
-  const pct = max > 0 ? value / max : 0;
-  if (pct >= 0.7) return "#10b981";
-  if (pct >= 0.4) return "#f59e0b";
-  return "#f43f5e";
+function getDefaultColor(rank: number, total: number): string {
+  const t = total > 1 ? rank / (total - 1) : 0;
+  if (t <= 0.25) return "#22c55e";
+  if (t <= 0.5) return "#3b82f6";
+  if (t <= 0.75) return "#f59e0b";
+  return "#71717a";
 }
 
-export function HBarChart({ items, maxValue, height = 28, className }: HBarChartProps) {
-  const max = maxValue ?? Math.max(...items.map((d) => d.value), 0.01);
+export function HBarChart({ items, maxValue, height = 22, className }: HBarChartProps) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const max = maxValue ?? Math.max(...items.map((d) => d.value), 0.001);
 
   return (
-    <div className={className} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div className={className} style={{ display: "flex", flexDirection: "column", gap: 4, position: "relative" }}>
       {items.map((item, i) => {
-        const pct = Math.max(0, Math.min(100, (item.value / max) * 100));
-        const color = item.color || getDefaultColor(item.value, max);
+        const pct = Math.max(2, Math.min(100, (item.value / max) * 100));
+        const color = item.color || getDefaultColor(i, items.length);
+        const isHov = hovered === i;
+
         return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              className="text-[11px] text-muted truncate text-right"
-              style={{ width: 80, flexShrink: 0 }}
-            >
-              {item.label}
-            </span>
+          <div
+            key={i}
+            style={{ display: "flex", alignItems: "center", gap: 0, position: "relative" }}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            {/* Bar */}
             <div
-              className="flex-1 rounded-full overflow-hidden"
-              style={{ height, background: "var(--border-color)", opacity: 0.3 }}
+              className="flex-1 rounded overflow-hidden"
+              style={{ height, background: "#1a1a1f", cursor: "default" }}
             >
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${pct}%` }}
-                transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
+                transition={{ duration: 0.5, delay: i * 0.03, ease: "easeOut" }}
                 style={{
                   height: "100%",
-                  borderRadius: "9999px",
-                  background: `linear-gradient(90deg, ${color}cc, ${color})`,
+                  borderRadius: 3,
+                  background: `linear-gradient(90deg, ${color}99, ${color})`,
+                  opacity: hovered !== null && !isHov ? 0.35 : 1,
+                  transition: "opacity 0.15s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  paddingLeft: 6,
+                  minWidth: 36,
                 }}
-              />
+              >
+                <span style={{ fontSize: 9, fontWeight: 600, color: "#000", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                  {(item.value * 100).toFixed(0)}%
+                </span>
+              </motion.div>
             </div>
-            <span
-              className="text-[11px] font-mono tabular-nums"
-              style={{ width: 42, flexShrink: 0, color, textAlign: "right" }}
-            >
-              {(item.value * 100).toFixed(0)}%
-            </span>
+
+            {/* Hover tooltip with full label */}
+            {isHov && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: -28,
+                  zIndex: 10,
+                  background: "#18181b",
+                  border: "1px solid #333",
+                  borderRadius: 4,
+                  padding: "3px 8px",
+                  maxWidth: 320,
+                  whiteSpace: "nowrap",
+                  pointerEvents: "none",
+                }}
+              >
+                <span style={{ fontSize: 10, color: "#e4e4e7", fontFamily: "var(--font-mono)" }}>
+                  {item.label}
+                </span>
+              </div>
+            )}
           </div>
         );
       })}
