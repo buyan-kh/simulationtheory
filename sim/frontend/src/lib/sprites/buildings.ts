@@ -1,5 +1,12 @@
-// Pixel art building sprites for Canvas rendering
-// Buildings are drawn at various sizes, with details like doors, windows, roofs, chimneys
+// Pixel art building sprites drawn on Canvas via fillRect pixel grids
+
+type PixelGrid = (string | null)[][];
+
+interface BuildingDef {
+  pixels: PixelGrid;
+  width: number;
+  height: number;
+}
 
 export type BuildingType =
   | 'house_small'
@@ -13,661 +20,670 @@ export type BuildingType =
   | 'well'
   | 'fountain';
 
-interface BuildingDef {
-  width: number;   // in pixels (before scale)
-  height: number;
-  draw: (ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, frame: number) => void;
+// ── Color Palette ──────────────────────────────────────────────────────
+
+const RF = '#CC4422'; // roof
+const RD = '#AA3311'; // roof dark
+const RE = '#882211'; // roof edge
+const SH = '#BB3818'; // shingle alt
+
+const WD = '#8B6914'; // wood
+const WK = '#6B4A0E'; // wood dark
+const WL = '#9A7820'; // wood light
+const PL = '#7A5810'; // plank
+
+const ST = '#6a6a7a'; // stone
+const SD = '#5a5a6a'; // stone dark
+const SL = '#7a7a8a'; // stone light
+const SE = '#4a4a5a'; // stone edge
+const FN = '#3a3a4a'; // foundation
+
+const GL = '#3a5a8a'; // glass
+const GT = '#4a6a9a'; // glass light
+
+const DR = '#5a3a1a'; // door
+const DD = '#4a2a0a'; // door dark
+
+const GD = '#ffd700'; // gold
+const GK = '#ccaa00'; // gold dark
+
+const CH = '#6a5050'; // chimney
+const CK = '#5a4040'; // chimney dark
+
+const WA = '#4a8acc'; // water
+const WW = '#6aaaee'; // water light
+const WV = '#3a6a9a'; // water dark
+
+const AA = '#cc6622'; // awning
+const AB = '#eedd88'; // awning stripe
+
+const BN = '#cc3333'; // banner
+const BK = '#aa2222'; // banner dark
+
+const TN = '#c4a46a'; // tan
+const TD = '#a4845a'; // tan dark
+const TL = '#d4b47a'; // tan light
+
+const YG = '#ffdd66'; // yellow glow
+const YL = '#ffee88'; // glow light
+
+const PI = '#c0c0cc'; // pillar
+const PD = '#a0a0aa'; // pillar dark
+const PT = '#d8d8dd'; // pillar light
+
+const BS = '#5a6a8a'; // blue stone
+const BD = '#4a5a7a'; // blue stone dark
+const BL = '#6a7a9a'; // blue stone light
+
+const SG = '#8a7a5a'; // sign
+const SK = '#6a5a3a'; // sign dark
+
+const RP = '#8a7a5a'; // rope
+const BU = '#6a5540'; // bucket
+
+// ── Grid Helpers ───────────────────────────────────────────────────────
+
+function grid(w: number, h: number): PixelGrid {
+  return Array.from({ length: h }, () => new Array<string | null>(w).fill(null));
 }
 
-// Color palette
-const WALL_BEIGE = '#c8b890';
-const WALL_BEIGE_LT = '#d8c8a0';
-const WALL_BEIGE_DK = '#b0a078';
-const WALL_STONE = '#8a8a8a';
-const WALL_STONE_LT = '#9a9a9a';
-const WALL_STONE_DK = '#6a6a6a';
-const ROOF_RED = '#aa3322';
-const ROOF_RED_LT = '#cc4433';
-const ROOF_RED_DK = '#882211';
-const ROOF_BLUE = '#2244aa';
-const ROOF_BLUE_LT = '#3355bb';
-const ROOF_BLUE_DK = '#112288';
-const ROOF_GREEN = '#226622';
-const ROOF_GREEN_LT = '#338833';
-const ROOF_GREEN_DK = '#114411';
-const ROOF_GOLD = '#aa8833';
-const ROOF_GOLD_LT = '#ccaa44';
-const ROOF_GOLD_DK = '#886622';
-const ROOF_PURPLE = '#663388';
-const ROOF_PURPLE_LT = '#8844aa';
-const ROOF_PURPLE_DK = '#442266';
-const DOOR = '#4a2a0a';
-const DOOR_LT = '#5a3a1a';
-const WINDOW_GLASS = '#88bbdd';
-const WINDOW_GLOW = '#ffd86050';
-const WOOD_FRAME = '#5a3a1a';
-const CHIMNEY = '#6a5a5a';
-const CHIMNEY_DK = '#4a3a3a';
-
-function px(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, scale: number) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * scale, y * scale, w * scale, h * scale);
+function rc(g: PixelGrid, x: number, y: number, w: number, h: number, c: string) {
+  for (let r = y; r < y + h; r++)
+    for (let co = x; co < x + w; co++)
+      if (r >= 0 && r < g.length && co >= 0 && co < g[0].length) g[r][co] = c;
 }
 
-// ==================== HOUSE SMALL (24x28) ====================
-const HOUSE_SMALL: BuildingDef = {
-  width: 24, height: 28,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+function px(g: PixelGrid, x: number, y: number, c: string) {
+  if (y >= 0 && y < g.length && x >= 0 && x < g[0].length) g[y][x] = c;
+}
 
-    // Wall
-    ctx.fillStyle = WALL_BEIGE;
-    ctx.fillRect(x(2), y(12), 20 * s, 14 * s);
-    ctx.fillStyle = WALL_BEIGE_LT;
-    ctx.fillRect(x(3), y(13), 18 * s, 1 * s);
-    ctx.fillStyle = WALL_BEIGE_DK;
-    ctx.fillRect(x(2), y(25), 20 * s, 1 * s);
+function hl(g: PixelGrid, x: number, y: number, n: number, c: string) {
+  for (let i = 0; i < n; i++) px(g, x + i, y, c);
+}
 
-    // Roof
-    ctx.fillStyle = ROOF_RED;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(13));
-    ctx.lineTo(x(12), y(2));
-    ctx.lineTo(x(24), y(13));
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ROOF_RED_LT;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(13));
-    ctx.lineTo(x(12), y(2));
-    ctx.lineTo(x(12), y(13));
-    ctx.closePath();
-    ctx.fill();
-    // Roof outline
-    ctx.strokeStyle = ROOF_RED_DK;
-    ctx.lineWidth = s * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(13));
-    ctx.lineTo(x(12), y(2));
-    ctx.lineTo(x(24), y(13));
-    ctx.stroke();
+function vl(g: PixelGrid, x: number, y: number, n: number, c: string) {
+  for (let i = 0; i < n; i++) px(g, x, y + i, c);
+}
 
-    // Door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(9), y(19), 6 * s, 7 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(10), y(20), 4 * s, 5 * s);
-    // Door knob
-    ctx.fillStyle = '#c8a040';
-    ctx.fillRect(x(13), y(22), 1 * s, 1 * s);
+function roof(g: PixelGrid, cx: number, ty: number, hb: number, ht: number, m: string, d: string, e: string) {
+  for (let r = 0; r < ht; r++) {
+    const hw = Math.floor((r + 1) * hb / ht);
+    for (let x = cx - hw; x <= cx + hw; x++) px(g, x, ty + r, ((r + x) & 1) ? d : m);
+    px(g, cx - hw, ty + r, e);
+    px(g, cx + hw, ty + r, e);
+  }
+}
 
-    // Windows
-    ctx.fillStyle = WOOD_FRAME;
-    ctx.fillRect(x(3), y(15), 5 * s, 5 * s);
-    ctx.fillStyle = WINDOW_GLASS;
-    ctx.fillRect(x(4), y(16), 3 * s, 3 * s);
-    ctx.fillStyle = WOOD_FRAME;
-    ctx.fillRect(x(16), y(15), 5 * s, 5 * s);
-    ctx.fillStyle = WINDOW_GLASS;
-    ctx.fillRect(x(17), y(16), 3 * s, 3 * s);
-    // Window cross
-    ctx.fillStyle = WOOD_FRAME;
-    ctx.fillRect(x(5), y(16), 1 * s, 3 * s);
-    ctx.fillRect(x(4), y(17), 3 * s, 1 * s);
-    ctx.fillRect(x(18), y(16), 1 * s, 3 * s);
-    ctx.fillRect(x(17), y(17), 3 * s, 1 * s);
+function wWin(g: PixelGrid, x: number, y: number, w: number, h: number) {
+  rc(g, x, y, w, h, WK);
+  rc(g, x + 1, y + 1, w - 2, h - 2, GL);
+  px(g, x + 1, y + 1, GT);
+  if (w >= 4) hl(g, x + 1, y + Math.floor(h / 2), w - 2, WK);
+  if (h >= 4) vl(g, x + Math.floor(w / 2), y + 1, h - 2, WK);
+}
 
-    // Chimney
-    ctx.fillStyle = CHIMNEY;
-    ctx.fillRect(x(17), y(3), 3 * s, 7 * s);
-    ctx.fillStyle = CHIMNEY_DK;
-    ctx.fillRect(x(17), y(3), 3 * s, 1 * s);
+function gWin(g: PixelGrid, x: number, y: number, w: number, h: number) {
+  rc(g, x, y, w, h, WK);
+  rc(g, x + 1, y + 1, w - 2, h - 2, YG);
+  px(g, x + 1, y + 1, YL);
+  if (w >= 4) hl(g, x + 1, y + Math.floor(h / 2), w - 2, WK);
+  if (h >= 4) vl(g, x + Math.floor(w / 2), y + 1, h - 2, WK);
+}
 
-    // Base line
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(26), 20 * s, 1 * s);
-  },
-};
+function wDoor(g: PixelGrid, x: number, y: number, w: number, h: number) {
+  rc(g, x, y, w, h, DR);
+  vl(g, x, y, h, DD);
+  vl(g, x + w - 1, y, h, DD);
+  hl(g, x, y, w, DD);
+  if (h >= 6) hl(g, x + 1, y + Math.floor(h / 2), w - 2, DD);
+  px(g, x + w - 2, y + Math.floor(h / 2) + 1, GD);
+}
 
-// ==================== HOUSE MEDIUM (32x32) ====================
-const HOUSE_MEDIUM: BuildingDef = {
-  width: 32, height: 32,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+function planks(g: PixelGrid, x: number, y: number, w: number, h: number) {
+  rc(g, x, y, w, h, WD);
+  for (let r = 3; r < h; r += 4) hl(g, x, y + r, w, WK);
+  for (let c = 5; c < w; c += 6)
+    for (let r = 0; r < h; r++)
+      if (r % 4 !== 3) px(g, x + c, y + r, PL);
+  vl(g, x, y, h, WK);
+  vl(g, x + w - 1, y, h, WK);
+}
 
-    // Wall
-    ctx.fillStyle = WALL_BEIGE;
-    ctx.fillRect(x(2), y(14), 28 * s, 16 * s);
-    ctx.fillStyle = WALL_BEIGE_LT;
-    ctx.fillRect(x(3), y(15), 26 * s, 1 * s);
-    ctx.fillStyle = WALL_BEIGE_DK;
-    ctx.fillRect(x(2), y(29), 28 * s, 1 * s);
-
-    // Roof
-    ctx.fillStyle = ROOF_BLUE;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(15));
-    ctx.lineTo(x(16), y(2));
-    ctx.lineTo(x(32), y(15));
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ROOF_BLUE_LT;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(15));
-    ctx.lineTo(x(16), y(2));
-    ctx.lineTo(x(16), y(15));
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = ROOF_BLUE_DK;
-    ctx.lineWidth = s * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(15));
-    ctx.lineTo(x(16), y(2));
-    ctx.lineTo(x(32), y(15));
-    ctx.stroke();
-
-    // Door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(13), y(22), 6 * s, 8 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(14), y(23), 4 * s, 6 * s);
-    ctx.fillStyle = '#c8a040';
-    ctx.fillRect(x(17), y(26), 1 * s, 1 * s);
-
-    // Windows (2 per side)
-    for (const wx of [3, 23]) {
-      ctx.fillStyle = WOOD_FRAME;
-      ctx.fillRect(x(wx), y(17), 6 * s, 5 * s);
-      ctx.fillStyle = WINDOW_GLASS;
-      ctx.fillRect(x(wx + 1), y(18), 4 * s, 3 * s);
-      ctx.fillStyle = WOOD_FRAME;
-      ctx.fillRect(x(wx + 2), y(18), 1 * s, 3 * s);
-      ctx.fillRect(x(wx + 1), y(19), 4 * s, 1 * s);
+function stones(g: PixelGrid, x: number, y: number, w: number, h: number) {
+  for (let r = 0; r < h; r++) {
+    const off = (r & 1) ? 2 : 0;
+    for (let c = 0; c < w; c++) {
+      const b = (c + off) % 4;
+      px(g, x + c, y + r, b === 0 ? SD : b === 1 ? SL : ST);
     }
+  }
+}
 
-    // Chimney
-    ctx.fillStyle = CHIMNEY;
-    ctx.fillRect(x(24), y(4), 4 * s, 8 * s);
-    ctx.fillStyle = CHIMNEY_DK;
-    ctx.fillRect(x(24), y(4), 4 * s, 1 * s);
+// ── Building Constructors ──────────────────────────────────────────────
 
+function makeHouseSmall(): BuildingDef {
+  const w = 24, h = 28, g = grid(w, h);
+
+  // Roof (rows 2-11)
+  roof(g, 11, 2, 10, 10, RF, RD, RE);
+  hl(g, 1, 11, 22, RE);
+
+  // Chimney above roof (rows 0-11)
+  rc(g, 17, 0, 2, 12, CH);
+  vl(g, 17, 0, 12, CK);
+  hl(g, 17, 0, 2, CK);
+
+  // Walls (rows 12-24)
+  planks(g, 3, 12, 18, 13);
+  hl(g, 2, 12, 20, WK);
+
+  // Window with shutters
+  wWin(g, 5, 15, 4, 4);
+  vl(g, 4, 15, 4, WK);
+  vl(g, 9, 15, 4, WK);
+
+  // Door
+  wDoor(g, 14, 19, 4, 6);
+  // Doorstep
+  hl(g, 13, 24, 6, SE);
+
+  // Foundation (rows 25-27)
+  rc(g, 2, 25, 20, 3, SE);
+  hl(g, 2, 25, 20, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeHouseMedium(): BuildingDef {
+  const w = 32, h = 28, g = grid(w, h);
+
+  // Roof
+  roof(g, 15, 2, 14, 10, RF, RD, RE);
+  hl(g, 1, 11, 30, RE);
+
+  // Chimney
+  rc(g, 25, 0, 2, 12, CH);
+  vl(g, 25, 0, 12, CK);
+  hl(g, 25, 0, 2, CK);
+
+  // Walls
+  planks(g, 2, 12, 28, 13);
+  hl(g, 1, 12, 30, WK);
+
+  // Two windows with shutters
+  wWin(g, 4, 15, 5, 4);
+  vl(g, 3, 15, 4, WK); vl(g, 9, 15, 4, WK);
+  wWin(g, 14, 15, 5, 4);
+  vl(g, 13, 15, 4, WK); vl(g, 19, 15, 4, WK);
+
+  // Door
+  wDoor(g, 23, 19, 5, 6);
+
+  // Flower box
+  rc(g, 4, 19, 5, 1, WK);
+  px(g, 5, 19, '#4a8a4a'); px(g, 7, 19, '#cc5544');
+  rc(g, 14, 19, 5, 1, WK);
+  px(g, 15, 19, '#cc5544'); px(g, 17, 19, '#4a8a4a');
+
+  // Foundation
+  rc(g, 1, 25, 30, 3, SE);
+  hl(g, 1, 25, 30, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeHouseLarge(): BuildingDef {
+  const w = 40, h = 32, g = grid(w, h);
+
+  // Roof (rows 2-13)
+  roof(g, 19, 2, 18, 12, RF, SH, RE);
+  hl(g, 1, 13, 38, RE);
+
+  // Chimney (3 wide)
+  rc(g, 33, 0, 3, 14, CH);
+  vl(g, 33, 0, 14, CK);
+  hl(g, 33, 0, 3, CK);
+
+  // Upper walls - wood (rows 14-21)
+  planks(g, 2, 14, 36, 8);
+  hl(g, 1, 14, 38, WK);
+
+  // Lower walls - stone (rows 22-27)
+  stones(g, 2, 22, 36, 6);
+  hl(g, 2, 22, 36, WK);
+
+  // Three windows
+  wWin(g, 4, 16, 5, 4);
+  wWin(g, 14, 16, 5, 4);
+  wWin(g, 28, 16, 5, 4);
+  for (const sx of [3, 9, 13, 19, 27, 33]) vl(g, sx, 16, 4, WK);
+
+  // Large door (center, stone section)
+  wDoor(g, 17, 23, 6, 5);
+  hl(g, 17, 22, 6, SD);
+
+  // Foundation (rows 28-31)
+  rc(g, 1, 28, 38, 4, FN);
+  hl(g, 1, 28, 38, SE);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeShop(): BuildingDef {
+  const w = 36, h = 32, g = grid(w, h);
+
+  // Roof (rows 0-7)
+  roof(g, 17, 0, 16, 8, SH, RD, RE);
+
+  // Walls (rows 8-27)
+  planks(g, 2, 8, 32, 20);
+  hl(g, 1, 8, 34, WK);
+
+  // Awning/canopy (rows 9-12)
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 28; c++)
+      px(g, 3 + c, 9 + r, ((c + r) % 4 < 2) ? AA : AB);
+  hl(g, 3, 12, 28, WK);
+
+  // Display window
+  rc(g, 4, 14, 12, 8, WK);
+  rc(g, 5, 15, 10, 6, GL);
+  px(g, 5, 15, GT);
+  // Goods in window
+  rc(g, 6, 19, 2, 2, '#cc8844');
+  rc(g, 9, 18, 2, 3, '#88aa44');
+  px(g, 12, 19, '#ddaa44');
+  px(g, 13, 20, '#cc6644');
+
+  // Counter shelf
+  rc(g, 3, 22, 14, 2, WK);
+  px(g, 5, 22, '#dd6644');
+  px(g, 8, 22, '#44aa66');
+  px(g, 11, 22, '#ddaa44');
+
+  // Sign
+  rc(g, 24, 13, 8, 4, SG);
+  hl(g, 24, 13, 8, SK);
+  hl(g, 24, 16, 8, SK);
+  px(g, 26, 14, GD); px(g, 27, 14, GD); px(g, 29, 14, GD);
+  px(g, 26, 15, GD); px(g, 28, 15, GD); px(g, 30, 15, GD);
+
+  // Door
+  wDoor(g, 22, 21, 5, 7);
+
+  // Foundation (rows 28-31)
+  rc(g, 1, 28, 34, 4, SE);
+  hl(g, 1, 28, 34, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeArena(): BuildingDef {
+  const w = 48, h = 36, g = grid(w, h);
+
+  // Crenellations (rows 0-3)
+  for (let bx = 2; bx < 46; bx += 6) {
+    rc(g, bx, 0, 3, 2, SL);
+    rc(g, bx, 2, 3, 2, ST);
+  }
+  hl(g, 2, 2, 44, ST);
+  hl(g, 2, 3, 44, SD);
+
+  // Upper wall with small arch windows (rows 4-7)
+  stones(g, 2, 4, 44, 4);
+  for (let ax = 6; ax < 42; ax += 8) {
+    rc(g, ax, 5, 3, 2, SD);
+    px(g, ax + 1, 4, SD);
+  }
+
+  // Main walls (rows 8-27)
+  stones(g, 2, 8, 44, 20);
+  // Vertical pilasters
+  for (const p of [4, 14, 24, 34, 44]) {
+    vl(g, p, 4, 24, SL);
+    vl(g, p - 1, 4, 24, SD);
+  }
+
+  // Red banners (rows 5-16)
+  for (let r = 0; r < 12; r++) {
+    const bw = r < 2 ? 3 : r < 8 ? 4 : 3;
+    const b1 = 6 - Math.floor(bw / 2);
+    rc(g, b1, 5 + r, bw, 1, r % 2 === 0 ? BN : BK);
+    const b2 = 41 - Math.floor(bw / 2);
+    rc(g, b2, 5 + r, bw, 1, r % 2 === 0 ? BN : BK);
+  }
+  px(g, 6, 17, BK); px(g, 41, 17, BK);
+
+  // Arched entrance (center, rows 20-27)
+  const al = 19, ar = 28;
+  for (let r = 24; r <= 27; r++)
+    for (let c = al + 1; c < ar; c++) g[r][c] = null;
+  for (let c = al + 2; c < ar - 1; c++) g[23][c] = null;
+  for (let c = al + 3; c < ar - 2; c++) g[22][c] = null;
+  // Arch frame
+  vl(g, al, 20, 8, SL);
+  vl(g, ar, 20, 8, SL);
+  hl(g, al + 3, 20, ar - al - 5, SL);
+  px(g, al + 1, 21, SL); px(g, ar - 1, 21, SL);
+  px(g, al + 2, 20, SL); px(g, ar - 2, 20, SL);
+
+  // Torch sconces on sides of entrance
+  px(g, al - 2, 21, '#ff8844'); px(g, al - 2, 22, '#cc6622');
+  px(g, ar + 2, 21, '#ff8844'); px(g, ar + 2, 22, '#cc6622');
+
+  // Foundation/steps (rows 28-35)
+  rc(g, 1, 28, 46, 4, SE);
+  hl(g, 1, 28, 46, ST);
+  rc(g, 0, 32, 48, 4, FN);
+  hl(g, 0, 32, 48, SE);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeCouncil(): BuildingDef {
+  const w = 48, h = 40, g = grid(w, h);
+
+  // Triangular pediment (rows 0-13)
+  roof(g, 23, 0, 22, 14, BS, BD, BD);
+  // Golden ridge
+  for (let r = 0; r < 14; r++) px(g, 23, r, GK);
+  // Golden trim at base
+  hl(g, 1, 13, 46, GD);
+
+  // Entablature (rows 14-15)
+  rc(g, 2, 14, 44, 2, BL);
+  hl(g, 2, 14, 44, GK);
+  hl(g, 2, 15, 44, BD);
+
+  // Main facade (rows 16-35)
+  stones(g, 4, 16, 40, 20);
+
+  // 4 Pillars
+  for (const cx of [6, 16, 30, 40]) {
+    // Capital
+    rc(g, cx - 1, 16, 4, 2, PT);
+    hl(g, cx - 1, 16, 4, GK);
+    // Shaft
+    rc(g, cx, 18, 2, 16, PI);
+    vl(g, cx, 18, 16, PD);
+    vl(g, cx + 1, 18, 16, PT);
     // Base
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(30), 28 * s, 1 * s);
-  },
-};
+    rc(g, cx - 1, 34, 4, 2, PD);
+  }
 
-// ==================== HOUSE LARGE (40x36) ====================
-const HOUSE_LARGE: BuildingDef = {
-  width: 40, height: 36,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+  // Windows between pillars
+  wWin(g, 9, 20, 5, 6);
+  wWin(g, 34, 20, 5, 6);
 
-    // Main wall
-    ctx.fillStyle = WALL_BEIGE;
-    ctx.fillRect(x(2), y(16), 36 * s, 18 * s);
-    ctx.fillStyle = WALL_BEIGE_LT;
-    ctx.fillRect(x(3), y(17), 34 * s, 1 * s);
-    ctx.fillStyle = WALL_BEIGE_DK;
-    ctx.fillRect(x(2), y(33), 36 * s, 1 * s);
+  // Grand double door (center)
+  rc(g, 19, 22, 10, 14, DR);
+  vl(g, 19, 22, 14, DD); vl(g, 28, 22, 14, DD);
+  hl(g, 19, 22, 10, DD);
+  vl(g, 24, 23, 12, DD);
+  hl(g, 20, 28, 8, DD);
+  px(g, 23, 30, GD); px(g, 25, 30, GD);
+  // Arch
+  hl(g, 20, 21, 8, GD);
+  px(g, 19, 21, GK); px(g, 28, 21, GK);
 
-    // Main roof
-    ctx.fillStyle = ROOF_GREEN;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(17));
-    ctx.lineTo(x(20), y(2));
-    ctx.lineTo(x(40), y(17));
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ROOF_GREEN_LT;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(17));
-    ctx.lineTo(x(20), y(2));
-    ctx.lineTo(x(20), y(17));
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = ROOF_GREEN_DK;
-    ctx.lineWidth = s * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(17));
-    ctx.lineTo(x(20), y(2));
-    ctx.lineTo(x(40), y(17));
-    ctx.stroke();
+  // Golden emblem diamond on pediment
+  px(g, 23, 5, GD);
+  px(g, 22, 6, GD); px(g, 24, 6, GD);
+  px(g, 21, 7, GD); px(g, 23, 7, GD); px(g, 25, 7, GD);
+  px(g, 22, 8, GD); px(g, 24, 8, GD);
+  px(g, 23, 9, GD);
 
-    // Double door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(15), y(24), 10 * s, 10 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(16), y(25), 4 * s, 8 * s);
-    ctx.fillRect(x(20), y(25), 4 * s, 8 * s);
-    ctx.fillStyle = '#c8a040';
-    ctx.fillRect(x(19), y(28), 1 * s, 1 * s);
-    ctx.fillRect(x(20), y(28), 1 * s, 1 * s);
+  // Foundation/steps (rows 36-39)
+  rc(g, 2, 36, 44, 2, SE);
+  hl(g, 2, 36, 44, ST);
+  rc(g, 0, 38, 48, 2, FN);
+  hl(g, 0, 38, 48, SE);
 
-    // Windows
-    for (const wx of [3, 10, 26, 33]) {
-      ctx.fillStyle = WOOD_FRAME;
-      ctx.fillRect(x(wx), y(19), 5 * s, 5 * s);
-      ctx.fillStyle = WINDOW_GLASS;
-      ctx.fillRect(x(wx + 1), y(20), 3 * s, 3 * s);
+  return { pixels: g, width: w, height: h };
+}
+
+function makeLibrary(): BuildingDef {
+  const w = 32, h = 40, g = grid(w, h);
+
+  // Steep peaked roof (rows 0-13)
+  roof(g, 15, 0, 14, 14, TD, TN, TD);
+  hl(g, 1, 13, 30, WK);
+
+  // Walls (rows 14-35)
+  rc(g, 2, 14, 28, 22, TN);
+  vl(g, 2, 14, 22, TD);
+  vl(g, 29, 14, 22, TD);
+  hl(g, 2, 14, 28, WK);
+  hl(g, 2, 24, 28, WK);
+
+  // Tall windows with bookshelves
+  const bkColors = ['#cc4444', '#4488cc', '#44aa44', '#ccaa44'];
+  for (const wx of [4, 13, 22]) {
+    rc(g, wx, 15, 5, 18, WK);
+    rc(g, wx + 1, 16, 3, 16, GL);
+    // Shelves and books
+    for (let sy = 19; sy <= 31; sy += 4) {
+      hl(g, wx + 1, sy, 3, WK);
     }
-
-    // Chimney
-    ctx.fillStyle = CHIMNEY;
-    ctx.fillRect(x(30), y(4), 4 * s, 10 * s);
-    ctx.fillStyle = CHIMNEY_DK;
-    ctx.fillRect(x(30), y(4), 4 * s, 1 * s);
-
-    // Base
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(34), 36 * s, 1 * s);
-  },
-};
-
-// ==================== SHOP (32x32) ====================
-const SHOP: BuildingDef = {
-  width: 32, height: 32,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
-
-    // Wall
-    ctx.fillStyle = '#d8c0a0';
-    ctx.fillRect(x(2), y(10), 28 * s, 20 * s);
-    ctx.fillStyle = '#e0c8a8';
-    ctx.fillRect(x(3), y(11), 26 * s, 1 * s);
-
-    // Awning
-    ctx.fillStyle = ROOF_GOLD;
-    ctx.fillRect(x(0), y(8), 32 * s, 4 * s);
-    ctx.fillStyle = ROOF_GOLD_LT;
-    ctx.fillRect(x(0), y(8), 32 * s, 2 * s);
-    // Awning stripes
-    ctx.fillStyle = ROOF_GOLD_DK;
-    for (let i = 0; i < 8; i++) {
-      ctx.fillRect(x(i * 4), y(10), 2 * s, 2 * s);
+    let bi = 0;
+    for (let sy = 20; sy <= 31; sy += 4) {
+      for (let bx = 0; bx < 3; bx++) {
+        px(g, wx + 1 + bx, sy, bkColors[(bi + bx) % 4]);
+        if (sy + 1 <= 31) px(g, wx + 1 + bx, sy + 1, bkColors[(bi + bx + 1) % 4]);
+      }
+      bi++;
     }
+    px(g, wx + 1, 16, GT);
+  }
 
-    // Sign
-    ctx.fillStyle = '#5a3a1a';
-    ctx.fillRect(x(8), y(3), 16 * s, 5 * s);
-    ctx.fillStyle = '#7a5a3a';
-    ctx.fillRect(x(9), y(4), 14 * s, 3 * s);
-    // "SHOP" text pixels
-    ctx.fillStyle = '#ffd700';
-    ctx.font = `bold ${3 * s}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SHOP', x(16), y(6.5));
-    ctx.textAlign = 'start';
+  // Door
+  wDoor(g, 12, 30, 5, 6);
+  // Arch
+  hl(g, 13, 29, 3, TD);
+  px(g, 14, 28, TD);
 
-    // Large display window
-    ctx.fillStyle = WOOD_FRAME;
-    ctx.fillRect(x(3), y(14), 12 * s, 10 * s);
-    ctx.fillStyle = WINDOW_GLASS;
-    ctx.fillRect(x(4), y(15), 10 * s, 8 * s);
-    // Display items
-    ctx.fillStyle = '#ffaa44';
-    ctx.fillRect(x(6), y(19), 2 * s, 3 * s);
-    ctx.fillStyle = '#44aaff';
-    ctx.fillRect(x(10), y(18), 2 * s, 4 * s);
+  // Foundation (rows 36-39)
+  rc(g, 1, 36, 30, 4, SE);
+  hl(g, 1, 36, 30, ST);
 
-    // Door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(19), y(18), 8 * s, 12 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(20), y(19), 6 * s, 10 * s);
-    // Door window
-    ctx.fillStyle = WINDOW_GLASS;
-    ctx.fillRect(x(21), y(20), 4 * s, 4 * s);
-    ctx.fillStyle = '#c8a040';
-    ctx.fillRect(x(25), y(24), 1 * s, 1 * s);
+  return { pixels: g, width: w, height: h };
+}
 
-    // Base
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(30), 28 * s, 1 * s);
-  },
+function makeTavern(): BuildingDef {
+  const w = 36, h = 32, g = grid(w, h);
+
+  // Roof (rows 2-9)
+  roof(g, 17, 2, 16, 8, RF, RD, RE);
+  hl(g, 1, 9, 34, RE);
+
+  // Chimney
+  rc(g, 29, 0, 2, 10, CH);
+  vl(g, 29, 0, 10, CK);
+  hl(g, 29, 0, 2, CK);
+
+  // Walls (rows 10-27)
+  planks(g, 2, 10, 32, 18);
+  hl(g, 1, 10, 34, WK);
+
+  // Hanging sign bracket
+  hl(g, 30, 11, 4, WK);
+  vl(g, 33, 11, 2, WK);
+  // Sign board
+  rc(g, 31, 13, 4, 3, SG);
+  hl(g, 31, 13, 4, SK); hl(g, 31, 15, 4, SK);
+  px(g, 32, 14, GD); px(g, 33, 14, GD);
+
+  // Two glowing windows
+  gWin(g, 4, 14, 5, 5);
+  gWin(g, 14, 14, 5, 5);
+  // Shutters
+  vl(g, 3, 14, 5, WK); vl(g, 9, 14, 5, WK);
+  vl(g, 13, 14, 5, WK); vl(g, 19, 14, 5, WK);
+
+  // Door
+  wDoor(g, 23, 21, 5, 7);
+
+  // Barrel beside door
+  rc(g, 20, 25, 3, 3, '#7a5a30');
+  hl(g, 20, 26, 3, '#5a4020');
+
+  // Foundation (rows 28-31)
+  rc(g, 1, 28, 34, 4, SE);
+  hl(g, 1, 28, 34, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeWell(): BuildingDef {
+  const w = 16, h = 16, g = grid(w, h);
+
+  // Roof beam
+  hl(g, 2, 0, 12, RE);
+  hl(g, 3, 1, 10, WD);
+  hl(g, 3, 0, 10, WK);
+
+  // Support posts
+  vl(g, 3, 0, 10, WK);
+  vl(g, 12, 0, 10, WK);
+
+  // Rope and bucket
+  vl(g, 8, 2, 4, RP);
+  rc(g, 7, 6, 3, 2, BU);
+  px(g, 7, 6, WK); px(g, 9, 6, WK);
+
+  // Stone well rim
+  rc(g, 3, 8, 10, 2, SL);
+  hl(g, 3, 8, 10, ST);
+
+  // Well walls
+  stones(g, 4, 10, 8, 4);
+  vl(g, 4, 10, 4, SD);
+  vl(g, 11, 10, 4, SD);
+
+  // Dark water inside
+  hl(g, 5, 12, 6, '#1a2a3a');
+  hl(g, 5, 13, 6, '#0a1a2a');
+
+  // Base
+  rc(g, 3, 14, 10, 2, SE);
+  hl(g, 3, 14, 10, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeFountain(): BuildingDef {
+  const w = 24, h = 20, g = grid(w, h);
+
+  // Spout column
+  rc(g, 11, 2, 2, 8, ST);
+  vl(g, 11, 2, 8, SD);
+  vl(g, 12, 2, 8, SL);
+  // Spout top cap
+  rc(g, 10, 2, 4, 1, SL);
+  px(g, 11, 1, SL); px(g, 12, 1, SL);
+
+  // Upper basin (rows 8-9)
+  rc(g, 6, 8, 12, 2, ST);
+  hl(g, 6, 8, 12, SL);
+  hl(g, 6, 9, 12, SD);
+  hl(g, 7, 9, 10, WA);
+
+  // Pedestal (rows 10-13)
+  rc(g, 9, 10, 6, 4, ST);
+  vl(g, 9, 10, 4, SD);
+  vl(g, 14, 10, 4, SL);
+
+  // Lower basin (rows 14-15)
+  rc(g, 2, 14, 20, 2, ST);
+  hl(g, 2, 14, 20, SL);
+  hl(g, 2, 15, 20, SD);
+  hl(g, 3, 15, 18, WA);
+
+  // Base (rows 16-19)
+  rc(g, 3, 16, 18, 2, SD);
+  rc(g, 1, 18, 22, 2, SE);
+  hl(g, 1, 18, 22, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+// ── Building Cache ─────────────────────────────────────────────────────
+
+const BUILDINGS: Record<BuildingType, BuildingDef> = {
+  house_small: makeHouseSmall(),
+  house_medium: makeHouseMedium(),
+  house_large: makeHouseLarge(),
+  shop: makeShop(),
+  arena: makeArena(),
+  council: makeCouncil(),
+  library: makeLibrary(),
+  tavern: makeTavern(),
+  well: makeWell(),
+  fountain: makeFountain(),
 };
 
-// ==================== ARENA (48x40) ====================
-const ARENA: BuildingDef = {
-  width: 48, height: 40,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+// ── Chimney Smoke Animation ────────────────────────────────────────────
 
-    // Base structure
-    ctx.fillStyle = WALL_STONE;
-    ctx.fillRect(x(4), y(10), 40 * s, 28 * s);
-    ctx.fillStyle = WALL_STONE_LT;
-    ctx.fillRect(x(5), y(11), 38 * s, 1 * s);
-    ctx.fillStyle = WALL_STONE_DK;
-    ctx.fillRect(x(4), y(37), 40 * s, 1 * s);
-
-    // Towers left & right
-    ctx.fillStyle = WALL_STONE_DK;
-    ctx.fillRect(x(0), y(5), 8 * s, 33 * s);
-    ctx.fillRect(x(40), y(5), 8 * s, 33 * s);
-    // Tower tops (crenellations)
-    for (let i = 0; i < 4; i++) {
-      ctx.fillStyle = WALL_STONE;
-      ctx.fillRect(x(i * 2), y(3), 2 * s, 4 * s);
-      ctx.fillRect(x(40 + i * 2), y(3), 2 * s, 4 * s);
-    }
-
-    // Red banner across
-    ctx.fillStyle = '#aa2222';
-    ctx.fillRect(x(10), y(12), 28 * s, 4 * s);
-    ctx.fillStyle = '#cc3333';
-    ctx.fillRect(x(10), y(12), 28 * s, 2 * s);
-
-    // Gate
-    ctx.fillStyle = '#2a1a0a';
-    ctx.fillRect(x(16), y(22), 16 * s, 16 * s);
-    ctx.fillStyle = '#3a2a1a';
-    // Arch top
-    ctx.beginPath();
-    ctx.arc(x(24), y(22), 8 * s, Math.PI, 0);
-    ctx.fill();
-    // Gate bars
-    ctx.fillStyle = '#4a4a4a';
-    for (let i = 0; i < 5; i++) {
-      ctx.fillRect(x(17 + i * 3), y(22), 1 * s, 16 * s);
-    }
-
-    // Torches on towers
-    ctx.fillStyle = '#ff8844';
-    ctx.fillRect(x(3), y(8), 2 * s, 2 * s);
-    ctx.fillRect(x(43), y(8), 2 * s, 2 * s);
-
-    // Base
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(x(0), y(38), 48 * s, 1 * s);
-  },
+const CHIMNEY_POS: Partial<Record<BuildingType, number>> = {
+  house_small: 17,
+  house_medium: 25,
+  house_large: 33,
+  tavern: 29,
 };
 
-// ==================== COUNCIL HALL (44x36) ====================
-const COUNCIL: BuildingDef = {
-  width: 44, height: 36,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+function drawSmoke(
+  ctx: CanvasRenderingContext2D,
+  bx: number, by: number,
+  type: BuildingType, scale: number, frame: number,
+) {
+  const cx = CHIMNEY_POS[type];
+  if (cx === undefined) return;
 
-    // Main wall
-    ctx.fillStyle = '#c0c8d0';
-    ctx.fillRect(x(4), y(14), 36 * s, 20 * s);
-    ctx.fillStyle = '#d0d8e0';
-    ctx.fillRect(x(5), y(15), 34 * s, 1 * s);
+  const puffs = [
+    { dx: 0, dy: -1, a: 0.45 },
+    { dx: (frame & 1) ? -1 : 1, dy: -2, a: 0.3 },
+    { dx: (frame & 1) ? 1 : -1, dy: -3, a: 0.18 },
+    { dx: ((frame >> 1) & 1) ? 0 : 1, dy: -4, a: 0.08 },
+  ];
 
-    // Pillars
-    ctx.fillStyle = '#b8b8b8';
-    for (const px of [6, 14, 22, 30, 38]) {
-      ctx.fillRect(x(px - 1), y(16), 3 * s, 18 * s);
-      ctx.fillStyle = '#d0d0d0';
-      ctx.fillRect(x(px - 1), y(16), 3 * s, 1 * s);
-      ctx.fillRect(x(px - 1), y(33), 3 * s, 1 * s);
-      ctx.fillStyle = '#b8b8b8';
-    }
+  for (const p of puffs) {
+    ctx.fillStyle = `rgba(180,180,190,${p.a})`;
+    ctx.fillRect(bx + (cx + p.dx) * scale, by + p.dy * scale, scale, scale);
+  }
+}
 
-    // Pediment (triangular)
-    ctx.fillStyle = ROOF_BLUE;
-    ctx.beginPath();
-    ctx.moveTo(x(2), y(15));
-    ctx.lineTo(x(22), y(2));
-    ctx.lineTo(x(42), y(15));
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ROOF_BLUE_LT;
-    ctx.beginPath();
-    ctx.moveTo(x(2), y(15));
-    ctx.lineTo(x(22), y(2));
-    ctx.lineTo(x(22), y(15));
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = ROOF_BLUE_DK;
-    ctx.lineWidth = s * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x(2), y(15));
-    ctx.lineTo(x(22), y(2));
-    ctx.lineTo(x(42), y(15));
-    ctx.stroke();
+// ── Fountain Water Animation ───────────────────────────────────────────
 
-    // Emblem in pediment
-    ctx.fillStyle = '#ffd700';
-    ctx.beginPath();
-    ctx.arc(x(22), y(9), 3 * s, 0, Math.PI * 2);
-    ctx.fill();
+function drawWaterAnim(
+  ctx: CanvasRenderingContext2D,
+  bx: number, by: number,
+  scale: number, frame: number,
+) {
+  const even = (frame & 1) === 0;
 
-    // Double door
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(17), y(24), 10 * s, 10 * s);
-    ctx.fillStyle = '#4a3a2a';
-    ctx.fillRect(x(18), y(25), 4 * s, 8 * s);
-    ctx.fillRect(x(22), y(25), 4 * s, 8 * s);
+  // Spray above spout
+  ctx.fillStyle = even ? WW : WA;
+  const spray: [number, number][] = even
+    ? [[11, 0], [12, 0], [10, 1], [13, 1]]
+    : [[11, 0], [12, 0], [9, 1], [14, 1]];
+  for (const [dx, dy] of spray)
+    ctx.fillRect(bx + dx * scale, by + dy * scale, scale, scale);
 
-    // Steps
-    ctx.fillStyle = '#a0a0a0';
-    ctx.fillRect(x(14), y(34), 16 * s, 1 * s);
-    ctx.fillStyle = '#909090';
-    ctx.fillRect(x(12), y(35), 20 * s, 1 * s);
-  },
-};
+  // Falling water on sides
+  ctx.fillStyle = even ? WA : WW;
+  const falls: [number, number][] = even
+    ? [[6, 10], [17, 10], [5, 12], [18, 12]]
+    : [[7, 10], [16, 10], [4, 12], [19, 12]];
+  for (const [dx, dy] of falls)
+    ctx.fillRect(bx + dx * scale, by + dy * scale, scale, scale);
 
-// ==================== LIBRARY (40x36) ====================
-const LIBRARY: BuildingDef = {
-  width: 40, height: 36,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
+  // Ripple in lower basin
+  ctx.fillStyle = WW;
+  const rx = even ? 8 : 14;
+  ctx.fillRect(bx + rx * scale, by + 15 * scale, scale * 2, scale);
+}
 
-    // Wall
-    ctx.fillStyle = '#a08870';
-    ctx.fillRect(x(2), y(12), 36 * s, 22 * s);
-    ctx.fillStyle = '#b09880';
-    ctx.fillRect(x(3), y(13), 34 * s, 1 * s);
-
-    // Roof
-    ctx.fillStyle = ROOF_PURPLE;
-    ctx.fillRect(x(0), y(8), 40 * s, 6 * s);
-    ctx.fillStyle = ROOF_PURPLE_LT;
-    ctx.fillRect(x(0), y(8), 40 * s, 3 * s);
-    ctx.strokeStyle = ROOF_PURPLE_DK;
-    ctx.lineWidth = s * 0.5;
-    ctx.strokeRect(x(0), y(8), 40 * s, 6 * s);
-
-    // Tower/cupola
-    ctx.fillStyle = ROOF_PURPLE;
-    ctx.fillRect(x(16), y(1), 8 * s, 8 * s);
-    ctx.fillStyle = ROOF_PURPLE_LT;
-    ctx.fillRect(x(16), y(1), 4 * s, 8 * s);
-    // Dome
-    ctx.beginPath();
-    ctx.arc(x(20), y(2), 4 * s, Math.PI, 0);
-    ctx.fillStyle = ROOF_PURPLE_LT;
-    ctx.fill();
-
-    // Tall windows (stained glass look)
-    for (const wx of [4, 12, 24, 32]) {
-      ctx.fillStyle = WOOD_FRAME;
-      ctx.fillRect(x(wx), y(15), 4 * s, 12 * s);
-      ctx.fillStyle = '#6688aa';
-      ctx.fillRect(x(wx + 1), y(16), 2 * s, 10 * s);
-      // Arch top
-      ctx.beginPath();
-      ctx.arc(x(wx + 2), y(16), 1.5 * s, Math.PI, 0);
-      ctx.fill();
-    }
-
-    // Door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(17), y(26), 6 * s, 8 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(18), y(27), 4 * s, 6 * s);
-
-    // Sign: LIBRARY
-    ctx.fillStyle = '#ffd700';
-    ctx.font = `bold ${2.5 * s}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('LIBRARY', x(20), y(11.5));
-    ctx.textAlign = 'start';
-
-    // Base
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(34), 36 * s, 1 * s);
-  },
-};
-
-// ==================== TAVERN (36x32) ====================
-const TAVERN: BuildingDef = {
-  width: 36, height: 32,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
-
-    // Wall
-    ctx.fillStyle = '#8a6a4a';
-    ctx.fillRect(x(2), y(12), 32 * s, 18 * s);
-    ctx.fillStyle = '#9a7a5a';
-    ctx.fillRect(x(3), y(13), 30 * s, 1 * s);
-
-    // Roof
-    ctx.fillStyle = ROOF_RED;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(13));
-    ctx.lineTo(x(18), y(2));
-    ctx.lineTo(x(36), y(13));
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ROOF_RED_LT;
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(13));
-    ctx.lineTo(x(18), y(2));
-    ctx.lineTo(x(18), y(13));
-    ctx.closePath();
-    ctx.fill();
-
-    // Sign post with hanging sign
-    ctx.fillStyle = '#5a3a1a';
-    ctx.fillRect(x(30), y(8), 2 * s, 8 * s);
-    ctx.fillRect(x(24), y(8), 8 * s, 1 * s);
-    // Sign
-    ctx.fillStyle = '#6a4a2a';
-    ctx.fillRect(x(24), y(9), 6 * s, 4 * s);
-    ctx.fillStyle = '#ffd700';
-    ctx.fillRect(x(25), y(10), 1 * s, 2 * s); // Mug icon
-    ctx.fillRect(x(26), y(11), 2 * s, 1 * s);
-
-    // Windows with warm glow
-    for (const wx of [4, 24]) {
-      ctx.fillStyle = WOOD_FRAME;
-      ctx.fillRect(x(wx), y(16), 6 * s, 5 * s);
-      ctx.fillStyle = WINDOW_GLOW;
-      ctx.fillRect(x(wx + 1), y(17), 4 * s, 3 * s);
-    }
-
-    // Door
-    ctx.fillStyle = DOOR;
-    ctx.fillRect(x(14), y(20), 8 * s, 10 * s);
-    ctx.fillStyle = DOOR_LT;
-    ctx.fillRect(x(15), y(21), 6 * s, 8 * s);
-
-    // Chimney with smoke
-    ctx.fillStyle = CHIMNEY;
-    ctx.fillRect(x(8), y(4), 3 * s, 6 * s);
-
-    // Base
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x(2), y(30), 32 * s, 1 * s);
-  },
-};
-
-// ==================== WELL (12x14) ====================
-const WELL: BuildingDef = {
-  width: 12, height: 14,
-  draw(ctx, bx, by, s) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
-
-    // Stone base (circular-ish)
-    ctx.fillStyle = '#7a7a7a';
-    ctx.fillRect(x(1), y(8), 10 * s, 5 * s);
-    ctx.fillRect(x(2), y(7), 8 * s, 1 * s);
-    ctx.fillRect(x(2), y(13), 8 * s, 1 * s);
-
-    // Water inside
-    ctx.fillStyle = '#2a4a7a';
-    ctx.fillRect(x(3), y(9), 6 * s, 3 * s);
-
-    // Posts
-    ctx.fillStyle = '#5a3a1a';
-    ctx.fillRect(x(2), y(2), 1 * s, 8 * s);
-    ctx.fillRect(x(9), y(2), 1 * s, 8 * s);
-
-    // Roof
-    ctx.fillStyle = '#6a4a2a';
-    ctx.fillRect(x(1), y(1), 10 * s, 2 * s);
-    ctx.fillStyle = '#7a5a3a';
-    ctx.fillRect(x(1), y(1), 10 * s, 1 * s);
-
-    // Bucket rope
-    ctx.fillStyle = '#8a7a5a';
-    ctx.fillRect(x(5), y(3), 1 * s, 5 * s);
-  },
-};
-
-// ==================== FOUNTAIN (20x16) ====================
-const FOUNTAIN: BuildingDef = {
-  width: 20, height: 16,
-  draw(ctx, bx, by, s, frame) {
-    const x = (cx: number) => bx + cx * s;
-    const y = (cy: number) => by + cy * s;
-
-    // Base pool
-    ctx.fillStyle = '#8a8a8a';
-    ctx.fillRect(x(1), y(10), 18 * s, 5 * s);
-    ctx.fillRect(x(3), y(9), 14 * s, 1 * s);
-    ctx.fillRect(x(3), y(15), 14 * s, 1 * s);
-    // Water in pool
-    ctx.fillStyle = '#3a6a9a';
-    ctx.fillRect(x(3), y(11), 14 * s, 3 * s);
-
-    // Center pillar
-    ctx.fillStyle = '#9a9a9a';
-    ctx.fillRect(x(9), y(4), 2 * s, 7 * s);
-
-    // Top basin
-    ctx.fillStyle = '#8a8a8a';
-    ctx.fillRect(x(7), y(3), 6 * s, 2 * s);
-    ctx.fillStyle = '#3a6a9a';
-    ctx.fillRect(x(8), y(3), 4 * s, 1 * s);
-
-    // Water spray (animated)
-    const sprayH = 2 + Math.sin(frame * 0.3);
-    ctx.fillStyle = '#6a9acc';
-    ctx.fillRect(x(9.5), y(3 - sprayH), 1 * s, sprayH * s);
-    // Droplets
-    ctx.fillStyle = '#88bbdd';
-    const d1 = Math.sin(frame * 0.4) * 2;
-    const d2 = Math.cos(frame * 0.35) * 2;
-    ctx.fillRect(x(8 + d1), y(5), 1 * s, 1 * s);
-    ctx.fillRect(x(12 + d2), y(5), 1 * s, 1 * s);
-  },
-};
-
-const BUILDING_MAP: Record<BuildingType, BuildingDef> = {
-  house_small: HOUSE_SMALL,
-  house_medium: HOUSE_MEDIUM,
-  house_large: HOUSE_LARGE,
-  shop: SHOP,
-  arena: ARENA,
-  council: COUNCIL,
-  library: LIBRARY,
-  tavern: TAVERN,
-  well: WELL,
-  fountain: FOUNTAIN,
-};
+// ── Exports ────────────────────────────────────────────────────────────
 
 export function drawBuilding(
   ctx: CanvasRenderingContext2D,
@@ -675,20 +691,33 @@ export function drawBuilding(
   y: number,
   type: BuildingType,
   scale: number,
-  frame: number,
+  frame?: number,
 ): void {
-  const def = BUILDING_MAP[type];
+  const def = BUILDINGS[type];
   if (!def) return;
-  def.draw(ctx, x, y, scale, frame);
+
+  const { pixels, width, height } = def;
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const color = pixels[row][col];
+      if (color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
+      }
+    }
+  }
+
+  const f = frame ?? 0;
+  if (type in CHIMNEY_POS) drawSmoke(ctx, x, y, type, scale, f);
+  if (type === 'fountain') drawWaterAnim(ctx, x, y, scale, f);
 }
 
 export function getBuildingSize(type: BuildingType): { width: number; height: number } {
-  const def = BUILDING_MAP[type];
+  const def = BUILDINGS[type];
   if (!def) return { width: 32, height: 32 };
   return { width: def.width, height: def.height };
 }
 
-// Map location types from backend to building types
 export function locationToBuildingType(locType: string, locName: string): BuildingType {
   const t = locType.toLowerCase();
   const n = locName.toLowerCase();
@@ -697,5 +726,7 @@ export function locationToBuildingType(locType: string, locName: string): Buildi
   if (t === 'diplomacy' || t === 'council' || n.includes('council') || n.includes('hall')) return 'council';
   if (t === 'knowledge' || t === 'library' || n.includes('library')) return 'library';
   if (t === 'exploration' || t === 'wilderness' || n.includes('tavern') || n.includes('inn')) return 'tavern';
+  if (n.includes('well')) return 'well';
+  if (n.includes('fountain')) return 'fountain';
   return 'tavern';
 }
