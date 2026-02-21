@@ -384,23 +384,169 @@ const FLOWER_PATCH: ObjectDef = {
   ],
 };
 
-const OBJECT_MAP: Record<string, ObjectDef> = {
+// Tree variant 2 — darker foliage
+const TREE_2: ObjectDef = (() => {
+  const pixels = TREE_1.pixels.map(row => row.map(c => {
+    if (c === G4) return G3;
+    if (c === G3) return '#1a6a1a';
+    if (c === '#1a5a1a') return '#0e4e0e';
+    return c;
+  }));
+  return { width: 16, height: 24, pixels };
+})();
+
+// Tree variant 3 — lighter, more vibrant foliage
+const TREE_3: ObjectDef = (() => {
+  const pixels = TREE_1.pixels.map(row => row.map(c => {
+    if (c === G4) return '#3a9a3a';
+    if (c === G3) return G4;
+    if (c === '#1a5a1a') return G2;
+    if (c === G2) return '#1a5a1a';
+    return c;
+  }));
+  return { width: 16, height: 24, pixels };
+})();
+
+// Mossy rock
+const ROCK_MOSSY: ObjectDef = {
+  width: 12, height: 8,
+  pixels: [
+    [T,T,T,G3,G4,G4,G4,G3,G3,T,T,T],
+    [T,T,G3,S4,G3,G4,G3,S4,S4,G3,T,T],
+    [T,S3,S4,S4,S3,G3,S3,S3,S4,S4,S3,T],
+    [S2,S3,S3,S3,S2,S2,S2,S2,S3,S3,S3,S2],
+    [S2,S2,S2,S2,S2,S1,S1,S2,S2,S2,S2,S2],
+    [T,S2,S2,S1,S1,S1,S1,S1,S1,S2,S2,T],
+    [T,T,S1,S1,S1,S1,S1,S1,S1,S1,T,T],
+    [T,T,T,T,S1,S1,S1,S1,T,T,T,T],
+  ],
+};
+
+// Fence post (single)
+const FENCE_POST_OBJ: ObjectDef = {
+  width: 4, height: 12,
+  pixels: (() => {
+    const w1 = '#6a4a2a', w2 = '#7a5a3a', w3 = '#5a3a1a';
+    const p: PixelGrid = [];
+    p.push([T, w2, w2, T]);
+    for (let i = 0; i < 9; i++) p.push([T, w3, w1, T]);
+    p.push([w3, w3, w1, w1]);
+    p.push([T, T, T, T]);
+    return p;
+  })(),
+};
+
+// Tall grass — frame 1 (upright)
+const TALL_GRASS_F1: ObjectDef = {
+  width: 8, height: 12,
+  pixels: [
+    [T,T,T,T,T,T,T,T],
+    [T,T,G4,T,T,T,G3,T],
+    [T,G3,G4,T,T,G3,G4,T],
+    [T,G3,T,T,T,G3,T,G4],
+    [T,G2,T,G4,T,G2,T,G3],
+    [T,G2,T,G3,T,G2,T,G3],
+    [T,G2,T,G3,T,G1,T,G2],
+    [T,G1,T,G2,T,G1,T,G2],
+    [T,G1,T,G2,T,G1,T,G1],
+    [T,G1,T,G1,T,G1,T,G1],
+    [T,G1,T,G1,T,G1,T,G1],
+    [T,T,T,T,T,T,T,T],
+  ],
+};
+
+// Tall grass — frame 2 (leaning right)
+const TALL_GRASS_F2: ObjectDef = {
+  width: 8, height: 12,
+  pixels: [
+    [T,T,T,T,T,T,T,T],
+    [T,T,T,G4,T,T,T,G3],
+    [T,T,G3,G4,T,T,G3,G4],
+    [T,G3,T,T,T,G3,T,G4],
+    [T,G2,T,T,G4,G2,T,G3],
+    [T,G2,T,G3,T,G2,T,G3],
+    [T,G2,T,G3,T,G1,T,G2],
+    [T,G1,T,G2,T,G1,T,G2],
+    [T,G1,T,G2,T,G1,T,G1],
+    [T,G1,T,G1,T,G1,T,G1],
+    [T,G1,T,G1,T,G1,T,G1],
+    [T,T,T,T,T,T,T,T],
+  ],
+};
+
+// Horizontal bridge (32x16)
+const BRIDGE_H_OBJ: ObjectDef = {
+  width: 32, height: 16,
+  pixels: (() => {
+    const pl = ['#7a5a3a', '#6a4a2a', '#8a6a4a'];
+    const rail = '#5a3a1a';
+    const gap = '#4a2a0a';
+    const p: PixelGrid = [];
+    for (let r = 0; r < 16; r++) {
+      const row: (string | null)[] = [];
+      for (let c = 0; c < 32; c++) {
+        const isEndPost = c <= 1 || c >= 30;
+        const isRail = r === 2 || r === 13;
+        const isEdge = r <= 1 || r >= 14;
+        if (isEndPost || isEdge || isRail) {
+          row.push(rail);
+        } else if (c % 4 === 3) {
+          row.push(gap);
+        } else {
+          row.push(pl[Math.floor(c / 4) % 3]);
+        }
+      }
+      p.push(row);
+    }
+    return p;
+  })(),
+};
+
+// Vertical bridge (16x32)
+const BRIDGE_V_OBJ: ObjectDef = {
+  width: 16, height: 32,
+  pixels: (() => {
+    const pl = ['#7a5a3a', '#6a4a2a', '#8a6a4a'];
+    const rail = '#5a3a1a';
+    const gap = '#4a2a0a';
+    const p: PixelGrid = [];
+    for (let r = 0; r < 32; r++) {
+      const row: (string | null)[] = [];
+      for (let c = 0; c < 16; c++) {
+        const isEndPost = r <= 1 || r >= 30;
+        const isRail = c === 2 || c === 13;
+        const isEdge = c <= 1 || c >= 14;
+        if (isEndPost || isEdge || isRail) {
+          row.push(rail);
+        } else if (r % 4 === 3) {
+          row.push(gap);
+        } else {
+          row.push(pl[Math.floor(r / 4) % 3]);
+        }
+      }
+      p.push(row);
+    }
+    return p;
+  })(),
+};
+
+const OBJECT_MAP: Record<string, ObjectDef | ObjectDef[]> = {
   tree: TREE_1,
-  tree2: TREE_1,
-  tree3: TREE_1,
+  tree2: TREE_2,
+  tree3: TREE_3,
   pine: PINE,
   bush: BUSH,
   rock_small: ROCK_SMALL,
   rock_large: ROCK_LARGE,
-  rock_mossy: ROCK_LARGE,
+  rock_mossy: ROCK_MOSSY,
   fence_h: FENCE_H,
-  fence_post: ROCK_SMALL,
+  fence_post: FENCE_POST_OBJ,
   lamp_post: LAMP_POST,
   sign_post: SIGN_POST,
   flower_patch: FLOWER_PATCH,
-  tall_grass: BUSH,
-  bridge_h: FENCE_H,
-  bridge_v: FENCE_H,
+  tall_grass: [TALL_GRASS_F1, TALL_GRASS_F2],
+  bridge_h: BRIDGE_H_OBJ,
+  bridge_v: BRIDGE_V_OBJ,
 };
 
 export function drawObject(
@@ -412,8 +558,11 @@ export function drawObject(
   frame: number,
   scale: number,
 ): void {
-  const def = OBJECT_MAP[type];
-  if (!def) return;
+  const entry = OBJECT_MAP[type];
+  if (!entry) return;
+
+  // Resolve animated objects (arrays) vs static
+  const def = Array.isArray(entry) ? entry[frame % entry.length] : entry;
 
   // Lamp post glow effect
   if (type === 'lamp_post') {
@@ -437,7 +586,8 @@ export function drawObject(
 }
 
 export function getObjectSize(type: ObjectType): { width: number; height: number } {
-  const def = OBJECT_MAP[type];
-  if (!def) return { width: 16, height: 16 };
+  const entry = OBJECT_MAP[type];
+  if (!entry) return { width: 16, height: 16 };
+  const def = Array.isArray(entry) ? entry[0] : entry;
   return { width: def.width, height: def.height };
 }
