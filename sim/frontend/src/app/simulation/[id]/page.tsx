@@ -6,7 +6,7 @@ import { useSimStore } from '@/lib/store';
 import { getSimulation, stepSimulation, updateConfig, addCharacter } from '@/lib/api';
 import type { SimulationConfig, CharacterCreate, PersonalityTraits } from '@/lib/types';
 import CharacterCard from '@/components/CharacterCard';
-import WorldView from '@/components/WorldView';
+import PixelCanvas from '@/components/PixelCanvas';
 import EventLog from '@/components/EventLog';
 import ChatLog from '@/components/ChatLog';
 import SimControls from '@/components/SimControls';
@@ -180,7 +180,7 @@ export default function SimulationPage() {
 
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 min-h-0">
-            <WorldView
+            <PixelCanvas
               characters={simulation.characters}
               locations={simulation.environment.locations}
               selectedCharacterId={selectedCharacterId}

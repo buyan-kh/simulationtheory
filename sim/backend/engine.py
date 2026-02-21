@@ -1,10 +1,31 @@
+import math
 import random
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
-    Action, Event, Environment, ChatMessage,
+    Action, Event, Environment, ChatMessage, House,
 )
 from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
+
+HOUSE_PLOTS = [
+    {"x": -30, "y": -30}, {"x": -15, "y": -35}, {"x": 0, "y": -40},
+    {"x": 15, "y": -35}, {"x": 30, "y": -30}, {"x": -40, "y": -15},
+    {"x": 40, "y": -15}, {"x": -40, "y": 15}, {"x": 40, "y": 15},
+    {"x": -30, "y": 30}, {"x": -15, "y": 35}, {"x": 0, "y": 40},
+    {"x": 15, "y": 35}, {"x": 30, "y": 30}, {"x": -50, "y": 0},
+    {"x": 50, "y": 0}, {"x": -20, "y": -50}, {"x": 20, "y": -50},
+    {"x": -20, "y": 50}, {"x": 20, "y": 50},
+    {"x": -60, "y": -30}, {"x": 60, "y": -30}, {"x": -60, "y": 30}, {"x": 60, "y": 30},
+    {"x": -45, "y": -45}, {"x": 45, "y": -45}, {"x": -45, "y": 45}, {"x": 45, "y": 45},
+    {"x": -70, "y": 0}, {"x": 70, "y": 0}, {"x": 0, "y": -70}, {"x": 0, "y": 70},
+]
+
+
+def _generate_spiral_plot(index: int) -> dict[str, float]:
+    """Generate house plot positions in a spiral pattern for overflow."""
+    angle = index * 0.8
+    radius = 40 + index * 3
+    return {"x": round(math.cos(angle) * radius, 1), "y": round(math.sin(angle) * radius, 1)}
 
 
 class SimulationEngine:
@@ -36,6 +57,7 @@ class SimulationEngine:
             position={"x": rng.uniform(-80, 80), "y": rng.uniform(-80, 80)},
         )
         sim.characters[char.id] = char
+        self._assign_house(sim, char)
         return char
 
     def step(self, sim_id: str) -> tuple[list[Event], list[ChatMessage]]:
@@ -103,6 +125,59 @@ class SimulationEngine:
         if sim_id in self.simulations:
             del self.simulations[sim_id]
 
+    _HOUSE_SIZE_MAX = {"small": 1, "medium": 2, "large": 3}
+
+    def _assign_house(self, sim: SimulationState, char: Character):
+        """Assign a house to the character, sharing with agreeable residents or creating a new one."""
+        # Try to find an existing house with space and agreeable residents
+        if char.traits.agreeableness > 0.6:
+            for house in sim.environment.houses:
+                # Allow up to 3 residents (large) for agreeable groups
+                if len(house.residents) >= 3:
+                    continue
+                # Check all current residents are agreeable
+                all_agreeable = all(
+                    sim.characters[rid].traits.agreeableness > 0.6
+                    for rid in house.residents if rid in sim.characters
+                )
+                if house.residents and all_agreeable:
+                    house.residents.append(char.id)
+                    char.house_id = house.id
+                    house.name = "Shared House"
+                    # Upgrade size to match resident count
+                    if len(house.residents) <= 1:
+                        house.size = "small"
+                        house.max_residents = 1
+                    elif len(house.residents) == 2:
+                        house.size = "medium"
+                        house.max_residents = 2
+                    else:
+                        house.size = "large"
+                        house.max_residents = 3
+                    return
+
+        # Create a new house at the next available plot
+        used_positions = {(h.position["x"], h.position["y"]) for h in sim.environment.houses}
+        plot = None
+        for p in HOUSE_PLOTS:
+            if (p["x"], p["y"]) not in used_positions:
+                plot = p
+                break
+        if plot is None:
+            # Generate a spiral plot beyond the predefined ones
+            idx = len(sim.environment.houses) - len(HOUSE_PLOTS)
+            plot = _generate_spiral_plot(max(idx, 0))
+
+        house = House(
+            name=f"House of {char.name}",
+            position={"x": float(plot["x"]), "y": float(plot["y"])},
+            size="small",
+            max_residents=1,
+            residents=[char.id],
+        )
+        sim.environment.houses.append(house)
+        char.house_id = house.id
+
     # Action type -> target location mapping
     _ACTION_LOCATION_MAP = {
         "cooperate": (0, 0),       # Market Square
@@ -123,11 +198,20 @@ class SimulationEngine:
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
         for char_id, action in actions.items():
             char = sim.characters[char_id]
-            target = self._ACTION_LOCATION_MAP.get(action.type.value)
-            if target is None:
-                continue
 
-            target_x, target_y = target
+            # When resting, move toward assigned house
+            if action.type.value == "rest" and char.house_id:
+                house = next((h for h in sim.environment.houses if h.id == char.house_id), None)
+                if house:
+                    target_x = house.position["x"]
+                    target_y = house.position["y"]
+                else:
+                    target_x, target_y = self._ACTION_LOCATION_MAP["rest"]
+            else:
+                target = self._ACTION_LOCATION_MAP.get(action.type.value)
+                if target is None:
+                    continue
+                target_x, target_y = target
             dx = target_x - char.position["x"]
             dy = target_y - char.position["y"]
 

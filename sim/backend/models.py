@@ -61,6 +61,15 @@ class Action(BaseModel):
     reasoning: str = ""
 
 
+class House(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    size: str = "small"  # small, medium, large
+    max_residents: int = 1
+    residents: list[str] = []  # character IDs
+
+
 class Character(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -77,6 +86,7 @@ class Character(BaseModel):
     last_reasoning: str = ""
     alive: bool = True
     position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    house_id: str | None = None
 
 
 class CharacterCreate(BaseModel):
@@ -127,6 +137,7 @@ class Environment(BaseModel):
         {"name": "Wilderness", "x": -100, "y": -100, "type": "exploration"},
         {"name": "Library", "x": 50, "y": 50, "type": "knowledge"},
     ])
+    houses: list[House] = []
 
 
 class SimulationConfig(BaseModel):
