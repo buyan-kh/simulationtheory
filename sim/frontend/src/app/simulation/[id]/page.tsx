@@ -339,85 +339,169 @@ function PixelSliderField({ label, value, onChange, color }: { label: string; va
   );
 }
 
+interface CharTemplate {
+  label: string;
+  icon: string;
+  color: string;
+  profile: string;
+  traits: PersonalityTraits;
+  goals: string[];
+  motivations: string[];
+}
+
+const TEMPLATES: CharTemplate[] = [
+  { label: 'Diplomat', icon: '♦', color: '#00e5ff', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3 }, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'], motivations: ['loyalty', 'compassion'] },
+  { label: 'Warrior', icon: '⚔', color: '#ff3366', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5 }, goals: ['Defeat all rivals', 'Protect the weak'], motivations: ['vengeance', 'loyalty'] },
+  { label: 'Trickster', icon: '★', color: '#ff00aa', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4 }, goals: ['Sow discord among others', 'Accumulate secret power'], motivations: ['greed', 'curiosity'] },
+  { label: 'Scholar', icon: '◆', color: '#ffd700', profile: 'A curious mind devoted to understanding the world through observation and study.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4 }, goals: ['Discover hidden knowledge', 'Map the environment'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Healer', icon: '✚', color: '#44cc88', profile: 'A compassionate caretaker who puts the wellbeing of others before their own.', traits: { openness: 0.6, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.95, neuroticism: 0.6 }, goals: ['Keep everyone healthy', 'Build a sanctuary'], motivations: ['compassion', 'loyalty'] },
+  { label: 'Merchant', icon: '⬡', color: '#ffaa44', profile: 'A shrewd trader with an eye for profit and a knack for deal-making.', traits: { openness: 0.6, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.5, neuroticism: 0.3 }, goals: ['Amass great wealth', 'Control the market'], motivations: ['greed', 'curiosity'] },
+  { label: 'Assassin', icon: '◇', color: '#8844cc', profile: 'A silent operative who strikes from the shadows with deadly precision.', traits: { openness: 0.3, conscientiousness: 0.8, extraversion: 0.2, agreeableness: 0.1, neuroticism: 0.5 }, goals: ['Eliminate key targets', 'Remain undetected'], motivations: ['vengeance', 'greed'] },
+  { label: 'Bard', icon: '♫', color: '#ff66aa', profile: 'A charismatic entertainer who uses charm and stories to influence everyone.', traits: { openness: 0.9, conscientiousness: 0.4, extraversion: 0.95, agreeableness: 0.7, neuroticism: 0.3 }, goals: ['Become legendary', 'Know everyones secrets'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Guardian', icon: '▣', color: '#4488ff', profile: 'A steadfast protector devoted to defending the community at all costs.', traits: { openness: 0.3, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.7, neuroticism: 0.4 }, goals: ['Protect the settlement', 'Uphold justice'], motivations: ['loyalty', 'vengeance'] },
+  { label: 'Hermit', icon: '☾', color: '#6a7a8a', profile: 'A reclusive loner who shuns society and finds peace in solitude and nature.', traits: { openness: 0.7, conscientiousness: 0.5, extraversion: 0.1, agreeableness: 0.4, neuroticism: 0.7 }, goals: ['Achieve inner peace', 'Understand the natural world'], motivations: ['curiosity'] },
+  { label: 'Tyrant', icon: '♛', color: '#cc2222', profile: 'A ruthless authoritarian who craves total dominance and control over others.', traits: { openness: 0.3, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.05, neuroticism: 0.6 }, goals: ['Rule over everyone', 'Crush all opposition'], motivations: ['greed', 'vengeance'] },
+  { label: 'Explorer', icon: '⚐', color: '#22ccaa', profile: 'A restless adventurer always seeking the unknown beyond the horizon.', traits: { openness: 0.95, conscientiousness: 0.4, extraversion: 0.6, agreeableness: 0.5, neuroticism: 0.3 }, goals: ['Discover every corner of the world', 'Find legendary artifacts'], motivations: ['curiosity'] },
+  { label: 'Prophet', icon: '☀', color: '#eedd44', profile: 'A mystical visionary who claims to see the future and speaks in riddles.', traits: { openness: 0.9, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.6, neuroticism: 0.8 }, goals: ['Guide others toward their destiny', 'Prevent catastrophe'], motivations: ['compassion', 'curiosity'] },
+  { label: 'Spy', icon: '⊘', color: '#7a8a9a', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
+];
+
 function QuickAddCharacter({ onClose, onAdd }: {
   onClose: () => void;
   onAdd: (data: CharacterCreate) => void;
 }) {
   const [name, setName] = useState('');
   const [profile, setProfile] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [traits, setTraits] = useState<PersonalityTraits>({ openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5 });
+  const [goals, setGoals] = useState('');
+  const [showTraits, setShowTraits] = useState(false);
 
-  const templates = [
-    { name: 'The Diplomat', icon: '♦', color: 'text-neon-cyan', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3 } as PersonalityTraits, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'] },
-    { name: 'The Warrior', icon: '⚔', color: 'text-neon-red', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5 } as PersonalityTraits, goals: ['Defeat all rivals', 'Protect the weak'] },
-    { name: 'The Trickster', icon: '★', color: 'text-neon-magenta', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4 } as PersonalityTraits, goals: ['Sow discord among others', 'Accumulate secret power'] },
-    { name: 'The Scholar', icon: '◆', color: 'text-neon-gold', profile: 'A curious mind devoted to understanding the world through observation.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4 } as PersonalityTraits, goals: ['Discover hidden knowledge', 'Map the environment'] },
-  ];
+  function selectTemplate(idx: number) {
+    const t = TEMPLATES[idx];
+    setSelectedTemplate(idx);
+    setName(t.label);
+    setProfile(t.profile);
+    setTraits(t.traits);
+    setGoals(t.goals.join(', '));
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
-      <div className="pixel-panel p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}
+      <div className="pixel-panel p-5 w-[560px] max-h-[85vh] overflow-y-auto pixel-scrollbar" onClick={(e) => e.stopPropagation()}
         style={{ borderColor: '#ff00aa', boxShadow: '0 0 12px rgba(255,0,170,0.3), 4px 4px 0 #000' }}
       >
-        <div className="text-pixel-sm text-neon-magenta mb-4 tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+        <div className="text-pixel-sm text-neon-magenta mb-3 tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
           ADD CHARACTER
         </div>
 
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          {templates.map((t) => (
+        <div className="text-pixel-xs text-gray-500 mb-2 tracking-wider">TEMPLATES</div>
+        <div className="grid grid-cols-7 gap-1.5 mb-4">
+          {TEMPLATES.map((t, i) => (
             <button
-              key={t.name}
-              onClick={() => {
-                setSelectedTemplate(t.name);
-                setName(t.name);
-                setProfile(t.profile);
-              }}
-              className={`pixel-panel p-2 text-center hover:bg-white/5 transition-colors ${
-                selectedTemplate === t.name ? 'border-neon-cyan' : ''
-              }`}
-              style={selectedTemplate === t.name ? { borderColor: '#00e5ff', boxShadow: '0 0 6px rgba(0,229,255,0.3)' } : {}}
+              key={t.label}
+              onClick={() => selectTemplate(i)}
+              className="pixel-panel p-1.5 text-center hover:bg-white/5 transition-colors"
+              style={selectedTemplate === i ? { borderColor: t.color, boxShadow: `0 0 6px ${t.color}40` } : {}}
+              title={t.label}
             >
-              <div className={`text-pixel-base ${t.color} mb-1`}>{t.icon}</div>
-              <div className="text-pixel-xs text-gray-400 truncate">{t.name.replace('The ', '')}</div>
+              <div className="mb-0.5" style={{ fontSize: '14px', color: t.color }}>{t.icon}</div>
+              <div className="text-gray-400 truncate" style={{ fontSize: '6px' }}>{t.label}</div>
             </button>
           ))}
         </div>
 
         <div className="space-y-3">
-          <div>
-            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1.5">NAME</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Character name..."
-              className="pixel-input text-pixel-xs w-full"
-            />
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">NAME</label>
+              <input
+                value={name}
+                onChange={(e) => { setName(e.target.value); setSelectedTemplate(null); }}
+                placeholder="Enter any name..."
+                className="pixel-input text-pixel-xs w-full"
+              />
+            </div>
           </div>
+
           <div>
-            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1.5">PROFILE</label>
+            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">BACKSTORY</label>
             <textarea
               value={profile}
               onChange={(e) => setProfile(e.target.value)}
-              placeholder="Character backstory..."
-              rows={3}
+              placeholder="Who is this character? What drives them?"
+              rows={2}
               className="pixel-input text-pixel-xs w-full resize-none"
             />
           </div>
+
+          <div>
+            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">GOALS</label>
+            <input
+              value={goals}
+              onChange={(e) => setGoals(e.target.value)}
+              placeholder="Comma-separated goals..."
+              className="pixel-input text-pixel-xs w-full"
+            />
+          </div>
+
+          <div>
+            <button
+              onClick={() => setShowTraits(!showTraits)}
+              className="text-pixel-xs text-neon-cyan hover:text-white transition-colors tracking-wider flex items-center gap-1"
+            >
+              <span style={{ fontSize: '8px' }}>{showTraits ? '▼' : '▶'}</span>
+              PERSONALITY TRAITS
+            </button>
+            {showTraits && (
+              <div className="mt-2 space-y-1.5 p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                {([
+                  ['Openness', 'openness', 'purple'],
+                  ['Conscientiousness', 'conscientiousness', 'cyan'],
+                  ['Extraversion', 'extraversion', 'gold'],
+                  ['Agreeableness', 'agreeableness', 'green'],
+                  ['Neuroticism', 'neuroticism', 'red'],
+                ] as const).map(([label, key, color]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-gray-400 w-28 truncate uppercase" style={{ fontSize: '7px', fontFamily: 'var(--font-pixel, monospace)' }}>{label}</span>
+                    <div className="flex-1 relative" style={{ height: '10px' }}>
+                      <div className="pixel-bar-container" style={{ height: '10px' }}>
+                        <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color] }} />
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={Math.round(traits[key] * 100)}
+                        onChange={(e) => setTraits({ ...traits, [key]: Number(e.target.value) / 100 })}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      />
+                    </div>
+                    <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
+                      {Math.round(traits[key] * 100)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-5">
+        <div className="flex justify-end gap-3 mt-4">
           <button onClick={onClose} className="pixel-btn text-pixel-xs">
             CANCEL
           </button>
           <button
             onClick={() => {
               if (!name.trim()) return;
-              const template = templates.find((t) => t.name === name);
+              const goalList = goals.split(',').map(g => g.trim()).filter(Boolean);
+              const tmpl = selectedTemplate !== null ? TEMPLATES[selectedTemplate] : null;
               onAdd({
                 name: name.trim(),
                 profile: profile.trim() || undefined,
-                traits: template?.traits,
-                goals: template?.goals,
+                traits,
+                goals: goalList.length > 0 ? goalList : undefined,
+                motivations: tmpl?.motivations,
               });
             }}
             disabled={!name.trim()}
