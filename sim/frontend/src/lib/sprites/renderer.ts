@@ -1,3 +1,6 @@
+import { setLampGlow } from './terrain';
+import { setWindowGlow } from './buildings';
+
 export interface Sprite {
   x: number;
   y: number;
@@ -180,6 +183,10 @@ export class PixelRenderer {
 
   private render() {
     const { ctx, width, height, camera, sprites } = this;
+
+    // Update module-level glow values for terrain/building draw functions
+    setLampGlow(this.dayNight.lampGlow);
+    setWindowGlow(this.dayNight.lampGlow);
 
     // Clear
     ctx.clearRect(0, 0, width, height);

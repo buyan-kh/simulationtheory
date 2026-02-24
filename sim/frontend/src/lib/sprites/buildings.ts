@@ -683,6 +683,14 @@ function drawWaterAnim(
   ctx.fillRect(bx + rx * scale, by + 15 * scale, scale * 2, scale);
 }
 
+// ── Night window glow state ──────────────────────────────────────────
+
+let _windowGlow = 0; // 0-1, set by renderer based on day/night
+export function setWindowGlow(glow: number) { _windowGlow = glow; }
+
+// Window/glass colors that should glow warm at night
+const GLASS_COLORS = new Set([GL, GT]);
+
 // ── Exports ────────────────────────────────────────────────────────────
 
 export function drawBuilding(
@@ -697,14 +705,43 @@ export function drawBuilding(
   if (!def) return;
 
   const { pixels, width, height } = def;
+  const glowActive = _windowGlow > 0.1;
+
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
       const color = pixels[row][col];
       if (color) {
-        ctx.fillStyle = color;
+        // At night, make glass windows glow warm yellow
+        if (glowActive && GLASS_COLORS.has(color)) {
+          const r = Math.round(58 + 197 * _windowGlow);
+          const g = Math.round(90 + 131 * _windowGlow);
+          const b = Math.round(138 - 38 * _windowGlow);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+        } else {
+          ctx.fillStyle = color;
+        }
         ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
       }
     }
+  }
+
+  // Warm glow around windows at night
+  if (glowActive) {
+    ctx.save();
+    ctx.globalAlpha = _windowGlow * 0.25;
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        if (GLASS_COLORS.has(pixels[row][col]!)) {
+          ctx.fillStyle = 'rgba(255, 220, 100, 0.5)';
+          ctx.beginPath();
+          ctx.arc(x + col * scale + scale / 2, y + row * scale + scale / 2, scale * 3, 0, Math.PI * 2);
+          ctx.fill();
+          // Skip ahead to avoid overlapping glow on adjacent glass pixels
+          col += 2;
+        }
+      }
+    }
+    ctx.restore();
   }
 
   const f = frame ?? 0;

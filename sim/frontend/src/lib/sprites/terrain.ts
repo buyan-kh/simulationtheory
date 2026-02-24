@@ -549,6 +549,10 @@ const OBJECT_MAP: Record<string, ObjectDef | ObjectDef[]> = {
   bridge_v: BRIDGE_V_OBJ,
 };
 
+// Module-level lamp glow intensity (set by renderer based on day/night)
+let _lampGlow = 0;
+export function setLampGlow(glow: number) { _lampGlow = glow; }
+
 export function drawObject(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -564,12 +568,14 @@ export function drawObject(
   // Resolve animated objects (arrays) vs static
   const def = Array.isArray(entry) ? entry[frame % entry.length] : entry;
 
-  // Lamp post glow effect
+  // Lamp post glow effect — scales with day/night cycle
   if (type === 'lamp_post') {
-    const glowIntensity = 0.2 + Math.sin(frame * 0.2) * 0.1;
+    const baseGlow = 0.15 + _lampGlow * 0.45;
+    const glowIntensity = baseGlow + Math.sin(frame * 0.2) * 0.08;
+    const radius = (8 + _lampGlow * 10) * scale;
     ctx.fillStyle = `rgba(255, 215, 0, ${glowIntensity})`;
     ctx.beginPath();
-    ctx.arc(x + 3 * scale, y + 2 * scale, 12 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 3 * scale, y + 2 * scale, radius, 0, Math.PI * 2);
     ctx.fill();
   }
 

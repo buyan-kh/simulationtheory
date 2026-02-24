@@ -1,5 +1,7 @@
 'use client';
 
+import { getDayNightState } from '@/lib/sprites/renderer';
+
 interface SimControlsProps {
   tick: number;
   isRunning: boolean;
@@ -17,6 +19,47 @@ const SPEEDS = [
   { label: '5x', value: 400 },
   { label: '10x', value: 200 },
 ];
+
+function TimeIndicator({ tick }: { tick: number }) {
+  const state = getDayNightState(tick);
+  const hour = state.hour;
+  const hourStr = String(hour).padStart(2, '0') + ':00';
+
+  // Icon and color based on time of day
+  let icon: string;
+  let color: string;
+  let glowColor: string;
+  switch (state.phase) {
+    case 'night':
+      icon = '\u263E'; // crescent moon
+      color = '#8888cc';
+      glowColor = 'rgba(136,136,204,0.4)';
+      break;
+    case 'dawn':
+      icon = '\u2600'; // sun
+      color = '#ffaa44';
+      glowColor = 'rgba(255,170,68,0.4)';
+      break;
+    case 'day':
+      icon = '\u2600'; // sun
+      color = '#ffdd44';
+      glowColor = 'rgba(255,221,68,0.4)';
+      break;
+    case 'dusk':
+      icon = '\u2600'; // sun
+      color = '#ff7744';
+      glowColor = 'rgba(255,119,68,0.4)';
+      break;
+  }
+
+  return (
+    <div className="flex items-center gap-1.5" title={`${state.phase.toUpperCase()} - ${hourStr}`}>
+      <span style={{ color, textShadow: `0 0 6px ${glowColor}`, fontSize: '12px' }}>{icon}</span>
+      <span className="font-pixel" style={{ fontSize: '8px', color }}>{hourStr}</span>
+      <span className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '7px' }}>{state.phase}</span>
+    </div>
+  );
+}
 
 export default function SimControls({
   tick,
@@ -36,6 +79,10 @@ export default function SimControls({
         <span className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '8px' }}>Tick:</span>
         <span className="font-pixel text-neon-cyan text-glow-cyan" style={{ fontSize: '12px' }}>{tickStr}</span>
       </div>
+
+      <div className="pixel-divider w-px h-6 mx-1" style={{ width: '2px' }} />
+
+      <TimeIndicator tick={tick} />
 
       <div className="pixel-divider w-px h-6 mx-1" style={{ width: '2px' }} />
 
