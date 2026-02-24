@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import type { Character, Location, ChatMessage } from '@/lib/types';
-import { PixelRenderer, Sprite } from '@/lib/sprites/renderer';
+import { PixelRenderer, Sprite, getDayNightState } from '@/lib/sprites/renderer';
 import { generateWorld, simToWorld, WORLD_SIZE, SCALE } from '@/lib/world';
 import {
   drawCharacter,
@@ -11,12 +11,14 @@ import {
   type Direction,
   type HatStyle,
 } from '@/lib/sprites/characters';
+import Minimap from './Minimap';
 
 interface PixelCanvasProps {
   characters: Record<string, Character>;
   locations: Location[];
   selectedCharacterId: string | null;
   onSelectCharacter: (id: string) => void;
+  onClickBuilding?: (buildingName: string) => void;
   chatMessages: ChatMessage[];
   currentTick: number;
 }
@@ -49,6 +51,7 @@ export default function PixelCanvas({
   locations,
   selectedCharacterId,
   onSelectCharacter,
+  onClickBuilding,
   chatMessages,
   currentTick,
 }: PixelCanvasProps) {
@@ -90,10 +93,17 @@ export default function PixelCanvas({
   // Click handler
   const onSelectRef = useRef(onSelectCharacter);
   onSelectRef.current = onSelectCharacter;
+  const onClickBuildingRef = useRef(onClickBuilding);
+  onClickBuildingRef.current = onClickBuilding;
 
   useEffect(() => {
     rendererRef.current?.setClickHandler((id: string) => {
-      onSelectRef.current(id);
+      if (id.startsWith('building:')) {
+        const buildingName = id.slice('building:'.length);
+        onClickBuildingRef.current?.(buildingName);
+      } else {
+        onSelectRef.current(id);
+      }
     });
   }, []);
 
@@ -268,6 +278,12 @@ export default function PixelCanvas({
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden relative bg-[#0a0a1a]">
       <canvas ref={canvasRef} className="block" />
+      <Minimap
+        characters={characters}
+        locations={locations}
+        selectedCharacterId={selectedCharacterId}
+        rendererRef={rendererRef}
+      />
       {Object.keys(characters).length === 0 && locations.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center font-mono text-gray-500 text-sm">

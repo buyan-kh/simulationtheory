@@ -20,6 +20,44 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ANIMATION_FRAME_DIVISOR = 15;
 
+// ==================== DAY/NIGHT CYCLE ====================
+
+export type TimeOfDay = 'night' | 'dawn' | 'day' | 'dusk';
+
+export interface DayNightState {
+  hour: number; // 0-23
+  phase: TimeOfDay;
+  overlayColor: string; // CSS rgb values e.g. "10,10,40"
+  overlayAlpha: number;
+  lampGlow: number; // 0-1
+}
+
+export function getDayNightState(tick: number): DayNightState {
+  const hour = tick % 24;
+
+  if (hour >= 8 && hour <= 17) {
+    // Day: very slight warm tint
+    return { hour, phase: 'day', overlayColor: '255,240,200', overlayAlpha: 0.03, lampGlow: 0 };
+  } else if (hour >= 5 && hour <= 7) {
+    // Dawn: warm orange/pink gradually brightening
+    const t = (hour - 5) / 2; // 0 at hour 5, 1 at hour 7
+    const r = Math.round(255 - 40 * (1 - t));
+    const g = Math.round(180 + 60 * t);
+    const b = Math.round(140 + 60 * t);
+    return { hour, phase: 'dawn', overlayColor: `${r},${g},${b}`, overlayAlpha: 0.25 - t * 0.22, lampGlow: Math.max(0, 1 - t * 1.5) };
+  } else if (hour >= 18 && hour <= 20) {
+    // Dusk: warm orange/red gradually darkening
+    const t = (hour - 18) / 2; // 0 at hour 18, 1 at hour 20
+    const r = Math.round(255 - 60 * t);
+    const g = Math.round(160 - 80 * t);
+    const b = Math.round(120 - 80 * t);
+    return { hour, phase: 'dusk', overlayColor: `${r},${g},${b}`, overlayAlpha: 0.05 + t * 0.25, lampGlow: Math.min(1, t * 1.5) };
+  } else {
+    // Night (21-4): dark blue overlay
+    return { hour, phase: 'night', overlayColor: '10,10,40', overlayAlpha: 0.45, lampGlow: 1 };
+  }
+}
+
 export class PixelRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -35,6 +73,8 @@ export class PixelRenderer {
   private onClickSprite: ((id: string) => void) | null = null;
   private width: number = 0;
   private height: number = 0;
+  private dayNight: DayNightState = getDayNightState(8);
+  private starPositions: { x: number; y: number; brightness: number }[] = [];
 
   // Bound handlers for cleanup
   private boundMouseDown: (e: MouseEvent) => void;
@@ -81,6 +121,10 @@ export class PixelRenderer {
     return { ...this.camera };
   }
 
+  getViewportSize(): { width: number; height: number } {
+    return { width: this.width, height: this.height };
+  }
+
   centerOn(worldX: number, worldY: number) {
     this.camera.x = worldX;
     this.camera.y = worldY;
@@ -88,6 +132,14 @@ export class PixelRenderer {
 
   setSprites(sprites: Sprite[]) {
     this.sprites = sprites;
+  }
+
+  setDayNight(tick: number) {
+    this.dayNight = getDayNightState(tick);
+  }
+
+  getDayNight(): DayNightState {
+    return this.dayNight;
   }
 
   setClickHandler(handler: (id: string) => void) {
@@ -175,11 +227,63 @@ export class PixelRenderer {
 
     ctx.restore();
 
+    // Day/night overlay (screen-space, after all world sprites)
+    this.renderDayNightOverlay();
+
     // Increment animation frame counter
     this.rawFrame++;
     if (this.rawFrame % ANIMATION_FRAME_DIVISOR === 0) {
       this.frame++;
     }
+  }
+
+  private generateStars() {
+    // Generate deterministic star positions across the screen
+    this.starPositions = [];
+    const rng = (s: number) => {
+      s = (s * 16807 + 0) % 2147483647;
+      return s / 2147483647;
+    };
+    let seed = 9999;
+    for (let i = 0; i < 80; i++) {
+      seed = (seed * 16807) % 2147483647;
+      const x = rng(seed + i * 137);
+      seed = (seed * 16807) % 2147483647;
+      const y = rng(seed + i * 251);
+      seed = (seed * 16807) % 2147483647;
+      const brightness = 0.4 + rng(seed + i * 73) * 0.6;
+      this.starPositions.push({ x, y, brightness });
+    }
+  }
+
+  private renderDayNightOverlay() {
+    const { ctx, width, height, dayNight } = this;
+    if (dayNight.overlayAlpha <= 0) return;
+
+    // Color overlay
+    ctx.save();
+    ctx.fillStyle = `rgba(${dayNight.overlayColor},${dayNight.overlayAlpha})`;
+    ctx.fillRect(0, 0, width, height);
+
+    // Stars at night/dawn/dusk when it's dark enough
+    if (dayNight.overlayAlpha >= 0.15) {
+      if (this.starPositions.length === 0) this.generateStars();
+
+      const twinklePhase = this.rawFrame * 0.03;
+      const starAlpha = Math.min(1, (dayNight.overlayAlpha - 0.15) / 0.3);
+
+      for (const star of this.starPositions) {
+        const twinkle = 0.5 + 0.5 * Math.sin(twinklePhase + star.x * 20 + star.y * 30);
+        const a = star.brightness * twinkle * starAlpha;
+        if (a < 0.05) continue;
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        const sx = star.x * width;
+        const sy = star.y * height * 0.6; // stars only in upper 60% of screen
+        ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+      }
+    }
+
+    ctx.restore();
   }
 
   private handleMouseDown(e: MouseEvent) {
