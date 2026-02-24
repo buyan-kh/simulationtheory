@@ -6,6 +6,7 @@ from models import (
 )
 from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
+from db import SimulationDB
 
 HOUSE_PLOTS = [
     {"x": -30, "y": -30}, {"x": -15, "y": -35}, {"x": 0, "y": -40},
@@ -32,15 +33,22 @@ class SimulationEngine:
 
     def __init__(self):
         self.simulations: dict[str, SimulationState] = {}
+        self.db = SimulationDB()
         self.brain = AgentBrain()
         self.event_gen = EventGenerator()
         self.dialogue = DialogueGenerator()
 
-    def create_simulation(self, config: SimulationConfig | None = None) -> SimulationState:
+    def create_simulation(self, config: SimulationConfig | None = None, name: str = "") -> SimulationState:
         sim = SimulationState()
         if config:
             sim.config = config
+        if name:
+            sim.name = name
+        else:
+            count = len(self.db.list_summaries()) + 1
+            sim.name = f"Simulation #{count}"
         self.simulations[sim.id] = sim
+        self.db.save(sim)
         return sim
 
     def add_character(self, sim_id: str, char_create: CharacterCreate) -> Character:
@@ -58,6 +66,7 @@ class SimulationEngine:
         )
         sim.characters[char.id] = char
         self._assign_house(sim, char)
+        self.db.save(sim)
         return char
 
     def step(self, sim_id: str) -> tuple[list[Event], list[ChatMessage]]:
@@ -108,24 +117,36 @@ class SimulationEngine:
         sim.events.extend(all_events)
         sim.chat_log.extend(chat_messages)
         sim.tick += 1
+        self.db.save(sim)
 
         return all_events, chat_messages
 
     def get_state(self, sim_id: str) -> SimulationState:
+        if sim_id not in self.simulations:
+            sim = self.db.load(sim_id)
+            if sim is None:
+                raise KeyError(sim_id)
+            self.simulations[sim_id] = sim
         return self.simulations[sim_id]
 
     def remove_character(self, sim_id: str, char_id: str):
         sim = self.simulations[sim_id]
         if char_id in sim.characters:
             del sim.characters[char_id]
+            self.db.save(sim)
 
     def update_config(self, sim_id: str, config: SimulationConfig):
         sim = self.simulations[sim_id]
         sim.config = config
+        self.db.save(sim)
 
     def delete_simulation(self, sim_id: str):
         if sim_id in self.simulations:
             del self.simulations[sim_id]
+        self.db.delete(sim_id)
+
+    def list_summaries(self) -> list[dict]:
+        return self.db.list_summaries()
 
     _HOUSE_SIZE_MAX = {"small": 1, "medium": 2, "large": 3}
 

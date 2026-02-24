@@ -2,8 +2,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models import (
-    SimulationState, SimulationConfig, Character, CharacterCreate,
-    Event, Memory, ChatMessage,
+    SimulationState, SimulationConfig, SimulationSummary,
+    Character, CharacterCreate, Event, Memory, ChatMessage,
 )
 from engine import SimulationEngine
 
@@ -21,6 +21,7 @@ engine = SimulationEngine()
 
 
 class CreateSimulationRequest(BaseModel):
+    name: str | None = None
     randomness: float | None = None
     information_symmetry: float | None = None
     resource_scarcity: float | None = None
@@ -33,71 +34,73 @@ class StepResponse(BaseModel):
     chat_messages: list[ChatMessage]
 
 
-@app.get("/api/simulations", response_model=list[SimulationState])
+@app.get("/api/simulations", response_model=list[SimulationSummary])
 def list_simulations():
-    return list(engine.simulations.values())
+    return engine.list_summaries()
 
 
 @app.post("/api/simulations", response_model=SimulationState)
 def create_simulation(req: CreateSimulationRequest | None = None):
     config = None
-    if req and any(v is not None for v in [req.randomness, req.information_symmetry, req.resource_scarcity, req.max_ticks]):
-        kwargs = {}
-        if req.randomness is not None:
-            kwargs["randomness"] = req.randomness
-        if req.information_symmetry is not None:
-            kwargs["information_symmetry"] = req.information_symmetry
-        if req.resource_scarcity is not None:
-            kwargs["resource_scarcity"] = req.resource_scarcity
-        if req.max_ticks is not None:
-            kwargs["max_ticks"] = req.max_ticks
-        config = SimulationConfig(**kwargs)
-    return engine.create_simulation(config)
+    name = ""
+    if req:
+        name = req.name or ""
+        if any(v is not None for v in [req.randomness, req.information_symmetry, req.resource_scarcity, req.max_ticks]):
+            kwargs = {}
+            if req.randomness is not None:
+                kwargs["randomness"] = req.randomness
+            if req.information_symmetry is not None:
+                kwargs["information_symmetry"] = req.information_symmetry
+            if req.resource_scarcity is not None:
+                kwargs["resource_scarcity"] = req.resource_scarcity
+            if req.max_ticks is not None:
+                kwargs["max_ticks"] = req.max_ticks
+            config = SimulationConfig(**kwargs)
+    return engine.create_simulation(config, name=name)
+
+
+def _get_sim(sim_id: str) -> SimulationState:
+    """Load simulation by ID, raising 404 if not found."""
+    try:
+        return engine.get_state(sim_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Simulation not found")
 
 
 @app.get("/api/simulations/{sim_id}", response_model=SimulationState)
 def get_simulation(sim_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    return engine.get_state(sim_id)
+    return _get_sim(sim_id)
 
 
 @app.post("/api/simulations/{sim_id}/step", response_model=StepResponse)
 def step_simulation(sim_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+    _get_sim(sim_id)
     events, chat_messages = engine.step(sim_id)
     return StepResponse(events=events, state=engine.get_state(sim_id), chat_messages=chat_messages)
 
 
 @app.patch("/api/simulations/{sim_id}/config", response_model=SimulationState)
 def update_config(sim_id: str, config: SimulationConfig):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+    _get_sim(sim_id)
     engine.update_config(sim_id, config)
     return engine.get_state(sim_id)
 
 
 @app.delete("/api/simulations/{sim_id}")
 def delete_simulation(sim_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
     engine.delete_simulation(sim_id)
     return {"status": "deleted"}
 
 
 @app.post("/api/simulations/{sim_id}/characters", response_model=Character)
 def add_character(sim_id: str, char_create: CharacterCreate):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+    _get_sim(sim_id)
     return engine.add_character(sim_id, char_create)
 
 
 @app.get("/api/simulations/{sim_id}/characters/{char_id}", response_model=Character)
 def get_character(sim_id: str, char_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     if char_id not in sim.characters:
         raise HTTPException(status_code=404, detail="Character not found")
     return sim.characters[char_id]
@@ -105,9 +108,7 @@ def get_character(sim_id: str, char_id: str):
 
 @app.delete("/api/simulations/{sim_id}/characters/{char_id}")
 def remove_character(sim_id: str, char_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     if char_id not in sim.characters:
         raise HTTPException(status_code=404, detail="Character not found")
     engine.remove_character(sim_id, char_id)
@@ -116,9 +117,7 @@ def remove_character(sim_id: str, char_id: str):
 
 @app.get("/api/simulations/{sim_id}/characters/{char_id}/memory", response_model=Memory)
 def get_character_memory(sim_id: str, char_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     if char_id not in sim.characters:
         raise HTTPException(status_code=404, detail="Character not found")
     return sim.characters[char_id].memory
@@ -126,9 +125,7 @@ def get_character_memory(sim_id: str, char_id: str):
 
 @app.get("/api/simulations/{sim_id}/characters/{char_id}/reasoning")
 def get_character_reasoning(sim_id: str, char_id: str):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     if char_id not in sim.characters:
         raise HTTPException(status_code=404, detail="Character not found")
     char = sim.characters[char_id]
@@ -142,15 +139,11 @@ def get_character_reasoning(sim_id: str, char_id: str):
 
 @app.get("/api/simulations/{sim_id}/events", response_model=list[Event])
 def get_events(sim_id: str, since_tick: int = Query(default=0, ge=0)):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     return [e for e in sim.events if e.tick >= since_tick]
 
 
 @app.get("/api/simulations/{sim_id}/chat", response_model=list[ChatMessage])
 def get_chat(sim_id: str, since_tick: int = Query(default=0, ge=0)):
-    if sim_id not in engine.simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    sim = engine.get_state(sim_id)
+    sim = _get_sim(sim_id)
     return [m for m in sim.chat_log if m.tick >= since_tick]

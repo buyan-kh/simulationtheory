@@ -2,18 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSimulation, getSimulations } from '@/lib/api';
-import type { SimulationState } from '@/lib/types';
+import { createSimulation, getSimulations, deleteSimulation } from '@/lib/api';
+import type { SimulationSummary } from '@/lib/types';
+
+function timeAgo(epoch: number): string {
+  const seconds = Math.floor(Date.now() / 1000 - epoch);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
 
 export default function TitleScreen() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
-  const [recentSims, setRecentSims] = useState<SimulationState[]>([]);
+  const [recentSims, setRecentSims] = useState<SimulationSummary[]>([]);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     getSimulations()
-      .then((sims) => setRecentSims(sims.slice(0, 5)))
+      .then((sims) => setRecentSims(sims))
       .catch(() => setLoadError(true));
   }, []);
 
@@ -108,33 +116,51 @@ export default function TitleScreen() {
         {recentSims.length > 0 && (
           <div className="pixel-panel p-4">
             <div className="text-pixel-xs text-neon-gold mb-3 tracking-wider" style={{ textShadow: '0 0 6px rgba(255,215,0,0.4)' }}>
-              CONTINUE SIMULATION
+              SAVED SESSIONS
             </div>
             <div className="space-y-1">
               {recentSims.map((sim) => (
-                <button
+                <div
                   key={sim.id}
-                  onClick={() => router.push(`/simulation/${sim.id}`)}
-                  className="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-neon-cyan/5 border-2 border-transparent hover:border-neon-cyan/20 transition-colors group"
+                  className="flex items-center hover:bg-neon-cyan/5 border-2 border-transparent hover:border-neon-cyan/20 transition-colors group"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-pixel-xs text-neon-cyan">▶</span>
-                    <span className="text-pixel-xs text-gray-300 truncate max-w-[300px]">
-                      {sim.id.slice(0, 16)}...
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-pixel-xs text-gray-600">
-                      TICK {String(sim.tick).padStart(3, '0')}
-                    </span>
-                    <span className="text-pixel-xs text-gray-600">
-                      {Object.keys(sim.characters).length} AGENTS
-                    </span>
-                    <span className="text-pixel-xs text-neon-cyan opacity-0 group-hover:opacity-100 transition-opacity">
-                      LOAD →
-                    </span>
-                  </div>
-                </button>
+                  <button
+                    onClick={() => router.push(`/simulation/${sim.id}`)}
+                    className="flex-1 text-left px-3 py-2 flex items-center justify-between min-w-0"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-pixel-xs text-neon-cyan shrink-0">▶</span>
+                      <span className="text-pixel-xs text-gray-300 truncate">
+                        {sim.name || sim.id.slice(0, 16)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0 ml-4">
+                      <span className="text-pixel-xs text-gray-600">
+                        TICK {String(sim.tick).padStart(3, '0')}
+                      </span>
+                      <span className="text-pixel-xs text-gray-600">
+                        {sim.character_count} AGENTS
+                      </span>
+                      <span className="text-pixel-xs text-gray-600">
+                        {sim.event_count} EVENTS
+                      </span>
+                      <span className="text-pixel-xs text-gray-600">
+                        {timeAgo(sim.updated_at)}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await deleteSimulation(sim.id);
+                      setRecentSims((prev) => prev.filter((s) => s.id !== sim.id));
+                    }}
+                    className="px-2 py-2 text-pixel-xs text-gray-700 hover:text-neon-red opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    title="Delete session"
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
             </div>
           </div>

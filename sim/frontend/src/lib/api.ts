@@ -1,5 +1,6 @@
 import type {
   SimulationState,
+  SimulationSummary,
   SimulationConfig,
   Character,
   CharacterCreate,
@@ -23,7 +24,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export async function getSimulations(): Promise<SimulationState[]> {
+export async function getSimulations(): Promise<SimulationSummary[]> {
   return request('/simulations');
 }
 

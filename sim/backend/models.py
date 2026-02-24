@@ -171,6 +171,7 @@ class ChatMessage(BaseModel):
 
 class SimulationState(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
     tick: int = 0
     characters: dict[str, Character] = {}
     environment: Environment = Field(default_factory=Environment)
@@ -179,3 +180,14 @@ class SimulationState(BaseModel):
     config: SimulationConfig = Field(default_factory=SimulationConfig)
     running: bool = False
     created_at: float = Field(default_factory=time.time)
+    updated_at: float = Field(default_factory=time.time)
+
+
+class SimulationSummary(BaseModel):
+    id: str
+    name: str
+    tick: int
+    character_count: int
+    event_count: int
+    created_at: float
+    updated_at: float

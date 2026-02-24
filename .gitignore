@@ -29,6 +29,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Database
+*.db
+
 # Generated
 next-env.d.ts
 *.tsbuildinfo

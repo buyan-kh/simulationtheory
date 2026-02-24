@@ -113,6 +113,7 @@ export interface SimulationConfig {
 
 export interface SimulationState {
   id: string;
+  name: string;
   tick: number;
   characters: Record<string, Character>;
   environment: Environment;
@@ -120,7 +121,18 @@ export interface SimulationState {
   config: SimulationConfig;
   running: boolean;
   created_at: number;
+  updated_at: number;
   chat_log: ChatMessage[];
+}
+
+export interface SimulationSummary {
+  id: string;
+  name: string;
+  tick: number;
+  character_count: number;
+  event_count: number;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface ChatMessage {
