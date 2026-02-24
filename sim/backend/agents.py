@@ -50,6 +50,39 @@ GOAL_ACTION_MAP: dict[str, list[ActionType]] = {
     "protect": [ActionType.DEFEND, ActionType.ALLY, ActionType.COOPERATE],
 }
 
+MOTIVATION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
+    "greed": {ActionType.GATHER: 0.7, ActionType.COMPETE: 0.5, ActionType.BETRAY: 0.4, ActionType.SHARE: -0.5},
+    "ambition": {ActionType.COMPETE: 0.6, ActionType.NEGOTIATE: 0.5, ActionType.ALLY: 0.4, ActionType.REST: -0.3},
+    "fear": {ActionType.DEFEND: 0.7, ActionType.REST: 0.4, ActionType.OBSERVE: 0.5, ActionType.ATTACK: -0.5},
+    "loyalty": {ActionType.COOPERATE: 0.6, ActionType.ALLY: 0.7, ActionType.DEFEND: 0.5, ActionType.BETRAY: -0.8},
+    "curiosity": {ActionType.EXPLORE: 0.8, ActionType.OBSERVE: 0.6, ActionType.COMMUNICATE: 0.5},
+    "compassion": {ActionType.SHARE: 0.7, ActionType.COOPERATE: 0.6, ActionType.ATTACK: -0.6, ActionType.BETRAY: -0.7},
+    "pride": {ActionType.COMPETE: 0.6, ActionType.DEFEND: 0.5, ActionType.COOPERATE: -0.2},
+    "vengeance": {ActionType.ATTACK: 0.7, ActionType.BETRAY: 0.5, ActionType.COMPETE: 0.4, ActionType.SHARE: -0.5},
+    "survival": {ActionType.GATHER: 0.6, ActionType.DEFEND: 0.6, ActionType.REST: 0.5, ActionType.EXPLORE: -0.2},
+    "diplomacy": {ActionType.NEGOTIATE: 0.7, ActionType.COMMUNICATE: 0.6, ActionType.ALLY: 0.5, ActionType.ATTACK: -0.5},
+}
+
+WEATHER_ACTION_MODIFIERS: dict[str, dict[ActionType, float]] = {
+    "stormy": {ActionType.REST: 0.4, ActionType.DEFEND: 0.2, ActionType.EXPLORE: -0.4, ActionType.GATHER: -0.3},
+    "harsh": {ActionType.REST: 0.3, ActionType.GATHER: -0.2, ActionType.EXPLORE: -0.3, ActionType.DEFEND: 0.2},
+    "pleasant": {ActionType.EXPLORE: 0.2, ActionType.GATHER: 0.2, ActionType.COMMUNICATE: 0.2, ActionType.COOPERATE: 0.1},
+    "foggy": {ActionType.OBSERVE: 0.3, ActionType.DEFEND: 0.2, ActionType.EXPLORE: -0.2, ActionType.ATTACK: -0.2},
+    "scorching": {ActionType.REST: 0.3, ActionType.EXPLORE: -0.3, ActionType.GATHER: -0.2},
+    "calm": {},
+}
+
+# Maps another character's last action to how we might respond
+RECIPROCITY_MAP: dict[str, dict[ActionType, float]] = {
+    "cooperate": {ActionType.COOPERATE: 0.4, ActionType.SHARE: 0.2, ActionType.ALLY: 0.2},
+    "share": {ActionType.COOPERATE: 0.3, ActionType.SHARE: 0.3, ActionType.ALLY: 0.1},
+    "attack": {ActionType.DEFEND: 0.5, ActionType.ATTACK: 0.3, ActionType.COMPETE: 0.2},
+    "betray": {ActionType.DEFEND: 0.4, ActionType.ATTACK: 0.4, ActionType.COMPETE: 0.2, ActionType.COOPERATE: -0.5},
+    "negotiate": {ActionType.NEGOTIATE: 0.3, ActionType.COOPERATE: 0.2},
+    "ally": {ActionType.ALLY: 0.4, ActionType.COOPERATE: 0.3},
+    "compete": {ActionType.COMPETE: 0.3, ActionType.DEFEND: 0.2, ActionType.ATTACK: 0.1},
+}
+
 EMOTION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
     "happiness": {
         ActionType.COOPERATE: 0.5, ActionType.SHARE: 0.6, ActionType.COMMUNICATE: 0.4,
@@ -149,6 +182,88 @@ class AgentBrain:
         relevant.sort(key=lambda x: x[1], reverse=True)
         return [m for m, _ in relevant[:10]]
 
+    def _compute_resource_urgency(self, character: Character) -> dict[ActionType, float]:
+        """Compute strong urgency bonuses based on resource levels."""
+        energy = character.resources.get("energy", 50)
+        wealth = character.resources.get("wealth", 50)
+        influence = character.resources.get("influence", 50)
+        urgency: dict[ActionType, float] = {}
+
+        # Critical energy: strongly favor rest
+        if energy < 15:
+            urgency[ActionType.REST] = 1.5
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.8
+            urgency[ActionType.COMPETE] = urgency.get(ActionType.COMPETE, 0) - 0.6
+            urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) - 0.5
+        elif energy < 30:
+            urgency[ActionType.REST] = 0.7
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.3
+        elif energy < 40:
+            urgency[ActionType.REST] = 0.3
+
+        # Low wealth: favor gathering and competing
+        if wealth < 15:
+            urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.8
+            urgency[ActionType.COMPETE] = urgency.get(ActionType.COMPETE, 0) + 0.3
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.6
+        elif wealth < 30:
+            urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.4
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.3
+
+        # High wealth: more inclined to share (especially agreeable characters)
+        if wealth > 80:
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) + 0.3 * character.traits.agreeableness
+
+        # Low influence: favor diplomacy
+        if influence < 20:
+            urgency[ActionType.NEGOTIATE] = urgency.get(ActionType.NEGOTIATE, 0) + 0.4
+            urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.3
+            urgency[ActionType.ALLY] = urgency.get(ActionType.ALLY, 0) + 0.3
+
+        return urgency
+
+    def _compute_environmental_modifiers(self, perception: dict) -> dict[ActionType, float]:
+        """Compute action modifiers based on weather and environmental scarcity."""
+        modifiers: dict[ActionType, float] = {}
+        weather = perception.get("environment_conditions", {}).get("weather", "calm")
+        weather_mods = WEATHER_ACTION_MODIFIERS.get(weather, {})
+        for action_type, mod in weather_mods.items():
+            modifiers[action_type] = modifiers.get(action_type, 0) + mod
+
+        scarcity = perception.get("environment_conditions", {}).get("scarcity", "moderate")
+        if scarcity == "severe":
+            modifiers[ActionType.GATHER] = modifiers.get(ActionType.GATHER, 0) + 0.5
+            modifiers[ActionType.COMPETE] = modifiers.get(ActionType.COMPETE, 0) + 0.3
+            modifiers[ActionType.DEFEND] = modifiers.get(ActionType.DEFEND, 0) + 0.2
+            modifiers[ActionType.SHARE] = modifiers.get(ActionType.SHARE, 0) - 0.3
+
+        # Low global resources increase competition
+        env_resources = perception.get("environment_resources", {})
+        avg_env = sum(env_resources.values()) / max(len(env_resources), 1)
+        if avg_env < 30:
+            modifiers[ActionType.GATHER] = modifiers.get(ActionType.GATHER, 0) + 0.3
+            modifiers[ActionType.COMPETE] = modifiers.get(ActionType.COMPETE, 0) + 0.2
+
+        return modifiers
+
+    def _compute_motivation_scores(self, character: Character) -> dict[ActionType, float]:
+        """Compute action scores from character motivations."""
+        scores: dict[ActionType, float] = {}
+        for motivation in character.motivations:
+            mot_lower = motivation.lower()
+            for keyword, action_weights in MOTIVATION_ACTION_MAP.items():
+                if keyword in mot_lower:
+                    for action_type, weight in action_weights.items():
+                        scores[action_type] = scores.get(action_type, 0) + weight * 0.5
+        return scores
+
+    def _compute_reciprocity(self, nc: dict) -> dict[ActionType, float]:
+        """Compute how we should respond based on another character's last action."""
+        last_action = nc.get("last_action")
+        if not last_action:
+            return {}
+        return dict(RECIPROCITY_MAP.get(last_action, {}))
+
     def evaluate_options(self, character: Character, perception: dict) -> list[tuple[Action, float]]:
         nearby = perception["nearby_characters"]
         options: list[tuple[Action, float]] = []
@@ -156,19 +271,27 @@ class AgentBrain:
         traits = character.traits
         emotions = character.emotional_state
 
+        # Pre-compute contextual modifiers
+        resource_urgency = self._compute_resource_urgency(character)
+        env_modifiers = self._compute_environmental_modifiers(perception)
+        motivation_scores = self._compute_motivation_scores(character)
+
         for action_type in ActionType:
             base_score = 0.0
 
+            # Personality-driven base score
             for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
                 trait_val = getattr(traits, trait_name)
                 weight = action_weights.get(action_type, 0.0)
                 base_score += trait_val * weight
 
+            # Emotion-driven modifiers
             for emotion_name, action_weights in EMOTION_ACTION_MAP.items():
                 emo_val = getattr(emotions, emotion_name, 0.0)
                 weight = action_weights.get(action_type, 0.0)
                 base_score += emo_val * weight * 0.5
 
+            # Goal-driven boosts
             goal_boost = 0.0
             for goal in character.goals:
                 goal_lower = goal.lower()
@@ -176,6 +299,15 @@ class AgentBrain:
                     if keyword in goal_lower and action_type in boosted_actions:
                         goal_boost += 0.4
             base_score += goal_boost
+
+            # Motivation-driven scores
+            base_score += motivation_scores.get(action_type, 0.0)
+
+            # Resource urgency
+            base_score += resource_urgency.get(action_type, 0.0)
+
+            # Environmental modifiers
+            base_score += env_modifiers.get(action_type, 0.0)
 
             needs_target = action_type in {
                 ActionType.COOPERATE, ActionType.COMPETE, ActionType.NEGOTIATE,
@@ -188,25 +320,57 @@ class AgentBrain:
                     target_score = base_score
                     rel = nc["relationship"]
 
+                    # Relationship influence (scaled stronger)
                     if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE, ActionType.COMMUNICATE}:
-                        target_score += rel * 0.5
+                        target_score += rel * 0.6
                     elif action_type in {ActionType.ATTACK, ActionType.BETRAY, ActionType.COMPETE}:
-                        target_score -= rel * 0.4
+                        target_score -= rel * 0.5
+                        # Strongly negative relationships boost hostile actions
+                        if rel < -0.4:
+                            target_score += abs(rel) * 0.4
 
+                    # Belief-based modifiers
                     belief = nc.get("belief")
                     if belief == "untrustworthy":
                         if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
                             target_score -= 0.6
                         elif action_type in {ActionType.DEFEND, ActionType.COMPETE}:
                             target_score += 0.3
+                        elif action_type == ActionType.ATTACK:
+                            target_score += 0.2
+                    elif belief == "suspicious":
+                        if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
+                            target_score -= 0.3
+                        elif action_type in {ActionType.OBSERVE, ActionType.DEFEND}:
+                            target_score += 0.2
                     elif belief == "ally":
                         if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
                             target_score += 0.4
                         elif action_type in {ActionType.ATTACK, ActionType.BETRAY}:
                             target_score -= 0.7
+                    elif belief == "friendly":
+                        if action_type in {ActionType.COOPERATE, ActionType.COMMUNICATE, ActionType.SHARE}:
+                            target_score += 0.2
+                        elif action_type in {ActionType.ATTACK, ActionType.BETRAY}:
+                            target_score -= 0.4
 
+                    # Reciprocity: respond to what the other character did last
+                    reciprocity = self._compute_reciprocity(nc)
+                    target_score += reciprocity.get(action_type, 0.0)
+
+                    # Proximity bonus
                     proximity_bonus = max(0, 1.0 - nc["distance"] / 200) * 0.2
                     target_score += proximity_bonus
+
+                    # Resource comparison: attack/compete with weaker targets, defend against stronger
+                    target_resources = nc.get("resources_visible", {})
+                    if target_resources:
+                        their_total = sum(target_resources.values())
+                        our_total = sum(character.resources.values())
+                        if our_total > their_total * 1.5 and action_type == ActionType.ATTACK:
+                            target_score += 0.2  # We're much stronger
+                        elif their_total > our_total * 1.5 and action_type == ActionType.DEFEND:
+                            target_score += 0.3  # They're much stronger, be defensive
 
                     detail = self._build_detail(action_type, character, nc)
                     reasoning = self._build_reasoning(action_type, character, nc, target_score)
@@ -218,11 +382,12 @@ class AgentBrain:
 
             elif not needs_target:
                 energy = character.resources.get("energy", 50)
-                if action_type == ActionType.REST and energy < 40:
-                    base_score += 0.5
-                elif action_type == ActionType.GATHER:
-                    if any(v < 30 for v in character.resources.values()):
-                        base_score += 0.4
+
+                # Additional contextual solo scoring
+                if action_type == ActionType.REST and energy > 80:
+                    base_score -= 0.5  # Penalize resting when energy is high
+                elif action_type == ActionType.EXPLORE and energy > 60:
+                    base_score += 0.15  # Slight bonus if we have energy to explore
 
                 detail = self._build_solo_detail(action_type, character, perception)
                 reasoning = self._build_solo_reasoning(action_type, character, base_score)
@@ -243,16 +408,35 @@ class AgentBrain:
             context_parts.append(evt.title)
         context = " ".join(context_parts)
 
+        # Memory-based influence: track both negative and positive signals per character
         memories = self.recall_relevant_memories(character, context)
-        memory_influence = {}
+        memory_influence: dict[str, float] = {}
         for mem in memories:
+            # Weight recent memories more strongly (decay by importance and recency)
+            recency_weight = 1.0 if (state.tick - mem.tick) < 5 else 0.6
             for char_id in mem.related_characters:
                 if char_id not in memory_influence:
                     memory_influence[char_id] = 0.0
-                if any(w in mem.content.lower() for w in ["betray", "attack", "stole", "lied"]):
-                    memory_influence[char_id] -= 0.3
-                elif any(w in mem.content.lower() for w in ["helped", "cooperat", "shared", "ally"]):
-                    memory_influence[char_id] += 0.2
+                content_lower = mem.content.lower()
+                if any(w in content_lower for w in ["betray", "attack", "stole", "lied", "backstab"]):
+                    memory_influence[char_id] -= 0.3 * recency_weight * mem.importance
+                elif any(w in content_lower for w in ["helped", "cooperat", "shared", "ally", "alliance"]):
+                    memory_influence[char_id] += 0.2 * recency_weight * mem.importance
+                elif any(w in content_lower for w in ["compete", "conflict", "battle"]):
+                    memory_influence[char_id] -= 0.1 * recency_weight
+
+        # Recent event reactivity: very recent events get extra weight
+        recent_event_targets: dict[str, str] = {}  # char_id -> event_sentiment
+        for evt in perception["recent_events"]:
+            for pid in evt.participants:
+                if pid == character.id:
+                    continue
+                if evt.type == EventType.CONFLICT:
+                    recent_event_targets[pid] = "hostile"
+                elif evt.type == EventType.ALLIANCE_FORMED:
+                    recent_event_targets[pid] = "allied"
+                elif "betray" in evt.description.lower():
+                    recent_event_targets[pid] = "betrayer"
 
         options = self.evaluate_options(character, perception)
 
@@ -263,6 +447,23 @@ class AgentBrain:
                     score += adjustment
                 elif action.type in {ActionType.ATTACK, ActionType.BETRAY, ActionType.COMPETE}:
                     score -= adjustment
+                options[i] = (action, score)
+
+            # Boost/penalize based on very recent events
+            if action.target_id and action.target_id in recent_event_targets:
+                sentiment = recent_event_targets[action.target_id]
+                if sentiment == "hostile" and action.type in {ActionType.DEFEND, ActionType.ATTACK}:
+                    score += 0.3
+                elif sentiment == "hostile" and action.type in {ActionType.COOPERATE, ActionType.SHARE}:
+                    score -= 0.3
+                elif sentiment == "allied" and action.type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
+                    score += 0.3
+                elif sentiment == "allied" and action.type in {ActionType.ATTACK, ActionType.BETRAY}:
+                    score -= 0.5
+                elif sentiment == "betrayer" and action.type in {ActionType.ATTACK, ActionType.COMPETE}:
+                    score += 0.4
+                elif sentiment == "betrayer" and action.type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.ALLY}:
+                    score -= 0.6
                 options[i] = (action, score)
 
         randomness = state.config.randomness
@@ -443,34 +644,97 @@ class AgentBrain:
         parts = []
         rel = nc["relationship"]
         belief = nc.get("belief")
+        emo = character.emotional_state
 
-        if rel > 0.3:
-            parts.append(f"positive relationship with {nc['name']} ({rel:.1f})")
+        # Relationship context
+        if rel > 0.5:
+            parts.append(f"strong bond with {nc['name']}")
+        elif rel > 0.3:
+            parts.append(f"positive relationship with {nc['name']}")
+        elif rel < -0.5:
+            parts.append(f"deep hostility toward {nc['name']}")
         elif rel < -0.3:
-            parts.append(f"negative relationship with {nc['name']} ({rel:.1f})")
+            parts.append(f"distrust of {nc['name']}")
 
-        if belief:
-            parts.append(f"believes {nc['name']} is {belief}")
+        # Belief context
+        if belief == "untrustworthy":
+            parts.append(f"considers {nc['name']} untrustworthy based on past betrayals")
+        elif belief == "suspicious":
+            parts.append(f"suspicious of {nc['name']}'s motives")
+        elif belief == "ally":
+            parts.append(f"trusts {nc['name']} as a proven ally")
+        elif belief == "friendly":
+            parts.append(f"sees {nc['name']} as friendly")
 
+        # Emotional context
+        if emo.anger > 0.4:
+            parts.append("feeling angry and aggressive")
+        elif emo.fear > 0.4:
+            parts.append("driven by fear and caution")
+        elif emo.happiness > 0.4:
+            parts.append("in good spirits")
+        elif emo.sadness > 0.4:
+            parts.append("feeling low and withdrawn")
+
+        # Resource context
+        energy = character.resources.get("energy", 50)
+        wealth = character.resources.get("wealth", 50)
+        if energy < 25:
+            parts.append("exhausted and struggling")
+        if wealth < 20:
+            parts.append("desperate for resources")
+
+        # Reciprocity context
+        last_action = nc.get("last_action")
+        if last_action:
+            if last_action in ("attack", "betray") and action_type in {ActionType.DEFEND, ActionType.ATTACK}:
+                parts.append(f"responding to {nc['name']}'s recent aggression")
+            elif last_action in ("cooperate", "share") and action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.ALLY}:
+                parts.append(f"reciprocating {nc['name']}'s goodwill")
+
+        # Personality driver
         dominant_trait = max(
             ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"],
             key=lambda t: getattr(character.traits, t),
         )
-        parts.append(f"driven by high {dominant_trait}")
+        parts.append(f"personality inclines toward {dominant_trait}")
 
         if character.goals:
-            parts.append(f"pursuing goal: {character.goals[0]}")
+            parts.append(f"pursuing: {character.goals[0]}")
 
-        return f"Chose to {action_type.value} because: {', '.join(parts)}. Score: {score:.2f}"
+        return f"Chose to {action_type.value} because: {', '.join(parts)}"
 
     def _build_solo_reasoning(self, action_type: ActionType, character: Character, score: float) -> str:
         parts = []
         energy = character.resources.get("energy", 50)
-        if energy < 40:
-            parts.append("low energy")
+        wealth = character.resources.get("wealth", 50)
+        emo = character.emotional_state
+
+        # Resource context
+        if energy < 20:
+            parts.append("critically low energy, must rest")
+        elif energy < 40:
+            parts.append("energy running low")
+        if wealth < 20:
+            parts.append("desperately low on resources")
+        elif wealth < 35:
+            parts.append("resources dwindling")
+
+        # Emotional context
+        if emo.fear > 0.4:
+            parts.append("feeling anxious and on edge")
+        elif emo.happiness > 0.4:
+            parts.append("feeling optimistic")
+        elif emo.sadness > 0.4:
+            parts.append("feeling melancholy")
+
+        # Goal context
         if character.goals:
             parts.append(f"pursuing: {character.goals[0]}")
+        if character.motivations:
+            parts.append(f"motivated by {character.motivations[0].lower()}")
 
+        # Personality
         dominant_trait = max(
             ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"],
             key=lambda t: getattr(character.traits, t),
@@ -478,7 +742,7 @@ class AgentBrain:
         parts.append(f"personality: high {dominant_trait}")
 
         ctx = ", ".join(parts) if parts else "general assessment"
-        return f"Chose to {action_type.value} based on {ctx}. Score: {score:.2f}"
+        return f"Chose to {action_type.value} because: {ctx}"
 
 
 DIALOGUE_TEMPLATES: dict[str, dict[str, list[str]]] = {
