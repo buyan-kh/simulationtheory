@@ -11,6 +11,7 @@ import EventLog from '@/components/EventLog';
 import ChatLog from '@/components/ChatLog';
 import SimControls from '@/components/SimControls';
 import Inspector from '@/components/Inspector';
+import BuildingInterior from '@/components/BuildingInterior';
 
 export default function SimulationPage() {
   const params = useParams();
@@ -36,6 +37,7 @@ export default function SimulationPage() {
   const [stepping, setStepping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAddChar, setShowAddChar] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -185,6 +187,7 @@ export default function SimulationPage() {
               locations={simulation.environment.locations}
               selectedCharacterId={selectedCharacterId}
               onSelectCharacter={(id) => selectCharacter(id === selectedCharacterId ? null : id)}
+              onClickBuilding={(name) => setSelectedBuilding(name)}
               chatMessages={chatMessages}
               currentTick={simulation.tick}
             />
@@ -255,6 +258,15 @@ export default function SimulationPage() {
             setSimulation(sim);
             setShowAddChar(false);
           }}
+        />
+      )}
+
+      {selectedBuilding && (
+        <BuildingInterior
+          buildingName={selectedBuilding}
+          locations={simulation.environment.locations}
+          characters={simulation.characters}
+          onClose={() => setSelectedBuilding(null)}
         />
       )}
     </div>

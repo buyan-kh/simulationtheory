@@ -353,6 +353,7 @@ function buildLocationSprites(locations: Location[]): Sprite[] {
       width: bSize.width * SCALE,
       height: bSize.height * SCALE,
       layer: 1,
+      id: `building:${loc.name}`,
       draw: (ctx: CanvasRenderingContext2D, _sx: number, _sy: number, frame: number) => {
         drawBuilding(ctx, bx, by, bType, SCALE, frame);
       },

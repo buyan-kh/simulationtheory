@@ -125,6 +125,11 @@ export default function PixelCanvas({
     }
   }, [selectedCharacterId, characters]);
 
+  // Update day/night cycle on renderer
+  useEffect(() => {
+    rendererRef.current?.setDayNight(currentTick);
+  }, [currentTick]);
+
   // Build character sprites
   const buildCharacterSprites = useCallback((): Sprite[] => {
     const sprites: Sprite[] = [];
