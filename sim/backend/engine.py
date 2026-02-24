@@ -93,6 +93,8 @@ class SimulationEngine:
 
         self.event_gen.apply_outcomes(all_events, sim)
 
+        self._update_needs(sim, actions)
+
         for char in sim.characters.values():
             if not char.alive:
                 continue
@@ -177,6 +179,61 @@ class SimulationEngine:
         )
         sim.environment.houses.append(house)
         char.house_id = house.id
+
+    # ── Needs decay rates per tick ──
+    _NEEDS_DECAY = {"hunger": 2.0, "energy": 3.0, "social": 1.5, "fun": 1.0, "hygiene": 0.5}
+
+    # ── Action → needs satisfaction mapping ──
+    _ACTION_NEEDS_BOOST: dict[str, dict[str, float]] = {
+        "rest": {"energy": 30.0, "hygiene": 5.0},
+        "gather": {"hunger": 20.0, "fun": 5.0},
+        "communicate": {"social": 25.0, "fun": 5.0},
+        "ally": {"social": 15.0},
+        "negotiate": {"social": 10.0},
+        "cooperate": {"social": 15.0, "fun": 5.0},
+        "share": {"social": 20.0, "hunger": 5.0},
+        "explore": {"fun": 15.0, "hygiene": -5.0},
+        "observe": {"fun": 10.0},
+        "compete": {"fun": 10.0, "energy": -5.0},
+        "attack": {"energy": -10.0, "fun": 5.0},
+        "defend": {"energy": -5.0},
+        "betray": {"social": -10.0, "fun": 5.0},
+    }
+
+    def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
+        """Decay needs each tick and apply boosts from actions. Low needs affect emotions."""
+        for char_id, char in sim.characters.items():
+            if not char.alive:
+                continue
+
+            needs = char.needs
+
+            # Decay all needs
+            for need_name, rate in self._NEEDS_DECAY.items():
+                current = getattr(needs, need_name)
+                setattr(needs, need_name, max(0.0, current - rate))
+
+            # Apply action boosts
+            action = actions.get(char_id)
+            if action:
+                boosts = self._ACTION_NEEDS_BOOST.get(action.type.value, {})
+                for need_name, amount in boosts.items():
+                    current = getattr(needs, need_name)
+                    setattr(needs, need_name, max(0.0, min(100.0, current + amount)))
+
+            # Low needs affect emotions
+            if needs.hunger < 20:
+                char.emotional_state.anger = min(1.0, char.emotional_state.anger + 0.15)
+                char.emotional_state.happiness = max(-1.0, char.emotional_state.happiness - 0.1)
+            if needs.energy < 20:
+                char.emotional_state.sadness = min(1.0, char.emotional_state.sadness + 0.15)
+                char.emotional_state.happiness = max(-1.0, char.emotional_state.happiness - 0.1)
+            if needs.social < 20:
+                char.emotional_state.sadness = min(1.0, char.emotional_state.sadness + 0.1)
+            if needs.fun < 20:
+                char.emotional_state.happiness = max(-1.0, char.emotional_state.happiness - 0.05)
+            if needs.hygiene < 20:
+                char.emotional_state.disgust = min(1.0, char.emotional_state.disgust + 0.1)
 
     # Action type -> target location mapping
     _ACTION_LOCATION_MAP = {

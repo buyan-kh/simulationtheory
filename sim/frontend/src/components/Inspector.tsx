@@ -106,6 +106,22 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
 
             <div className="pixel-divider" />
 
+            {character.needs && (
+              <>
+                <div>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Needs</div>
+                  <div className="space-y-1.5">
+                    <NeedBar label="Hunger" value={character.needs.hunger} color="#ff8844" icon="🍖" />
+                    <NeedBar label="Energy" value={character.needs.energy} color="#ffdd44" icon="⚡" />
+                    <NeedBar label="Social" value={character.needs.social} color="#4488ff" icon="💬" />
+                    <NeedBar label="Fun" value={character.needs.fun} color="#ff66aa" icon="✦" />
+                    <NeedBar label="Hygiene" value={character.needs.hygiene} color="#44cc88" icon="✧" />
+                  </div>
+                </div>
+                <div className="pixel-divider" />
+              </>
+            )}
+
             <div>
               <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Goals</div>
               <div className="space-y-1">
@@ -404,6 +420,43 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function NeedBar({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  const isCritical = pct < 20;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="font-pixel w-3 text-center" style={{ fontSize: '7px' }}>{icon}</span>
+      <span className="font-pixel w-12 truncate" style={{ fontSize: '7px', color: isCritical ? '#ff3366' : '#aaaaaa' }}>
+        {label}
+      </span>
+      <div
+        className="flex-1 relative"
+        style={{ height: '6px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: `${pct}%`,
+            background: isCritical ? '#ff3366' : color,
+            transition: 'width 0.3s ease',
+            animation: isCritical ? 'pulse 1s ease-in-out infinite' : undefined,
+          }}
+        />
+      </div>
+      <span
+        className="font-pixel w-7 text-right"
+        style={{ fontSize: '7px', color: isCritical ? '#ff3366' : color }}
+      >
+        {pct}
+      </span>
     </div>
   );
 }

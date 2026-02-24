@@ -40,6 +40,14 @@ export interface Action {
   reasoning: string;
 }
 
+export interface Needs {
+  hunger: number;
+  energy: number;
+  social: number;
+  fun: number;
+  hygiene: number;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -56,6 +64,7 @@ export interface Character {
   last_reasoning: string;
   alive: boolean;
   position: { x: number; y: number };
+  needs: Needs;
 }
 
 export interface CharacterCreate {

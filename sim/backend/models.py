@@ -70,6 +70,14 @@ class House(BaseModel):
     residents: list[str] = []  # character IDs
 
 
+class Needs(BaseModel):
+    hunger: float = Field(default=80.0, ge=0.0, le=100.0)
+    energy: float = Field(default=80.0, ge=0.0, le=100.0)
+    social: float = Field(default=80.0, ge=0.0, le=100.0)
+    fun: float = Field(default=80.0, ge=0.0, le=100.0)
+    hygiene: float = Field(default=80.0, ge=0.0, le=100.0)
+
+
 class Character(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -87,6 +95,7 @@ class Character(BaseModel):
     alive: bool = True
     position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
     house_id: str | None = None
+    needs: Needs = Field(default_factory=Needs)
 
 
 class CharacterCreate(BaseModel):
