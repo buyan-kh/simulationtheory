@@ -18,7 +18,11 @@ export type BuildingType =
   | 'library'
   | 'tavern'
   | 'well'
-  | 'fountain';
+  | 'fountain'
+  | 'cafe'
+  | 'restaurant'
+  | 'fast_food'
+  | 'park';
 
 // ── Color Palette ──────────────────────────────────────────────────────
 
@@ -607,6 +611,261 @@ function makeFountain(): BuildingDef {
   return { pixels: g, width: w, height: h };
 }
 
+// ── Cafe ──────────────────────────────────────────────────────────────
+
+function makeCafe(): BuildingDef {
+  const w = 32, h = 28, g = grid(w, h);
+
+  // Roof (rows 2-9) — warm terracotta
+  const CF = '#B05030'; // cafe roof
+  const CD = '#903820'; // cafe roof dark
+  roof(g, 15, 2, 14, 8, CF, CD, CD);
+  hl(g, 1, 9, 30, CD);
+
+  // Walls — warm beige plaster
+  const BG = '#D4B896'; // beige
+  const BK = '#B49876'; // beige dark
+  rc(g, 2, 10, 28, 15, BG);
+  vl(g, 2, 10, 15, BK);
+  vl(g, 29, 10, 15, BK);
+  hl(g, 2, 10, 28, BK);
+
+  // Awning (striped, rows 11-13)
+  const AW = '#22AA66'; // green awning
+  const AS = '#FFFFFF'; // white stripe
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 26; c++)
+      px(g, 3 + c, 11 + r, ((c + r) % 4 < 2) ? AW : AS);
+  hl(g, 3, 13, 26, '#1a7744');
+
+  // Large window
+  gWin(g, 4, 15, 8, 5);
+
+  // Coffee cup icon in window
+  px(g, 7, 17, '#6a4a2a'); px(g, 8, 17, '#6a4a2a'); px(g, 9, 17, '#6a4a2a');
+  px(g, 7, 18, '#6a4a2a'); px(g, 9, 18, '#6a4a2a');
+  px(g, 10, 17, '#6a4a2a'); // handle
+
+  // Door
+  wDoor(g, 20, 19, 5, 6);
+
+  // Outdoor table & chairs (left side)
+  rc(g, 14, 22, 4, 1, WK); // table top
+  px(g, 15, 23, WK); px(g, 16, 23, WK); // table legs
+  px(g, 13, 22, WK); px(g, 18, 22, WK); // chairs
+
+  // Hanging sign
+  hl(g, 26, 12, 4, WK);
+  vl(g, 29, 12, 2, WK);
+  rc(g, 26, 14, 4, 3, SG);
+  hl(g, 26, 14, 4, SK); hl(g, 26, 16, 4, SK);
+
+  // Foundation
+  rc(g, 1, 25, 30, 3, SE);
+  hl(g, 1, 25, 30, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+// ── Restaurant ────────────────────────────────────────────────────────
+
+function makeRestaurant(): BuildingDef {
+  const w = 40, h = 32, g = grid(w, h);
+
+  // Elegant sloped roof (rows 0-11)
+  const RR = '#2a2a3a'; // dark slate
+  const RK = '#1a1a2a'; // darker
+  roof(g, 19, 0, 18, 12, RR, RK, RK);
+  hl(g, 1, 11, 38, RK);
+
+  // Chimney
+  rc(g, 33, 0, 2, 12, CH);
+  vl(g, 33, 0, 12, CK); hl(g, 33, 0, 2, CK);
+
+  // Walls — elegant cream stone
+  const CR = '#E8D8C0'; // cream
+  const CK2 = '#C8B8A0'; // cream dark
+  rc(g, 2, 12, 36, 16, CR);
+  vl(g, 2, 12, 16, CK2);
+  vl(g, 37, 12, 16, CK2);
+  hl(g, 2, 12, 36, CK2);
+
+  // Two glowing windows with shutters
+  gWin(g, 4, 15, 6, 5);
+  gWin(g, 28, 15, 6, 5);
+  // Shutters
+  vl(g, 3, 15, 5, '#2a4a2a'); vl(g, 10, 15, 5, '#2a4a2a');
+  vl(g, 27, 15, 5, '#2a4a2a'); vl(g, 34, 15, 5, '#2a4a2a');
+
+  // Elegant double door (center)
+  rc(g, 16, 20, 8, 8, DR);
+  vl(g, 16, 20, 8, DD); vl(g, 23, 20, 8, DD);
+  hl(g, 16, 20, 8, DD);
+  vl(g, 20, 21, 7, DD); // center divider
+  px(g, 19, 24, GD); px(g, 21, 24, GD); // handles
+
+  // Decorative arch above door
+  hl(g, 17, 19, 6, GD);
+
+  // Potted plants flanking door
+  rc(g, 14, 25, 2, 3, '#5a3a1a');
+  px(g, 14, 24, '#2a7a2a'); px(g, 15, 24, '#3a8a3a');
+  rc(g, 24, 25, 2, 3, '#5a3a1a');
+  px(g, 24, 24, '#2a7a2a'); px(g, 25, 24, '#3a8a3a');
+
+  // Name plate above door
+  rc(g, 15, 16, 10, 2, '#1a1a2a');
+  // "RESTAURANT" text dots
+  for (let i = 0; i < 8; i++) px(g, 16 + i, 17, GD);
+
+  // Foundation
+  rc(g, 1, 28, 38, 4, SE);
+  hl(g, 1, 28, 38, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+// ── Fast Food (McDonald's-style) ─────────────────────────────────────
+
+function makeFastFood(): BuildingDef {
+  const w = 36, h = 28, g = grid(w, h);
+
+  // Flat roof with parapet
+  const MR = '#CC0000'; // McDonald's red
+  const MD = '#AA0000'; // dark red
+  rc(g, 1, 2, 34, 3, MR);
+  hl(g, 1, 2, 34, MD);
+  hl(g, 1, 4, 34, MD);
+
+  // Walls — light beige/white
+  const FW = '#F0E8D8'; // fast food wall
+  const FK = '#D0C8B8'; // dark
+  rc(g, 2, 5, 32, 19, FW);
+  vl(g, 2, 5, 19, FK);
+  vl(g, 33, 5, 19, FK);
+
+  // Golden arches logo (center top)
+  const MY = '#FFD700'; // McDonald's yellow
+  const MG = '#CCAA00'; // gold dark
+  // Left arch
+  px(g, 14, 6, MY); px(g, 15, 6, MY);
+  px(g, 13, 7, MY); px(g, 16, 7, MY);
+  px(g, 13, 8, MY); px(g, 16, 8, MY);
+  px(g, 13, 9, MY); px(g, 16, 9, MY);
+  px(g, 13, 10, MY); px(g, 16, 10, MY);
+  // Right arch
+  px(g, 19, 6, MY); px(g, 20, 6, MY);
+  px(g, 18, 7, MY); px(g, 21, 7, MY);
+  px(g, 18, 8, MY); px(g, 21, 8, MY);
+  px(g, 18, 9, MY); px(g, 21, 9, MY);
+  px(g, 18, 10, MY); px(g, 21, 10, MY);
+  // Connection
+  px(g, 16, 10, MY); px(g, 17, 10, MY); px(g, 18, 10, MY);
+
+  // Large front window
+  rc(g, 4, 12, 12, 8, WK);
+  rc(g, 5, 13, 10, 6, GL);
+  px(g, 5, 13, GT);
+
+  // Menu board in window
+  rc(g, 6, 14, 4, 3, '#1a1a1a');
+  px(g, 7, 15, '#ff6644'); px(g, 8, 15, '#ffaa44');
+
+  // Drive-thru style window (right side)
+  rc(g, 24, 14, 6, 4, WK);
+  rc(g, 25, 15, 4, 2, GL);
+
+  // Service counter ledge
+  rc(g, 24, 18, 8, 1, FK);
+
+  // Door
+  wDoor(g, 16, 18, 5, 6);
+
+  // Red stripe above door
+  rc(g, 4, 11, 28, 1, MR);
+
+  // Foundation
+  rc(g, 1, 24, 34, 4, SE);
+  hl(g, 1, 24, 34, ST);
+
+  return { pixels: g, width: w, height: h };
+}
+
+// ── Park (open-air with gazebo/bench structure) ───────────────────────
+
+function makePark(): BuildingDef {
+  const w = 40, h = 28, g = grid(w, h);
+
+  // Park gazebo roof (octagonal)
+  const PK1 = '#7a5a3a'; // dark wood
+  const PK2 = '#8a6a4a'; // wood
+  const PK3 = '#9a7a5a'; // light wood
+
+  // Roof peak
+  px(g, 19, 0, PK1); px(g, 20, 0, PK1);
+  hl(g, 17, 1, 6, PK1);
+  hl(g, 15, 2, 10, PK2);
+  hl(g, 13, 3, 14, PK2);
+  hl(g, 11, 4, 18, PK3);
+  hl(g, 9, 5, 22, PK3);
+  hl(g, 7, 6, 26, PK2);
+  hl(g, 7, 7, 26, PK1);
+
+  // Support posts
+  vl(g, 10, 8, 12, PK1);
+  vl(g, 29, 8, 12, PK1);
+
+  // Wooden floor/platform
+  rc(g, 9, 18, 22, 2, PK3);
+  hl(g, 9, 18, 22, PK1);
+
+  // Park bench (left)
+  rc(g, 2, 17, 5, 1, PK2); // seat
+  vl(g, 2, 17, 3, PK1); vl(g, 6, 17, 3, PK1); // legs
+  rc(g, 2, 15, 5, 2, PK3); // backrest
+
+  // Park bench (right)
+  rc(g, 33, 17, 5, 1, PK2);
+  vl(g, 33, 17, 3, PK1); vl(g, 37, 17, 3, PK1);
+  rc(g, 33, 15, 5, 2, PK3);
+
+  // Flower beds
+  const FL1 = '#cc4466'; const FL2 = '#ffaa44'; const FL3 = '#44aaff';
+  const LF = '#2a7a2a'; const LF2 = '#3a8a3a';
+  // Left flower bed
+  px(g, 3, 22, LF); px(g, 4, 22, FL1); px(g, 5, 22, LF2);
+  px(g, 3, 23, FL2); px(g, 4, 23, LF); px(g, 5, 23, FL3);
+  // Right flower bed
+  px(g, 34, 22, FL3); px(g, 35, 22, LF); px(g, 36, 22, FL1);
+  px(g, 34, 23, LF2); px(g, 35, 23, FL2); px(g, 36, 23, LF);
+
+  // Trees (simple small trees on sides)
+  // Left tree
+  px(g, 1, 8, LF); px(g, 2, 8, LF2); px(g, 3, 8, LF);
+  px(g, 0, 9, LF); px(g, 1, 9, LF2); px(g, 2, 9, LF2); px(g, 3, 9, LF2); px(g, 4, 9, LF);
+  px(g, 0, 10, LF); px(g, 1, 10, LF); px(g, 2, 10, LF2); px(g, 3, 10, LF); px(g, 4, 10, LF);
+  px(g, 1, 11, LF); px(g, 2, 11, LF); px(g, 3, 11, LF);
+  vl(g, 2, 12, 5, PK1);
+  // Right tree
+  px(g, 36, 8, LF); px(g, 37, 8, LF2); px(g, 38, 8, LF);
+  px(g, 35, 9, LF); px(g, 36, 9, LF2); px(g, 37, 9, LF2); px(g, 38, 9, LF2); px(g, 39, 9, LF);
+  px(g, 35, 10, LF); px(g, 36, 10, LF); px(g, 37, 10, LF2); px(g, 38, 10, LF); px(g, 39, 10, LF);
+  px(g, 36, 11, LF); px(g, 37, 11, LF); px(g, 38, 11, LF);
+  vl(g, 37, 12, 5, PK1);
+
+  // Cobblestone path
+  for (let c = 14; c <= 25; c++) {
+    px(g, c, 20, ((c) % 2 === 0) ? ST : SL);
+    px(g, c, 21, ((c) % 2 === 1) ? ST : SD);
+  }
+
+  // Foundation/grass base
+  rc(g, 0, 24, 40, 4, '#1a5a1a');
+  hl(g, 0, 24, 40, '#2a6a2a');
+
+  return { pixels: g, width: w, height: h };
+}
+
 // ── Building Cache ─────────────────────────────────────────────────────
 
 const BUILDINGS: Record<BuildingType, BuildingDef> = {
@@ -620,6 +879,10 @@ const BUILDINGS: Record<BuildingType, BuildingDef> = {
   tavern: makeTavern(),
   well: makeWell(),
   fountain: makeFountain(),
+  cafe: makeCafe(),
+  restaurant: makeRestaurant(),
+  fast_food: makeFastFood(),
+  park: makePark(),
 };
 
 // ── Chimney Smoke Animation ────────────────────────────────────────────
@@ -629,6 +892,7 @@ const CHIMNEY_POS: Partial<Record<BuildingType, number>> = {
   house_medium: 25,
   house_large: 33,
   tavern: 29,
+  restaurant: 33,
 };
 
 function drawSmoke(
@@ -758,6 +1022,10 @@ export function getBuildingSize(type: BuildingType): { width: number; height: nu
 export function locationToBuildingType(locType: string, locName: string): BuildingType {
   const t = locType.toLowerCase();
   const n = locName.toLowerCase();
+  if (t === 'cafe' || n.includes('cafe') || n.includes('coffee')) return 'cafe';
+  if (t === 'restaurant' || n.includes('restaurant') || n.includes('plate') || n.includes('diner')) return 'restaurant';
+  if (t === 'fast_food' || n.includes('mcburger') || n.includes('mcdonald') || n.includes('burger') || n.includes('fast food')) return 'fast_food';
+  if (t === 'park' || n.includes('park') || n.includes('garden')) return 'park';
   if (t === 'trade' || t === 'market' || n.includes('market') || n.includes('shop')) return 'shop';
   if (t === 'conflict' || t === 'arena' || n.includes('arena')) return 'arena';
   if (t === 'diplomacy' || t === 'council' || n.includes('council') || n.includes('hall')) return 'council';

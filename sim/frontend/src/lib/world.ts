@@ -135,28 +135,35 @@ function generateTileMap(rng: () => number, locations: Location[]): TileInfo[][]
   return map;
 }
 
+function isWaterTile(map: TileInfo[][], r: number, c: number): boolean {
+  if (r < 0 || r >= WORLD_TILES || c < 0 || c >= WORLD_TILES) return true;
+  return map[r][c].type === 'water' || map[r][c].type === 'water2';
+}
+
+function setRoadTile(map: TileInfo[][], r: number, c: number, type: TileType) {
+  if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES && !isWaterTile(map, r, c)) {
+    map[r][c] = { type, variant: 0 };
+  }
+}
+
 function drawRoad(map: TileInfo[][], c1: number, r1: number, c2: number, r2: number) {
-  // Simple L-shaped road: horizontal then vertical
+  // 3-tile-wide road: sidewalk, road (with center line), sidewalk
   const minC = Math.min(c1, c2);
   const maxC = Math.max(c1, c2);
   const minR = Math.min(r1, r2);
   const maxR = Math.max(r1, r2);
 
-  // Horizontal segment at r1
+  // Horizontal segment at r1 (3 tiles wide)
   for (let c = minC; c <= maxC; c++) {
-    if (r1 >= 0 && r1 < WORLD_TILES && c >= 0 && c < WORLD_TILES) {
-      if (map[r1][c].type !== 'water' && map[r1][c].type !== 'water2') {
-        map[r1][c] = { type: 'cobblestone', variant: 0 };
-      }
-    }
+    setRoadTile(map, r1 - 1, c, 'sidewalk');
+    setRoadTile(map, r1, c, 'road_line');
+    setRoadTile(map, r1 + 1, c, 'sidewalk');
   }
-  // Vertical segment at c2
+  // Vertical segment at c2 (3 tiles wide)
   for (let r = minR; r <= maxR; r++) {
-    if (r >= 0 && r < WORLD_TILES && c2 >= 0 && c2 < WORLD_TILES) {
-      if (map[r][c2].type !== 'water' && map[r][c2].type !== 'water2') {
-        map[r][c2] = { type: 'cobblestone', variant: 0 };
-      }
-    }
+    setRoadTile(map, r, c2 - 1, 'sidewalk');
+    setRoadTile(map, r, c2, 'road_line');
+    setRoadTile(map, r, c2 + 1, 'sidewalk');
   }
 }
 
@@ -268,6 +275,52 @@ function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations
     const cc = Math.floor(wx / TILE_PX);
     decorations.push({ type: 'fence_h', col: cc - 3, row: cr + 3 });
     decorations.push({ type: 'fence_h', col: cc + 1, row: cr + 3 });
+  }
+
+  // Cars parked along roads
+  for (let i = 0; i < 8; i++) {
+    const row = Math.floor(rng() * WORLD_TILES);
+    const col = Math.floor(rng() * WORLD_TILES);
+    const tile = tileMap[row]?.[col];
+    if (tile && (tile.type === 'sidewalk' || tile.type === 'road' || tile.type === 'road_line')) {
+      const carType = rng() < 0.5 ? 'car_red' : 'car_blue';
+      decorations.push({ type: carType as ObjectType, col, row: row - 1 });
+    }
+  }
+
+  // Benches near parks and cafes
+  for (const loc of locations) {
+    const t = loc.type?.toLowerCase() || '';
+    if (t === 'park' || t === 'cafe') {
+      const { wx, wy } = simToWorld(loc.x, loc.y);
+      const cr = Math.floor(wy / TILE_PX);
+      const cc = Math.floor(wx / TILE_PX);
+      decorations.push({ type: 'bench', col: cc + 3, row: cr + 2 });
+      decorations.push({ type: 'bench', col: cc - 3, row: cr + 2 });
+    }
+  }
+
+  // Trash cans near fast food and along roads
+  for (const loc of locations) {
+    const t = loc.type?.toLowerCase() || '';
+    if (t === 'fast_food' || t === 'trade') {
+      const { wx, wy } = simToWorld(loc.x, loc.y);
+      const cr = Math.floor(wy / TILE_PX);
+      const cc = Math.floor(wx / TILE_PX);
+      decorations.push({ type: 'trash_can', col: cc + 2, row: cr + 3 });
+    }
+  }
+
+  // Tall grass patches
+  for (let i = 0; i < 15; i++) {
+    const row = Math.floor(rng() * WORLD_TILES);
+    const col = Math.floor(rng() * WORLD_TILES);
+    if (!noSpawn.has(`${row},${col}`)) {
+      const tile = tileMap[row]?.[col];
+      if (tile && tile.type.startsWith('grass')) {
+        decorations.push({ type: 'tall_grass', col, row });
+      }
+    }
   }
 
   return decorations;
