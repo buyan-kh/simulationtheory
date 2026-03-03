@@ -2,6 +2,7 @@ import math
 import random
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
+    BatchCharacterCreate,
     Action, Event, EventType, Environment, ChatMessage, House, Location,
     MemoryEntry, EmotionalState, PersonalityTraits, Needs,
 )
@@ -73,6 +74,132 @@ class SimulationEngine:
         self._assign_house(sim, char)
         self.db.save(sim)
         return char
+
+    # ── Name generation pools ──
+
+    _FIRST_NAMES = [
+        "Ada", "Amir", "Aria", "Axel", "Bao", "Bodhi", "Calla", "Caspian",
+        "Dalia", "Dmitri", "Elara", "Enzo", "Esme", "Farah", "Felix", "Freya",
+        "Gia", "Hana", "Hugo", "Idris", "Iris", "Jasper", "Juno", "Kai",
+        "Kira", "Leif", "Lila", "Luna", "Magnus", "Mara", "Mateo", "Mika",
+        "Nadia", "Nico", "Noor", "Odin", "Ora", "Orion", "Petra", "Quinn",
+        "Ravi", "Rhea", "Ronan", "Rosa", "Samir", "Saya", "Selene", "Soren",
+        "Tala", "Theo", "Uma", "Vera", "Wren", "Xena", "Yael", "Yuki",
+        "Zara", "Zeke", "Anya", "Bjorn", "Cleo", "Dante", "Elio", "Faye",
+        "Gideon", "Hiro", "Ines", "Jace", "Kato", "Lena", "Malik", "Nyla",
+        "Omar", "Priya", "Remy", "Sage", "Tomas", "Uri", "Veda", "Wyatt",
+    ]
+
+    _LAST_NAMES = [
+        "Alden", "Ashford", "Barros", "Chen", "Cruz", "Dara", "Delgado",
+        "Erikson", "Fairchild", "Graves", "Hale", "Ishida", "Jalal", "Kato",
+        "Kim", "Lagos", "Marin", "Nakamura", "Osei", "Park", "Qadir",
+        "Reyes", "Santos", "Shah", "Tanaka", "Voss", "Wang", "Xu", "Yoon",
+        "Zhao", "Berg", "Costa", "Duval", "Fischer", "Gupta", "Hansen",
+        "Ibrahim", "Jensen", "Khan", "Liu", "Moreau", "Novak", "Olsen",
+        "Patel", "Rivera", "Silva", "Torres", "Volkov", "Wolfe", "Yang",
+    ]
+
+    _GOALS_POOL = [
+        "wealth", "power", "knowledge", "survive", "peace", "influence",
+        "friendship", "revenge", "explore", "trade", "protect", "create",
+        "justice", "freedom", "legacy", "community",
+    ]
+
+    _MOTIVATIONS_POOL = [
+        "greed", "loyalty", "curiosity", "compassion", "fear", "ambition",
+        "pride", "vengeance", "survival", "diplomacy", "honor", "love",
+        "duty", "rebellion", "faith", "creativity",
+    ]
+
+    _PROFILES_POOL = [
+        "A quiet observer who watches before acting.",
+        "Brash and confident, always the first to speak up.",
+        "Gentle soul with a hidden fierce streak.",
+        "Calculating and strategic, always three steps ahead.",
+        "Warm and generous, sometimes to a fault.",
+        "A wanderer who never stays in one place for long.",
+        "Hardened by life, slow to trust but fiercely loyal.",
+        "Optimistic dreamer with grand visions for the future.",
+        "Practical and grounded, focused on what works.",
+        "Charismatic and persuasive, draws people in effortlessly.",
+        "Stubborn and principled, never compromises on values.",
+        "Nervous and cautious, but surprisingly brave when it counts.",
+        "Old soul with wisdom beyond their years.",
+        "Restless spirit always seeking the next challenge.",
+        "Patient and methodical, trusts the process.",
+        "Quick-tempered but quick to forgive.",
+        "A natural caretaker who puts others first.",
+        "Ambitious climber who sees every interaction as an opportunity.",
+        "Thoughtful introvert who expresses best through actions.",
+        "Joyful presence who lifts the mood of any group.",
+    ]
+
+    def _generate_random_traits(self, rng: random.Random) -> PersonalityTraits:
+        """Generate personality traits using a bell curve distribution (like Dwarf Fortress).
+        78% of values cluster around neutral (0.35-0.65), with rare extremes."""
+        def bell_trait() -> float:
+            # Mean 0.5, std 0.15 → 78% within 0.35-0.65, rare extremes
+            val = rng.gauss(0.5, 0.15)
+            return max(0.0, min(1.0, round(val, 3)))
+        return PersonalityTraits(
+            openness=bell_trait(),
+            conscientiousness=bell_trait(),
+            extraversion=bell_trait(),
+            agreeableness=bell_trait(),
+            neuroticism=bell_trait(),
+        )
+
+    def _generate_name(self, rng: random.Random, existing_names: set[str], prefix: str = "") -> str:
+        """Generate a unique name, retrying on collision."""
+        for _ in range(100):
+            first = rng.choice(self._FIRST_NAMES)
+            last = rng.choice(self._LAST_NAMES)
+            name = f"{prefix}{first} {last}" if prefix else f"{first} {last}"
+            if name not in existing_names:
+                return name
+        # Fallback: append a number
+        return f"{prefix}{rng.choice(self._FIRST_NAMES)} {rng.choice(self._LAST_NAMES)}-{rng.randint(1, 9999)}"
+
+    def batch_create_characters(self, sim_id: str, req: BatchCharacterCreate) -> list[Character]:
+        """Create multiple characters with randomized traits, goals, and motivations."""
+        sim = self.simulations[sim_id]
+        rng = random.Random(hash((sim_id, "batch", len(sim.characters), req.count)))
+        existing_names = {c.name for c in sim.characters.values()}
+        created: list[Character] = []
+
+        for i in range(req.count):
+            name = self._generate_name(rng, existing_names, req.name_prefix)
+            existing_names.add(name)
+
+            traits = self._generate_random_traits(rng)
+            goals = rng.sample(self._GOALS_POOL, k=rng.randint(1, 3))
+            motivations = rng.sample(self._MOTIVATIONS_POOL, k=rng.randint(1, 3))
+            profile = rng.choice(self._PROFILES_POOL)
+            age = rng.randint(16, 65)
+
+            char = Character(
+                name=name,
+                profile=profile,
+                traits=traits,
+                goals=goals,
+                motivations=motivations,
+                position={"x": rng.uniform(-80, 80), "y": rng.uniform(-80, 80)},
+                age=age,
+                max_age=rng.randint(max(age + 15, 60), 100),
+                trade_skill=round(rng.uniform(0.1, 0.9), 2),
+            )
+
+            # Set starting emotions with slight variation
+            char.emotional_state.happiness = round(rng.gauss(0.1, 0.2), 2)
+            char.emotional_state.trust = round(rng.gauss(0.0, 0.15), 2)
+
+            sim.characters[char.id] = char
+            self._assign_house(sim, char)
+            created.append(char)
+
+        self.db.save(sim)
+        return created
 
     def step(self, sim_id: str) -> tuple[list[Event], list[ChatMessage]]:
         sim = self.simulations[sim_id]
@@ -240,6 +367,13 @@ class SimulationEngine:
         "attack": {"energy": -10.0, "fun": 5.0},
         "defend": {"energy": -5.0},
         "betray": {"social": -10.0, "fun": 5.0},
+        # New life actions
+        "build_home": {"energy": -15.0, "fun": 10.0},
+        "kill": {"energy": -20.0, "social": -15.0},
+        "bully": {"fun": 5.0, "social": -5.0},
+        "learn": {"fun": 10.0, "energy": -5.0},
+        "teach": {"social": 15.0, "fun": 5.0, "energy": -5.0},
+        "court": {"social": 20.0, "fun": 15.0, "energy": -5.0},
     }
 
     def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
@@ -287,15 +421,21 @@ class SimulationEngine:
         "defend": "conflict",
         "compete": "conflict",
         "betray": "conflict",
+        "kill": "conflict",
+        "bully": "conflict",
         "ally": "diplomacy",
         "communicate": "diplomacy",
         "form_group": "diplomacy",
         "join_group": "diplomacy",
         "leave_group": "diplomacy",
+        "court": "diplomacy",
         "explore": "exploration",
         "gather": "exploration",
+        "build_home": "exploration",
         "observe": "knowledge",
         "rest": "knowledge",
+        "learn": "knowledge",
+        "teach": "knowledge",
     }
 
     # Fallback coordinates if no matching location found
@@ -308,15 +448,21 @@ class SimulationEngine:
         "defend": (100, 0),
         "compete": (100, 0),
         "betray": (100, 0),
+        "kill": (100, 0),
+        "bully": (100, 0),
         "ally": (0, 100),
         "communicate": (0, 100),
         "form_group": (0, 100),
         "join_group": (0, 100),
         "leave_group": (0, 100),
+        "court": (0, 100),
         "explore": (-100, -100),
         "gather": (-100, -100),
+        "build_home": (-100, -100),
         "observe": (50, 50),
         "rest": (50, 50),
+        "learn": (50, 50),
+        "teach": (50, 50),
     }
 
     def _find_location_by_type(self, sim: SimulationState, loc_type: str) -> Location | None:

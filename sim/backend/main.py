@@ -6,7 +6,8 @@ import io
 import zipfile
 from models import (
     SimulationState, SimulationConfig, SimulationSummary,
-    Character, CharacterCreate, Event, Memory, ChatMessage,
+    Character, CharacterCreate, BatchCharacterCreate,
+    Event, Memory, ChatMessage,
     Location, Group, MarketState, TradeOffer, TradeHistory,
 )
 from engine import SimulationEngine
@@ -104,6 +105,12 @@ def delete_simulation(sim_id: str):
 def add_character(sim_id: str, char_create: CharacterCreate):
     _get_sim(sim_id)
     return engine.add_character(sim_id, char_create)
+
+
+@app.post("/api/simulations/{sim_id}/characters/batch", response_model=list[Character])
+def batch_create_characters(sim_id: str, req: BatchCharacterCreate):
+    _get_sim(sim_id)
+    return engine.batch_create_characters(sim_id, req)
 
 
 @app.get("/api/simulations/{sim_id}/characters/{char_id}", response_model=Character)
