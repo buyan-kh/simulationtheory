@@ -133,7 +133,7 @@ class EventGenerator:
             events.append(Event(
                 tick=tick, type=EventType.ENVIRONMENTAL,
                 title=title, description=desc,
-                participants=list(state.characters.keys()),
+                participants=[],  # Global event — no per-character processing needed
                 outcomes=[f"{resource} changed by {change:+.0f}"],
                 importance=0.4 + abs(change) / 40,
             ))
@@ -148,7 +148,7 @@ class EventGenerator:
                     tick=tick, type=EventType.ENVIRONMENTAL,
                     title=f"Weather shifts to {new_weather}",
                     description=f"The weather changes from {old_weather} to {new_weather}, affecting all inhabitants.",
-                    participants=list(state.characters.keys()),
+                    participants=[],  # Global event
                     outcomes=[f"Weather is now {new_weather}"],
                     importance=0.3,
                 ))
@@ -158,7 +158,7 @@ class EventGenerator:
                 tick=tick, type=EventType.ENVIRONMENTAL,
                 title="A mysterious discovery",
                 description="Something unusual has been found in the environment, sparking curiosity and tension.",
-                participants=list(state.characters.keys()),
+                participants=[],  # Global event
                 outcomes=["New opportunities and dangers emerge"],
                 importance=0.7,
             ))
@@ -220,7 +220,7 @@ class EventGenerator:
                     tick=tick, type=EventType.EMERGENT,
                     title=f"Crisis: {resource} shortage",
                     description=f"{resource} has dropped to critically low levels ({amount:.0f}). Desperation and conflict are likely.",
-                    participants=list(characters.keys()),
+                    participants=[],  # Global event
                     outcomes=[f"{resource} scarcity intensifies competition"],
                     importance=0.9,
                 ))
@@ -243,7 +243,7 @@ class EventGenerator:
                     tick=tick, type=EventType.EMERGENT,
                     title=f"{dominant.name} dominates",
                     description=f"{dominant.name} has accumulated far more resources than anyone else, creating a power imbalance.",
-                    participants=list(characters.keys()),
+                    participants=[max_holder],  # Only the dominant character
                     outcomes=[f"{dominant.name} holds disproportionate power", "Others may unite against them"],
                     importance=0.8,
                 ))
@@ -258,7 +258,7 @@ class EventGenerator:
                 tick=tick, type=EventType.EMERGENT,
                 title="Era of suspicion",
                 description="Trust has collapsed across the community. Everyone watches their back.",
-                participants=list(characters.keys()),
+                participants=[],  # Global event
                 outcomes=["Cooperation becomes nearly impossible", "Betrayals become more likely"],
                 importance=0.75,
             ))
@@ -269,7 +269,7 @@ class EventGenerator:
                 tick=tick, type=EventType.EMERGENT,
                 title="Escalating violence",
                 description="Multiple conflicts have erupted. The situation is spiraling toward all-out war.",
-                participants=list(characters.keys()),
+                participants=[],  # Global event
                 outcomes=["Fear spreads", "Alliances become crucial for survival"],
                 importance=0.85,
             ))
@@ -277,39 +277,56 @@ class EventGenerator:
         return emergent
 
     def apply_outcomes(self, events: list[Event], state: SimulationState):
+        _gain_words = {"gains", "received", "gets"}
+        _loss_words = {"loses", "lost"}
+
         for event in events:
+            # Skip global events with no participants — nothing to apply per-character
+            if not event.participants:
+                continue
+
             for outcome in event.outcomes:
                 outcome_lower = outcome.lower()
+                # Quick keyword check — skip expensive parsing when no resource keywords present
+                has_gain = "gains" in outcome_lower or "received" in outcome_lower
+                has_loss = "loses" in outcome_lower or "lost" in outcome_lower
+                if not has_gain and not has_loss:
+                    continue
+
+                # Pre-parse the outcome once instead of per-character
+                parts = outcome_lower.split()
+                parsed_val = None
+                parsed_op = None
+                for i, p in enumerate(parts):
+                    if p in _gain_words:
+                        try:
+                            parsed_val = float(parts[i + 1])
+                            parsed_op = "gain"
+                        except (IndexError, ValueError):
+                            pass
+                        break
+                    elif p in _loss_words:
+                        try:
+                            parsed_val = float(parts[i + 1])
+                            parsed_op = "loss"
+                        except (IndexError, ValueError):
+                            pass
+                        break
+
+                if parsed_val is None:
+                    continue
+
                 for char_id in event.participants:
                     if char_id not in state.characters:
                         continue
                     char = state.characters[char_id]
-
-                    if "gains" in outcome_lower or "received" in outcome_lower:
-                        for res_name in char.resources:
-                            if res_name in outcome_lower:
-                                try:
-                                    parts = outcome_lower.split()
-                                    for i, p in enumerate(parts):
-                                        if p in ("gains", "received", "gets"):
-                                            val = float(parts[i + 1])
-                                            char.resources[res_name] = char.resources.get(res_name, 0) + val
-                                            break
-                                except (IndexError, ValueError):
-                                    pass
-
-                    if "loses" in outcome_lower or "lost" in outcome_lower:
-                        for res_name in char.resources:
-                            if res_name in outcome_lower:
-                                try:
-                                    parts = outcome_lower.split()
-                                    for i, p in enumerate(parts):
-                                        if p in ("loses", "lost"):
-                                            val = float(parts[i + 1])
-                                            char.resources[res_name] = max(0, char.resources.get(res_name, 0) - val)
-                                            break
-                                except (IndexError, ValueError):
-                                    pass
+                    for res_name in char.resources:
+                        if res_name in outcome_lower:
+                            if parsed_op == "gain":
+                                char.resources[res_name] = char.resources.get(res_name, 0) + parsed_val
+                            else:
+                                char.resources[res_name] = max(0, char.resources.get(res_name, 0) - parsed_val)
+                            break
 
             if event.type == EventType.ALLIANCE_FORMED:
                 for i, pid1 in enumerate(event.participants):

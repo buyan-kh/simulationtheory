@@ -168,10 +168,19 @@ class TradeManager:
         for offer in sim.market.offers:
             if offer.status == "open" and sim.tick >= offer.expires_tick:
                 offer.status = "expired"
+        # Prune closed offers to prevent unbounded list growth
+        if len(sim.market.offers) > 200:
+            sim.market.offers = [o for o in sim.market.offers if o.status == "open"]
 
     def _update_price_index(self, sim: SimulationState):
         """Adjust prices based on recent supply/demand."""
-        recent = [h for h in sim.market.history if h.tick >= sim.tick - 20]
+        # Only scan recent history (use reversed walk for efficiency)
+        cutoff = sim.tick - 20
+        recent = []
+        for h in reversed(sim.market.history):
+            if h.tick < cutoff:
+                break
+            recent.append(h)
         if not recent:
             return
 
@@ -190,3 +199,7 @@ class TradeManager:
                 # Move price toward supply/demand ratio
                 current = sim.market.price_index[resource]
                 sim.market.price_index[resource] = current * 0.9 + ratio * 0.1
+
+        # Cap history to prevent unbounded growth
+        if len(sim.market.history) > 500:
+            sim.market.history = sim.market.history[-200:]

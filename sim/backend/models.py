@@ -191,6 +191,10 @@ def _default_locations() -> list[Location]:
         Location(name="Council Hall", x=0, y=100, type="diplomacy", biome="plains", is_removable=False),
         Location(name="Wilderness", x=-100, y=-100, type="exploration", biome="forest", is_removable=False),
         Location(name="Library", x=50, y=50, type="knowledge", biome="plains", is_removable=False),
+        Location(name="Central Park", x=-50, y=30, type="park", biome="plains", is_removable=False),
+        Location(name="The Cozy Cafe", x=30, y=-30, type="cafe", biome="plains", is_removable=False),
+        Location(name="Golden Plate", x=-30, y=-60, type="restaurant", biome="plains", is_removable=False),
+        Location(name="McBurger's", x=70, y=-50, type="fast_food", biome="plains", is_removable=False),
     ]
 
 
