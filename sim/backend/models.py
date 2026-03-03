@@ -52,6 +52,10 @@ class ActionType(str, Enum):
     DEFEND = "defend"
     OBSERVE = "observe"
     COMMUNICATE = "communicate"
+    TRADE = "trade"
+    FORM_GROUP = "form_group"
+    JOIN_GROUP = "join_group"
+    LEAVE_GROUP = "leave_group"
 
 
 class Action(BaseModel):
@@ -96,6 +100,18 @@ class Character(BaseModel):
     position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
     house_id: str | None = None
     needs: Needs = Field(default_factory=Needs)
+    # Lifecycle
+    age: int = Field(default=20, ge=0)
+    max_age: int = Field(default=80, ge=1)
+    health: float = Field(default=100.0, ge=0.0, le=100.0)
+    cause_of_death: str | None = None
+    death_tick: int | None = None
+    parent_ids: list[str] = []
+    # Social
+    group_id: str | None = None
+    group_role: str | None = None  # leader, officer, member
+    # Trade
+    trade_skill: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class CharacterCreate(BaseModel):
@@ -117,6 +133,17 @@ class EventType(str, Enum):
     NEGOTIATION = "negotiation"
     RESOURCE_CHANGE = "resource_change"
     EMOTIONAL_SHIFT = "emotional_shift"
+    DEATH = "death"
+    BIRTH = "birth"
+    GROUP_FORMED = "group_formed"
+    GROUP_DISSOLVED = "group_dissolved"
+    GROUP_CONFLICT = "group_conflict"
+    MEMBER_JOINED = "member_joined"
+    MEMBER_LEFT = "member_left"
+    LEADERSHIP_CHANGE = "leadership_change"
+    TRADE_COMPLETED = "trade_completed"
+    TRADE_POSTED = "trade_posted"
+    MARKET_SHIFT = "market_shift"
 
 
 class Event(BaseModel):
@@ -130,6 +157,31 @@ class Event(BaseModel):
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
+class Location(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    x: float = 0.0
+    y: float = 0.0
+    type: str = "trade"
+    biome: str = "plains"  # plains, forest, desert, mountain, swamp, coastal
+    resources: dict[str, float] = Field(default_factory=lambda: {"food": 10.0, "materials": 10.0})
+    resource_regen_rate: dict[str, float] = Field(default_factory=lambda: {"food": 1.0, "materials": 0.5})
+    capacity: int = 10
+    owner_group_id: str | None = None
+    modifiers: dict[str, float] = Field(default_factory=dict)
+    is_removable: bool = True
+
+
+def _default_locations() -> list[Location]:
+    return [
+        Location(name="Market Square", x=0, y=0, type="trade", biome="plains", is_removable=False),
+        Location(name="The Arena", x=100, y=0, type="conflict", biome="plains", is_removable=False),
+        Location(name="Council Hall", x=0, y=100, type="diplomacy", biome="plains", is_removable=False),
+        Location(name="Wilderness", x=-100, y=-100, type="exploration", biome="forest", is_removable=False),
+        Location(name="Library", x=50, y=50, type="knowledge", biome="plains", is_removable=False),
+    ]
+
+
 class Environment(BaseModel):
     name: str = "The Commons"
     description: str = "A shared space where characters interact and compete for resources."
@@ -139,13 +191,7 @@ class Environment(BaseModel):
     conditions: dict[str, str] = Field(default_factory=lambda: {
         "weather": "calm", "stability": "peaceful", "scarcity": "moderate",
     })
-    locations: list[dict] = Field(default_factory=lambda: [
-        {"name": "Market Square", "x": 0, "y": 0, "type": "trade"},
-        {"name": "The Arena", "x": 100, "y": 0, "type": "conflict"},
-        {"name": "Council Hall", "x": 0, "y": 100, "type": "diplomacy"},
-        {"name": "Wilderness", "x": -100, "y": -100, "type": "exploration"},
-        {"name": "Library", "x": 50, "y": 50, "type": "knowledge"},
-    ])
+    locations: list[Location] = Field(default_factory=_default_locations)
     houses: list[House] = []
 
 
@@ -154,6 +200,10 @@ class SimulationConfig(BaseModel):
     information_symmetry: float = Field(default=0.5, ge=0.0, le=1.0)
     resource_scarcity: float = Field(default=0.3, ge=0.0, le=1.0)
     max_ticks: int = 1000
+    aging_rate: int = Field(default=1, ge=0)
+    enable_permadeath: bool = True
+    enable_offspring: bool = True
+    max_population: int = 30
 
 
 class ChatMessage(BaseModel):
@@ -169,6 +219,61 @@ class ChatMessage(BaseModel):
     action_context: str = ""
 
 
+class GroupMember(BaseModel):
+    character_id: str
+    role: str = "member"  # leader, officer, member
+    joined_tick: int = 0
+    loyalty: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
+class Group(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    founded_tick: int = 0
+    leader_id: str | None = None
+    members: list[GroupMember] = []
+    goals: list[str] = []
+    resources: dict[str, float] = Field(default_factory=lambda: {"treasury": 0.0, "territory": 0.0})
+    territory_ids: list[str] = []
+    reputation: float = Field(default=0.5, ge=0.0, le=1.0)
+    rival_group_ids: list[str] = []
+    ally_group_ids: list[str] = []
+    dissolved: bool = False
+    dissolved_tick: int | None = None
+
+
+class TradeOffer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    seller_id: str
+    offer_resource: str
+    offer_amount: float
+    request_resource: str
+    request_amount: float
+    created_tick: int = 0
+    expires_tick: int = 0
+    status: str = "open"  # open, accepted, expired, cancelled
+    accepted_by: str | None = None
+
+
+class TradeHistory(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tick: int
+    seller_id: str
+    buyer_id: str
+    sold_resource: str
+    sold_amount: float
+    bought_resource: str
+    bought_amount: float
+
+
+class MarketState(BaseModel):
+    offers: list[TradeOffer] = []
+    history: list[TradeHistory] = []
+    price_index: dict[str, float] = Field(default_factory=lambda: {
+        "energy": 1.0, "influence": 1.5, "wealth": 1.0,
+    })
+
+
 class SimulationState(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
@@ -181,6 +286,8 @@ class SimulationState(BaseModel):
     running: bool = False
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
+    groups: dict[str, Group] = {}
+    market: MarketState = Field(default_factory=MarketState)
 
 
 class SimulationSummary(BaseModel):

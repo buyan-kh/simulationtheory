@@ -152,11 +152,11 @@ class AgentBrain:
 
         nearby_locations = []
         for loc in state.environment.locations:
-            dx = loc["x"] - character.position["x"]
-            dy = loc["y"] - character.position["y"]
+            dx = loc.x - character.position["x"]
+            dy = loc.y - character.position["y"]
             dist = math.sqrt(dx * dx + dy * dy)
             if dist < 150:
-                nearby_locations.append({**loc, "distance": dist})
+                nearby_locations.append({"name": loc.name, "x": loc.x, "y": loc.y, "type": loc.type, "distance": dist})
 
         return {
             "nearby_characters": nearby_chars,
@@ -182,21 +182,57 @@ class AgentBrain:
         relevant.sort(key=lambda x: x[1], reverse=True)
         return [m for m, _ in relevant[:10]]
 
-    def _compute_resource_urgency(self, character: Character) -> dict[ActionType, float]:
-        """Compute strong urgency bonuses based on resource levels."""
+    def _compute_resource_urgency(self, character: Character, state: SimulationState | None = None) -> dict[ActionType, float]:
+        """Compute strong urgency bonuses based on resource levels, health, age, group, trade."""
         energy = character.resources.get("energy", 50)
         wealth = character.resources.get("wealth", 50)
         influence = character.resources.get("influence", 50)
         urgency: dict[ActionType, float] = {}
 
+        # Health urgency
+        if character.health < 30:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.0
+            urgency[ActionType.DEFEND] = urgency.get(ActionType.DEFEND, 0) + 0.5
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.8
+
+        # Age-based urgency (elderly prefer safety)
+        if character.max_age > 0 and character.age / character.max_age > 0.75:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 0.3
+            urgency[ActionType.DEFEND] = urgency.get(ActionType.DEFEND, 0) + 0.2
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.3
+
+        # Group awareness
+        if not character.group_id and state:
+            # Ungrouped chars with allies might want to form a group
+            ally_count = sum(1 for v in character.relationships.values() if v > 0.5)
+            if ally_count >= 2:
+                urgency[ActionType.FORM_GROUP] = urgency.get(ActionType.FORM_GROUP, 0) + 0.4
+        elif character.group_id:
+            # Grouped chars with low loyalty might want to leave
+            if state:
+                group = state.groups.get(character.group_id)
+                if group:
+                    my_member = next((m for m in group.members if m.character_id == character.id), None)
+                    if my_member and my_member.loyalty < 0.3:
+                        urgency[ActionType.LEAVE_GROUP] = urgency.get(ActionType.LEAVE_GROUP, 0) + 0.5
+        else:
+            # No group, maybe join one
+            if state and any(not g.dissolved for g in state.groups.values()):
+                urgency[ActionType.JOIN_GROUP] = urgency.get(ActionType.JOIN_GROUP, 0) + 0.2
+
+        # Trade urgency: if we have surplus of one resource and deficit of another
+        resource_vals = sorted(character.resources.values())
+        if len(resource_vals) >= 2 and resource_vals[-1] > 60 and resource_vals[0] < 30:
+            urgency[ActionType.TRADE] = urgency.get(ActionType.TRADE, 0) + 0.4
+
         # Critical energy: strongly favor rest
         if energy < 15:
-            urgency[ActionType.REST] = 1.5
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.5
             urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.8
             urgency[ActionType.COMPETE] = urgency.get(ActionType.COMPETE, 0) - 0.6
             urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) - 0.5
         elif energy < 30:
-            urgency[ActionType.REST] = 0.7
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 0.7
             urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.3
         elif energy < 40:
             urgency[ActionType.REST] = 0.3
@@ -264,7 +300,7 @@ class AgentBrain:
             return {}
         return dict(RECIPROCITY_MAP.get(last_action, {}))
 
-    def evaluate_options(self, character: Character, perception: dict) -> list[tuple[Action, float]]:
+    def evaluate_options(self, character: Character, perception: dict, state: SimulationState | None = None) -> list[tuple[Action, float]]:
         nearby = perception["nearby_characters"]
         options: list[tuple[Action, float]] = []
 
@@ -272,7 +308,7 @@ class AgentBrain:
         emotions = character.emotional_state
 
         # Pre-compute contextual modifiers
-        resource_urgency = self._compute_resource_urgency(character)
+        resource_urgency = self._compute_resource_urgency(character, state)
         env_modifiers = self._compute_environmental_modifiers(perception)
         motivation_scores = self._compute_motivation_scores(character)
 
@@ -314,6 +350,20 @@ class AgentBrain:
                 ActionType.ALLY, ActionType.BETRAY, ActionType.ATTACK,
                 ActionType.DEFEND, ActionType.SHARE, ActionType.COMMUNICATE,
             }
+
+            # Group/trade actions are solo (no target needed)
+            is_solo_special = action_type in {
+                ActionType.TRADE, ActionType.FORM_GROUP, ActionType.JOIN_GROUP, ActionType.LEAVE_GROUP,
+            }
+
+            if is_solo_special:
+                detail = f"{character.name} decides to {action_type.value.replace('_', ' ')}"
+                reasoning = f"Score {base_score:.2f} for {action_type.value}"
+                options.append((
+                    Action(type=action_type, detail=detail, reasoning=reasoning),
+                    base_score,
+                ))
+                continue
 
             if needs_target and nearby:
                 for nc in nearby:
@@ -361,6 +411,23 @@ class AgentBrain:
                     # Proximity bonus
                     proximity_bonus = max(0, 1.0 - nc["distance"] / 200) * 0.2
                     target_score += proximity_bonus
+
+                    # Group loyalty: cooperate with group members, compete with rival group members
+                    if state and character.group_id:
+                        other_char = state.characters.get(nc["id"])
+                        if other_char:
+                            if other_char.group_id == character.group_id:
+                                if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
+                                    target_score += 0.4
+                                elif action_type in {ActionType.ATTACK, ActionType.BETRAY}:
+                                    target_score -= 0.8
+                            elif other_char.group_id:
+                                my_group = state.groups.get(character.group_id)
+                                if my_group and other_char.group_id in my_group.rival_group_ids:
+                                    if action_type in {ActionType.ATTACK, ActionType.COMPETE}:
+                                        target_score += 0.3
+                                    elif action_type in {ActionType.COOPERATE, ActionType.SHARE}:
+                                        target_score -= 0.3
 
                     # Resource comparison: attack/compete with weaker targets, defend against stronger
                     target_resources = nc.get("resources_visible", {})
@@ -438,7 +505,7 @@ class AgentBrain:
                 elif "betray" in evt.description.lower():
                     recent_event_targets[pid] = "betrayer"
 
-        options = self.evaluate_options(character, perception)
+        options = self.evaluate_options(character, perception, state)
 
         for i, (action, score) in enumerate(options):
             if action.target_id and action.target_id in memory_influence:

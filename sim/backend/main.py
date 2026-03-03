@@ -1,11 +1,16 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+import io
+import zipfile
 from models import (
     SimulationState, SimulationConfig, SimulationSummary,
     Character, CharacterCreate, Event, Memory, ChatMessage,
+    Location, Group, MarketState, TradeOffer, TradeHistory,
 )
 from engine import SimulationEngine
+from analytics import SimulationAnalytics
 
 app = FastAPI(title="Multi-Agent Simulation Platform")
 
@@ -18,6 +23,7 @@ app.add_middleware(
 )
 
 engine = SimulationEngine()
+analytics = SimulationAnalytics()
 
 
 class CreateSimulationRequest(BaseModel):
@@ -92,6 +98,8 @@ def delete_simulation(sim_id: str):
     return {"status": "deleted"}
 
 
+# ── Characters ──
+
 @app.post("/api/simulations/{sim_id}/characters", response_model=Character)
 def add_character(sim_id: str, char_create: CharacterCreate):
     _get_sim(sim_id)
@@ -147,3 +155,154 @@ def get_events(sim_id: str, since_tick: int = Query(default=0, ge=0)):
 def get_chat(sim_id: str, since_tick: int = Query(default=0, ge=0)):
     sim = _get_sim(sim_id)
     return [m for m in sim.chat_log if m.tick >= since_tick]
+
+
+# ── Locations ──
+
+@app.get("/api/simulations/{sim_id}/locations")
+def list_locations(sim_id: str):
+    sim = _get_sim(sim_id)
+    return sim.environment.locations
+
+
+@app.post("/api/simulations/{sim_id}/locations")
+def add_location(sim_id: str, location: Location):
+    sim = _get_sim(sim_id)
+    sim.environment.locations.append(location)
+    engine.db.save(sim)
+    return location
+
+
+@app.delete("/api/simulations/{sim_id}/locations/{loc_id}")
+def remove_location(sim_id: str, loc_id: str):
+    sim = _get_sim(sim_id)
+    loc = next((l for l in sim.environment.locations if l.id == loc_id), None)
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    if not loc.is_removable:
+        raise HTTPException(status_code=400, detail="Cannot remove core location")
+    sim.environment.locations = [l for l in sim.environment.locations if l.id != loc_id]
+    engine.db.save(sim)
+    return {"status": "removed"}
+
+
+# ── Groups ──
+
+@app.get("/api/simulations/{sim_id}/groups")
+def list_groups(sim_id: str):
+    sim = _get_sim(sim_id)
+    return list(sim.groups.values())
+
+
+@app.get("/api/simulations/{sim_id}/groups/{group_id}")
+def get_group(sim_id: str, group_id: str):
+    sim = _get_sim(sim_id)
+    if group_id not in sim.groups:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return sim.groups[group_id]
+
+
+# ── Market ──
+
+@app.get("/api/simulations/{sim_id}/market")
+def get_market(sim_id: str):
+    sim = _get_sim(sim_id)
+    return sim.market
+
+
+@app.get("/api/simulations/{sim_id}/market/offers")
+def get_offers(sim_id: str, status: str = "open"):
+    sim = _get_sim(sim_id)
+    return [o for o in sim.market.offers if o.status == status]
+
+
+@app.get("/api/simulations/{sim_id}/market/history")
+def get_trade_history(sim_id: str, limit: int = Query(default=50, ge=1, le=500)):
+    sim = _get_sim(sim_id)
+    return sim.market.history[-limit:]
+
+
+@app.get("/api/simulations/{sim_id}/market/prices")
+def get_prices(sim_id: str):
+    sim = _get_sim(sim_id)
+    return sim.market.price_index
+
+
+# ── Replay ──
+
+@app.get("/api/simulations/{sim_id}/replay/ticks")
+def get_replay_ticks(sim_id: str):
+    _get_sim(sim_id)
+    return engine.db.get_snapshot_ticks(sim_id)
+
+
+@app.get("/api/simulations/{sim_id}/replay/{tick}")
+def get_replay_state(sim_id: str, tick: int):
+    state = engine.db.load_snapshot(sim_id, tick)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Snapshot not found for this tick")
+    return state
+
+
+# ── Analytics ──
+
+@app.get("/api/simulations/{sim_id}/analytics/summary")
+def get_analytics_summary(sim_id: str):
+    sim = _get_sim(sim_id)
+    return analytics.compute_summary(sim)
+
+
+@app.get("/api/simulations/{sim_id}/analytics/relationships")
+def get_relationship_graph(sim_id: str):
+    sim = _get_sim(sim_id)
+    return analytics.relationship_graph(sim)
+
+
+@app.get("/api/simulations/{sim_id}/analytics/resource-trends")
+def get_resource_trends(sim_id: str):
+    sim = _get_sim(sim_id)
+    ticks = engine.db.get_snapshot_ticks(sim_id)
+    # Sample up to 50 snapshots for performance
+    if len(ticks) > 50:
+        step = len(ticks) // 50
+        ticks = ticks[::step]
+    snapshots = []
+    for t in ticks:
+        snap = engine.db.load_snapshot(sim_id, t)
+        if snap:
+            snapshots.append(snap)
+    return analytics.resource_trends(sim, snapshots)
+
+
+@app.get("/api/simulations/{sim_id}/analytics/event-frequency")
+def get_event_frequency(sim_id: str):
+    sim = _get_sim(sim_id)
+    return analytics.event_frequency(sim)
+
+
+@app.get("/api/simulations/{sim_id}/export/json")
+def export_json(sim_id: str):
+    sim = _get_sim(sim_id)
+    return JSONResponse(
+        content=sim.model_dump(),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=simulation_{sim_id}.json"},
+    )
+
+
+@app.get("/api/simulations/{sim_id}/export/csv")
+def export_csv(sim_id: str):
+    sim = _get_sim(sim_id)
+    csv_files = analytics.export_csv(sim)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for filename, content in csv_files.items():
+            zf.writestr(filename, content)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=simulation_{sim_id}.zip"},
+    )

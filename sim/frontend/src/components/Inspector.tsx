@@ -86,6 +86,58 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
       <div className="flex-1 overflow-y-auto p-3 pixel-scrollbar">
         {tab === 'stats' && (
           <div className="space-y-4">
+            {/* Vitals: Age, Health */}
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Vitals</div>
+              <div className="grid grid-cols-2 gap-2">
+                {character.age !== undefined && (
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                    <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>Age</div>
+                    <div className="font-pixel text-neon-gold" style={{ fontSize: '10px' }}>
+                      {character.age}{character.max_age ? `/${character.max_age}` : ''}
+                    </div>
+                  </div>
+                )}
+                {character.health !== undefined && (
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                    <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>Health</div>
+                    <NeedBar label="" value={character.health} color={character.health < 30 ? '#ff3366' : '#44cc88'} icon="♥" />
+                  </div>
+                )}
+              </div>
+              {!character.alive && character.cause_of_death && (
+                <div className="mt-2 p-2" style={{ background: '#1a0a0a', border: '1px solid #ff3366' }}>
+                  <span className="font-pixel" style={{ fontSize: '7px', color: '#ff3366' }}>
+                    Died from {character.cause_of_death} {character.death_tick !== undefined ? `at tick ${character.death_tick}` : ''}
+                  </span>
+                </div>
+              )}
+              {character.parent_ids && character.parent_ids.length > 0 && (
+                <div className="mt-1">
+                  <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>
+                    Parents: {character.parent_ids.map(pid => allCharacters[pid]?.name || 'Unknown').join(', ')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pixel-divider" />
+
+            {/* Group Info */}
+            {character.group_id && (
+              <>
+                <div>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Group</div>
+                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #44ccff' }}>
+                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#44ccff', color: '#44ccff' }}>
+                      {character.group_role || 'member'}
+                    </span>
+                  </div>
+                </div>
+                <div className="pixel-divider" />
+              </>
+            )}
+
             <div>
               <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Personality</div>
               <div className="space-y-2">

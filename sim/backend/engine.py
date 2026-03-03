@@ -2,10 +2,13 @@ import math
 import random
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
-    Action, Event, Environment, ChatMessage, House,
+    Action, Event, EventType, Environment, ChatMessage, House, Location,
+    MemoryEntry, EmotionalState, PersonalityTraits, Needs,
 )
 from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
+from groups import GroupManager
+from trade import TradeManager
 from db import SimulationDB
 
 HOUSE_PLOTS = [
@@ -37,6 +40,8 @@ class SimulationEngine:
         self.brain = AgentBrain()
         self.event_gen = EventGenerator()
         self.dialogue = DialogueGenerator()
+        self.group_mgr = GroupManager()
+        self.trade_mgr = TradeManager()
 
     def create_simulation(self, config: SimulationConfig | None = None, name: str = "") -> SimulationState:
         sim = SimulationState()
@@ -104,6 +109,21 @@ class SimulationEngine:
 
         self._update_needs(sim, actions)
 
+        # Lifecycle: aging, death, offspring
+        lifecycle_events = self._process_lifecycle(sim)
+        all_events.extend(lifecycle_events)
+
+        # Groups
+        group_events = self.group_mgr.process_groups(sim, actions)
+        all_events.extend(group_events)
+
+        # Trade/Market
+        trade_events = self.trade_mgr.process_market(sim, actions)
+        all_events.extend(trade_events)
+
+        # Location resource regeneration
+        self._regen_location_resources(sim)
+
         for char in sim.characters.values():
             if not char.alive:
                 continue
@@ -118,6 +138,7 @@ class SimulationEngine:
         sim.chat_log.extend(chat_messages)
         sim.tick += 1
         self.db.save(sim)
+        self.db.save_snapshot(sim)
 
         return all_events, chat_messages
 
@@ -256,22 +277,53 @@ class SimulationEngine:
             if needs.hygiene < 20:
                 char.emotional_state.disgust = min(1.0, char.emotional_state.disgust + 0.1)
 
-    # Action type -> target location mapping
-    _ACTION_LOCATION_MAP = {
-        "cooperate": (0, 0),       # Market Square
-        "share": (0, 0),           # Market Square
-        "negotiate": (0, 0),       # Market Square
-        "attack": (100, 0),        # The Arena
-        "defend": (100, 0),        # The Arena
-        "compete": (100, 0),       # The Arena
-        "betray": (100, 0),        # The Arena
-        "ally": (0, 100),          # Council Hall
-        "communicate": (0, 100),   # Council Hall
-        "explore": (-100, -100),   # Wilderness
-        "gather": (-100, -100),    # Wilderness
-        "observe": (50, 50),       # Library
-        "rest": (50, 50),          # Library
+    # Action type -> location type mapping (resolved dynamically)
+    _ACTION_LOCATION_TYPE = {
+        "cooperate": "trade",
+        "share": "trade",
+        "negotiate": "trade",
+        "trade": "trade",
+        "attack": "conflict",
+        "defend": "conflict",
+        "compete": "conflict",
+        "betray": "conflict",
+        "ally": "diplomacy",
+        "communicate": "diplomacy",
+        "form_group": "diplomacy",
+        "join_group": "diplomacy",
+        "leave_group": "diplomacy",
+        "explore": "exploration",
+        "gather": "exploration",
+        "observe": "knowledge",
+        "rest": "knowledge",
     }
+
+    # Fallback coordinates if no matching location found
+    _ACTION_LOCATION_MAP = {
+        "cooperate": (0, 0),
+        "share": (0, 0),
+        "negotiate": (0, 0),
+        "trade": (0, 0),
+        "attack": (100, 0),
+        "defend": (100, 0),
+        "compete": (100, 0),
+        "betray": (100, 0),
+        "ally": (0, 100),
+        "communicate": (0, 100),
+        "form_group": (0, 100),
+        "join_group": (0, 100),
+        "leave_group": (0, 100),
+        "explore": (-100, -100),
+        "gather": (-100, -100),
+        "observe": (50, 50),
+        "rest": (50, 50),
+    }
+
+    def _find_location_by_type(self, sim: SimulationState, loc_type: str) -> Location | None:
+        for loc in sim.environment.locations:
+            if loc.type == loc_type:
+                return loc
+        return None
 
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
         for char_id, action in actions.items():
@@ -284,12 +336,19 @@ class SimulationEngine:
                     target_x = house.position["x"]
                     target_y = house.position["y"]
                 else:
-                    target_x, target_y = self._ACTION_LOCATION_MAP["rest"]
+                    target_x, target_y = self._ACTION_LOCATION_MAP.get("rest", (50, 50))
             else:
-                target = self._ACTION_LOCATION_MAP.get(action.type.value)
-                if target is None:
-                    continue
-                target_x, target_y = target
+                # Try dynamic location lookup first
+                loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
+                loc = self._find_location_by_type(sim, loc_type) if loc_type else None
+                if loc:
+                    target_x, target_y = loc.x, loc.y
+                else:
+                    fallback = self._ACTION_LOCATION_MAP.get(action.type.value)
+                    if fallback is None:
+                        continue
+                    target_x, target_y = fallback
+
             dx = target_x - char.position["x"]
             dy = target_y - char.position["y"]
 
@@ -306,3 +365,178 @@ class SimulationEngine:
             # Clamp to world bounds
             char.position["x"] = max(-120, min(120, char.position["x"]))
             char.position["y"] = max(-120, min(120, char.position["y"]))
+
+    # ── Lifecycle processing ──
+
+    def _process_lifecycle(self, sim: SimulationState) -> list[Event]:
+        events: list[Event] = []
+        tick = sim.tick
+
+        for char in list(sim.characters.values()):
+            if not char.alive:
+                continue
+
+            # Aging
+            char.age += sim.config.aging_rate
+            self._apply_age_effects(char)
+
+            # Death checks
+            cause = self._check_death(char, sim)
+            if cause:
+                events.append(self._kill_character(char, sim, cause))
+
+        # Offspring
+        if sim.config.enable_offspring:
+            offspring_events = self._check_offspring(sim)
+            events.extend(offspring_events)
+
+        return events
+
+    def _apply_age_effects(self, char: Character):
+        """Modify stats based on age brackets."""
+        ratio = char.age / char.max_age
+        if ratio < 0.25:  # young: energy bonus
+            char.resources["energy"] = min(100, char.resources.get("energy", 0) + 2)
+        elif ratio > 0.75:  # elderly: wisdom but frailty
+            char.resources["influence"] = char.resources.get("influence", 0) + 0.5
+            char.resources["energy"] = max(0, char.resources.get("energy", 0) - 1)
+            char.health = max(0, char.health - 0.5)
+
+    def _check_death(self, char: Character, sim: SimulationState) -> str | None:
+        if not sim.config.enable_permadeath:
+            return None
+        if char.age >= char.max_age:
+            return "old age"
+        if char.health <= 0:
+            return "injuries"
+        if char.needs.hunger <= 0 and char.needs.energy <= 0:
+            return "starvation"
+        return None
+
+    def _kill_character(self, char: Character, sim: SimulationState, cause: str) -> Event:
+        char.alive = False
+        char.cause_of_death = cause
+        char.death_tick = sim.tick
+
+        # Remove from group
+        if char.group_id and char.group_id in sim.groups:
+            group = sim.groups[char.group_id]
+            group.members = [m for m in group.members if m.character_id != char.id]
+            if group.leader_id == char.id:
+                group.leader_id = group.members[0].character_id if group.members else None
+
+        # Create legacy memories for witnesses
+        for other in sim.characters.values():
+            if other.id == char.id or not other.alive:
+                continue
+            rel = other.relationships.get(char.id, 0)
+            if abs(rel) > 0.2:
+                other.memory.long_term.append(MemoryEntry(
+                    tick=sim.tick,
+                    content=f"{char.name} died from {cause}. I {'mourn their loss' if rel > 0 else 'feel conflicted about their passing'}.",
+                    importance=0.8,
+                    related_characters=[char.id],
+                ))
+
+        # Redistribute some wealth
+        remaining_wealth = char.resources.get("wealth", 0) * 0.5
+        alive_chars = [c for c in sim.characters.values() if c.alive and c.id != char.id]
+        if alive_chars and remaining_wealth > 0:
+            share = remaining_wealth / len(alive_chars)
+            for c in alive_chars:
+                c.resources["wealth"] = c.resources.get("wealth", 0) + share
+
+        return Event(
+            tick=sim.tick, type=EventType.DEATH,
+            title=f"{char.name} has died",
+            description=f"{char.name} died from {cause} at age {char.age}.",
+            participants=[char.id],
+            outcomes=[f"{char.name} is no longer among the living"],
+            importance=0.9,
+        )
+
+    def _check_offspring(self, sim: SimulationState) -> list[Event]:
+        events: list[Event] = []
+        alive = [c for c in sim.characters.values() if c.alive]
+        if len(alive) >= sim.config.max_population:
+            return events
+
+        rng = random.Random(hash(("offspring", sim.tick)))
+        checked: set[tuple[str, str]] = set()
+
+        for c1 in alive:
+            for c2 in alive:
+                if c1.id >= c2.id:
+                    continue
+                pair = (c1.id, c2.id)
+                if pair in checked:
+                    continue
+                checked.add(pair)
+
+                rel1 = c1.relationships.get(c2.id, 0)
+                rel2 = c2.relationships.get(c1.id, 0)
+                if rel1 > 0.7 and rel2 > 0.7 and rng.random() < 0.05:
+                    child = self._create_offspring(c1, c2, sim, rng)
+                    sim.characters[child.id] = child
+                    self._assign_house(sim, child)
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.BIRTH,
+                        title=f"{child.name} is born",
+                        description=f"{child.name} is born to {c1.name} and {c2.name}, inheriting traits from both parents.",
+                        participants=[c1.id, c2.id, child.id],
+                        outcomes=[f"A new character joins the simulation"],
+                        importance=0.8,
+                    ))
+                    if len(sim.characters) >= sim.config.max_population:
+                        return events
+        return events
+
+    def _create_offspring(self, p1: Character, p2: Character, sim: SimulationState, rng: random.Random) -> Character:
+        """Create a child character with blended traits from two parents."""
+        def blend(v1: float, v2: float) -> float:
+            avg = (v1 + v2) / 2
+            return max(0.0, min(1.0, avg + rng.gauss(0, 0.1)))
+
+        traits = PersonalityTraits(
+            openness=blend(p1.traits.openness, p2.traits.openness),
+            conscientiousness=blend(p1.traits.conscientiousness, p2.traits.conscientiousness),
+            extraversion=blend(p1.traits.extraversion, p2.traits.extraversion),
+            agreeableness=blend(p1.traits.agreeableness, p2.traits.agreeableness),
+            neuroticism=blend(p1.traits.neuroticism, p2.traits.neuroticism),
+        )
+
+        # Name generation
+        syllables = ["an", "el", "or", "is", "ar", "en", "il", "on", "ra", "li", "na", "to"]
+        name = rng.choice(syllables).capitalize() + rng.choice(syllables) + rng.choice(syllables)
+
+        # Inherit some goals/motivations
+        goals = list(set(rng.sample(p1.goals, min(1, len(p1.goals))) + rng.sample(p2.goals, min(1, len(p2.goals)))))
+        motivations = list(set(rng.sample(p1.motivations, min(1, len(p1.motivations))) + rng.sample(p2.motivations, min(1, len(p2.motivations)))))
+
+        child = Character(
+            name=name,
+            profile=f"Child of {p1.name} and {p2.name}",
+            traits=traits,
+            goals=goals or ["survive"],
+            motivations=motivations or ["curiosity"],
+            age=0,
+            max_age=rng.randint(60, 100),
+            parent_ids=[p1.id, p2.id],
+            position={"x": (p1.position["x"] + p2.position["x"]) / 2, "y": (p1.position["y"] + p2.position["y"]) / 2},
+            needs=Needs(hunger=90, energy=90, social=90, fun=90, hygiene=90),
+        )
+
+        # Parents get positive relationship with child
+        p1.relationships[child.id] = 0.8
+        p2.relationships[child.id] = 0.8
+        child.relationships[p1.id] = 0.6
+        child.relationships[p2.id] = 0.6
+
+        return child
+
+    # ── Location resource regeneration ──
+
+    def _regen_location_resources(self, sim: SimulationState):
+        for loc in sim.environment.locations:
+            for res, rate in loc.resource_regen_rate.items():
+                loc.resources[res] = loc.resources.get(res, 0) + rate

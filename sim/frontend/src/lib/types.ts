@@ -31,7 +31,11 @@ export interface Memory {
   beliefs: Record<string, string>;
 }
 
-export type ActionType = 'cooperate' | 'compete' | 'negotiate' | 'ally' | 'betray' | 'explore' | 'rest' | 'gather' | 'share' | 'attack' | 'defend' | 'observe' | 'communicate';
+export type ActionType =
+  | 'cooperate' | 'compete' | 'negotiate' | 'ally' | 'betray'
+  | 'explore' | 'rest' | 'gather' | 'share' | 'attack' | 'defend'
+  | 'observe' | 'communicate'
+  | 'trade' | 'form_group' | 'join_group' | 'leave_group';
 
 export interface Action {
   type: ActionType;
@@ -65,6 +69,18 @@ export interface Character {
   alive: boolean;
   position: { x: number; y: number };
   needs: Needs;
+  // Lifecycle
+  age?: number;
+  max_age?: number;
+  health?: number;
+  cause_of_death?: string | null;
+  death_tick?: number | null;
+  parent_ids?: string[];
+  // Social
+  group_id?: string | null;
+  group_role?: string | null;
+  // Trade
+  trade_skill?: number;
 }
 
 export interface CharacterCreate {
@@ -76,7 +92,12 @@ export interface CharacterCreate {
   image_url?: string | null;
 }
 
-export type EventType = 'interaction' | 'environmental' | 'decision' | 'emergent' | 'alliance_formed' | 'conflict' | 'negotiation' | 'resource_change' | 'emotional_shift';
+export type EventType =
+  | 'interaction' | 'environmental' | 'decision' | 'emergent'
+  | 'alliance_formed' | 'conflict' | 'negotiation' | 'resource_change' | 'emotional_shift'
+  | 'death' | 'birth'
+  | 'group_formed' | 'group_dissolved' | 'group_conflict' | 'member_joined' | 'member_left' | 'leadership_change'
+  | 'trade_completed' | 'trade_posted' | 'market_shift';
 
 export interface SimEvent {
   id: string;
@@ -90,10 +111,18 @@ export interface SimEvent {
 }
 
 export interface Location {
+  id: string;
   name: string;
   x: number;
   y: number;
   type: string;
+  biome: string;
+  resources: Record<string, number>;
+  resource_regen_rate: Record<string, number>;
+  capacity: number;
+  owner_group_id: string | null;
+  modifiers: Record<string, number>;
+  is_removable: boolean;
 }
 
 export interface Environment {
@@ -109,6 +138,63 @@ export interface SimulationConfig {
   information_symmetry: number;
   resource_scarcity: number;
   max_ticks: number;
+  aging_rate?: number;
+  enable_permadeath?: boolean;
+  enable_offspring?: boolean;
+  max_population?: number;
+}
+
+export interface GroupMember {
+  character_id: string;
+  role: string;
+  joined_tick: number;
+  loyalty: number;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  founded_tick: number;
+  leader_id: string | null;
+  members: GroupMember[];
+  goals: string[];
+  resources: Record<string, number>;
+  territory_ids: string[];
+  reputation: number;
+  rival_group_ids: string[];
+  ally_group_ids: string[];
+  dissolved: boolean;
+  dissolved_tick: number | null;
+}
+
+export interface TradeOffer {
+  id: string;
+  seller_id: string;
+  offer_resource: string;
+  offer_amount: number;
+  request_resource: string;
+  request_amount: number;
+  created_tick: number;
+  expires_tick: number;
+  status: string;
+  accepted_by: string | null;
+}
+
+export interface TradeHistory {
+  id: string;
+  tick: number;
+  seller_id: string;
+  buyer_id: string;
+  sold_resource: string;
+  sold_amount: number;
+  bought_resource: string;
+  bought_amount: number;
+}
+
+export interface MarketState {
+  offers: TradeOffer[];
+  history: TradeHistory[];
+  price_index: Record<string, number>;
 }
 
 export interface SimulationState {
@@ -123,6 +209,8 @@ export interface SimulationState {
   created_at: number;
   updated_at: number;
   chat_log: ChatMessage[];
+  groups: Record<string, Group>;
+  market: MarketState;
 }
 
 export interface SimulationSummary {
@@ -146,4 +234,23 @@ export interface ChatMessage {
   target_name: string | null;
   is_thought: boolean;
   action_context: string;
+}
+
+export interface AnalyticsSummary {
+  total_ticks: number;
+  total_characters: number;
+  alive_characters: number;
+  dead_characters: number;
+  total_events: number;
+  events_by_type: Record<string, number>;
+  avg_relationship: number;
+  total_groups: number;
+  most_influential: string | null;
+  wealthiest: string | null;
+  most_connected: string | null;
+}
+
+export interface RelationshipGraph {
+  nodes: { id: string; name: string; alive: boolean; group_id: string | null }[];
+  edges: { source: string; target: string; weight: number; type: string }[];
 }

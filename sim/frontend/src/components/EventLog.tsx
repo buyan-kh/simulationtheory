@@ -7,7 +7,7 @@ interface EventLogProps {
   events: SimEvent[];
 }
 
-const EVENT_STYLES: Record<EventType, { color: string; icon: string }> = {
+const EVENT_STYLES: Record<string, { color: string; icon: string }> = {
   conflict: { color: '#ff3366', icon: '⚔' },
   alliance_formed: { color: '#00ff88', icon: '🛡' },
   negotiation: { color: '#ff8844', icon: '🤝' },
@@ -17,6 +17,17 @@ const EVENT_STYLES: Record<EventType, { color: string; icon: string }> = {
   resource_change: { color: '#4488ff', icon: '💎' },
   decision: { color: '#d0d0e0', icon: '►' },
   emotional_shift: { color: '#aa44ff', icon: '💜' },
+  death: { color: '#ff1144', icon: '💀' },
+  birth: { color: '#88ff88', icon: '✧' },
+  group_formed: { color: '#44ccff', icon: '⚑' },
+  group_dissolved: { color: '#886644', icon: '⚐' },
+  group_conflict: { color: '#ff4488', icon: '⚔' },
+  member_joined: { color: '#44ffaa', icon: '►' },
+  member_left: { color: '#ffaa44', icon: '◄' },
+  leadership_change: { color: '#ffdd00', icon: '♛' },
+  trade_completed: { color: '#ffcc00', icon: '⬡' },
+  trade_posted: { color: '#ccaa44', icon: '⬡' },
+  market_shift: { color: '#ff8800', icon: '⬡' },
 };
 
 export default function EventLog({ events }: EventLogProps) {

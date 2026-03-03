@@ -40,13 +40,36 @@ export default function CharacterCard({ character, selected, onClick }: Characte
             <span className="font-pixel text-pixel-text truncate" style={{ fontSize: '8px' }}>
               {character.name}
             </span>
+            {character.age !== undefined && (
+              <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>
+                {character.age}y
+              </span>
+            )}
             <span style={{ fontSize: '10px' }}>{getMoodEmoji(character.emotional_state)}</span>
+            {character.group_role && (
+              <span className="pixel-badge font-pixel" style={{ fontSize: '5px', borderColor: '#44ccff', color: '#44ccff' }}>
+                {character.group_role === 'leader' ? '♛' : '⚑'}
+              </span>
+            )}
             {!character.alive && (
               <span className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ff3366', color: '#ff3366' }}>
                 DEAD
               </span>
             )}
           </div>
+
+          {character.health !== undefined && character.alive && (
+            <div className="mt-1 flex items-center gap-1">
+              <span className="font-pixel" style={{ fontSize: '6px', color: character.health < 30 ? '#ff3366' : '#44cc88' }}>HP</span>
+              <div style={{ flex: 1, height: '3px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                <div style={{
+                  width: `${Math.round(character.health)}%`,
+                  height: '100%',
+                  background: character.health < 30 ? '#ff3366' : character.health < 60 ? '#ffaa44' : '#44cc88',
+                }} />
+              </div>
+            </div>
+          )}
 
           {character.last_action && (
             <div className="mt-1">

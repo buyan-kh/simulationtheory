@@ -380,10 +380,14 @@ class EventGenerator:
             defender.resources["wealth"] = max(0, defender.resources.get("wealth", 0) - loot)
             attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 10)
             defender.resources["energy"] = max(0, defender.resources.get("energy", 0) - 15)
+            defender.health = max(0, defender.health - rng.uniform(5, 15))
+            attacker.health = max(0, attacker.health - rng.uniform(2, 5))
             winner, loser = attacker, defender
         else:
             attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 15)
             defender.resources["energy"] = max(0, defender.resources.get("energy", 0) - 5)
+            attacker.health = max(0, attacker.health - rng.uniform(5, 15))
+            defender.health = max(0, defender.health - rng.uniform(2, 5))
             winner, loser = defender, attacker
 
         return Event(
@@ -405,6 +409,8 @@ class EventGenerator:
 
         a.resources["energy"] = max(0, a.resources.get("energy", 0) - 20)
         b.resources["energy"] = max(0, b.resources.get("energy", 0) - 20)
+        a.health = max(0, a.health - rng.uniform(8, 20))
+        b.health = max(0, b.health - rng.uniform(8, 20))
 
         if a_power > b_power:
             loot = min(10, b.resources.get("wealth", 0))
@@ -438,9 +444,11 @@ class EventGenerator:
             loot = min(5, defender.resources.get("wealth", 0))
             attacker.resources["wealth"] = attacker.resources.get("wealth", 0) + loot
             defender.resources["wealth"] = max(0, defender.resources.get("wealth", 0) - loot)
+            defender.health = max(0, defender.health - rng.uniform(3, 10))
             desc = f"{attacker.name} breaks through {defender.name}'s defenses."
         else:
             defender.resources["influence"] = defender.resources.get("influence", 0) + 5
+            attacker.health = max(0, attacker.health - rng.uniform(3, 8))
             desc = f"{defender.name} successfully repels {attacker.name}'s attack, gaining respect."
 
         return Event(
@@ -611,8 +619,8 @@ class EventGenerator:
                 locs = state.environment.locations
                 if locs:
                     target_loc = rng.choice(locs)
-                    char.position["x"] += (target_loc["x"] - char.position["x"]) * 0.3
-                    char.position["y"] += (target_loc["y"] - char.position["y"]) * 0.3
+                    char.position["x"] += (target_loc.x - char.position["x"]) * 0.3
+                    char.position["y"] += (target_loc.y - char.position["y"]) * 0.3
                 char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
                 found = rng.random() < 0.4
                 if found:

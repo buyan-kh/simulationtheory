@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSimStore } from '@/lib/store';
-import { getSimulation, stepSimulation, updateConfig, addCharacter } from '@/lib/api';
+import { getSimulation, stepSimulation, updateConfig, addCharacter, getReplayTicks, getReplayState } from '@/lib/api';
 import type { SimulationConfig, CharacterCreate, PersonalityTraits } from '@/lib/types';
 import CharacterCard from '@/components/CharacterCard';
 import PixelCanvas from '@/components/PixelCanvas';
@@ -12,6 +12,10 @@ import ChatLog from '@/components/ChatLog';
 import SimControls from '@/components/SimControls';
 import Inspector from '@/components/Inspector';
 import BuildingInterior from '@/components/BuildingInterior';
+import GroupPanel from '@/components/GroupPanel';
+import MarketPanel from '@/components/MarketPanel';
+import ReplayControls from '@/components/ReplayControls';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 
 export default function SimulationPage() {
   const params = useParams();
@@ -34,9 +38,15 @@ export default function SimulationPage() {
     setActivePanel,
   } = useSimStore();
 
+  const {
+    replayMode, replayTick, replayTicks,
+    setReplayMode, setReplayTick, setReplayTicks,
+  } = useSimStore();
+
   const [stepping, setStepping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAddChar, setShowAddChar] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,8 +156,53 @@ export default function SimulationPage() {
           {error && (
             <span className="text-pixel-xs text-neon-red">{error}</span>
           )}
+          <button
+            onClick={() => setShowAnalytics(true)}
+            className="pixel-btn text-pixel-xs"
+            style={{ fontSize: '7px', padding: '2px 6px' }}
+          >
+            ANALYTICS
+          </button>
+          <button
+            onClick={async () => {
+              if (replayMode) {
+                setReplayMode(false);
+              } else {
+                const ticks = await getReplayTicks(simId);
+                if (ticks.length > 0) {
+                  setReplayTicks(ticks);
+                  setReplayTick(ticks[ticks.length - 1]);
+                  setReplayMode(true);
+                  setRunning(false);
+                }
+              }
+            }}
+            className={`pixel-btn text-pixel-xs ${replayMode ? 'pixel-btn-red' : ''}`}
+            style={{ fontSize: '7px', padding: '2px 6px' }}
+          >
+            {replayMode ? 'EXIT REPLAY' : 'REPLAY'}
+          </button>
         </div>
       </div>
+
+      {replayMode && (
+        <ReplayControls
+          currentTick={replayTick}
+          maxTick={replayTicks.length > 0 ? replayTicks[replayTicks.length - 1] : 0}
+          ticks={replayTicks}
+          onSeek={async (tick) => {
+            setReplayTick(tick);
+            try {
+              const state = await getReplayState(simId, tick);
+              setSimulation(state);
+            } catch {}
+          }}
+          onExit={() => {
+            setReplayMode(false);
+            getSimulation(simId).then(setSimulation).catch(() => {});
+          }}
+        />
+      )}
 
       <div className="flex-1 flex min-h-0">
         <div className="w-[220px] border-r-2 border-[#4a4a8a] bg-pixel-panel overflow-y-auto pixel-scrollbar shrink-0 flex flex-col">
@@ -206,33 +261,31 @@ export default function SimulationPage() {
 
         <div className="w-[280px] border-l-2 border-[#4a4a8a] bg-pixel-panel shrink-0 flex flex-col">
           <div className="flex shrink-0">
-            <button
-              onClick={() => setActivePanel('events')}
-              className={`flex-1 px-3 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
-                activePanel === 'events'
-                  ? 'text-neon-cyan border-neon-cyan bg-[#12122a]'
-                  : 'text-gray-500 border-[#2a2a5a] bg-[#1a1a3a] hover:text-gray-300'
-              }`}
-            >
-              EVENTS
-            </button>
-            <button
-              onClick={() => setActivePanel('chat')}
-              className={`flex-1 px-3 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
-                activePanel === 'chat'
-                  ? 'text-neon-magenta border-neon-magenta bg-[#12122a]'
-                  : 'text-gray-500 border-[#2a2a5a] bg-[#1a1a3a] hover:text-gray-300'
-              }`}
-            >
-              CHAT
-            </button>
+            {([
+              { key: 'events' as const, label: 'EVENTS', color: 'neon-cyan' },
+              { key: 'chat' as const, label: 'CHAT', color: 'neon-magenta' },
+              { key: 'groups' as const, label: 'GROUPS', color: '#44ccff' },
+              { key: 'market' as const, label: 'MARKET', color: '#ffcc00' },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActivePanel(tab.key)}
+                className={`flex-1 px-1.5 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
+                  activePanel === tab.key
+                    ? `bg-[#12122a]`
+                    : 'text-gray-500 border-[#2a2a5a] bg-[#1a1a3a] hover:text-gray-300'
+                }`}
+                style={activePanel === tab.key ? { color: tab.color, borderColor: tab.color } : { fontSize: '7px' }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
           <div className="flex-1 overflow-hidden">
-            {activePanel === 'events' ? (
-              <EventLog events={events} />
-            ) : (
-              <ChatLog messages={chatMessages} characters={simulation.characters} />
-            )}
+            {activePanel === 'events' && <EventLog events={events} />}
+            {activePanel === 'chat' && <ChatLog messages={chatMessages} characters={simulation.characters} />}
+            {activePanel === 'groups' && <GroupPanel groups={simulation.groups || {}} characters={simulation.characters} />}
+            {activePanel === 'market' && <MarketPanel market={simulation.market || { offers: [], history: [], price_index: {} }} characters={simulation.characters} />}
           </div>
         </div>
       </div>
@@ -269,6 +322,13 @@ export default function SimulationPage() {
           onClose={() => setSelectedBuilding(null)}
         />
       )}
+
+      {showAnalytics && (
+        <AnalyticsDashboard
+          simId={simId}
+          onClose={() => setShowAnalytics(false)}
+        />
+      )}
     </div>
   );
 }
@@ -301,6 +361,51 @@ function SettingsModal({ config, onClose, onSave }: {
               onChange={(e) => setLocal({ ...local, max_ticks: Number(e.target.value) })}
               className="pixel-input text-pixel-xs w-full"
             />
+          </div>
+
+          <div className="pixel-divider" />
+          <div className="text-pixel-xs text-gray-400 tracking-wider">LIFECYCLE</div>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">AGING RATE</label>
+              <input
+                type="number"
+                value={local.aging_rate ?? 1}
+                onChange={(e) => setLocal({ ...local, aging_rate: Number(e.target.value) })}
+                min={0}
+                className="pixel-input text-pixel-xs w-full"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">MAX POP</label>
+              <input
+                type="number"
+                value={local.max_population ?? 30}
+                onChange={(e) => setLocal({ ...local, max_population: Number(e.target.value) })}
+                min={1}
+                className="pixel-input text-pixel-xs w-full"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={local.enable_permadeath ?? true}
+                onChange={(e) => setLocal({ ...local, enable_permadeath: e.target.checked })}
+              />
+              <span className="text-pixel-xs text-gray-400">Permadeath</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={local.enable_offspring ?? true}
+                onChange={(e) => setLocal({ ...local, enable_offspring: e.target.checked })}
+              />
+              <span className="text-pixel-xs text-gray-400">Offspring</span>
+            </label>
           </div>
         </div>
 
