@@ -66,26 +66,31 @@ The simulation currently models characters with:
 #### Game Design Approaches
 
 **Dwarf Fortress**: The gold standard for personality simulation in games.
-- Beliefs (what matters to them), Facets (personality dimensions, 0-100 each), Goals (life aspirations)
-- ~50 personality facets following bell-curve distributions
-- Species-level defaults with individual variation
-- Facets affect which skills can be learned and how dwarves interact
-- Key insight: **Most facets cluster around neutral (78% in the 40-60 range)**. Only ~2% are extreme. This creates realistic populations where most people are "normal" but a few are exceptional.
+- Three independent personality subsystems that can *conflict with each other*:
+  - **Facets** (~50 dimensions, each 0-100): HOW a creature acts. Love, Anger, Greed, Altruism, Bravery, Gregariousness, Trust, Excitement-seeking, Imagination, etc.
+  - **Beliefs/Values** (~30 dimensions, each -50 to +50): WHAT a creature believes in. Law, Loyalty, Family, Friendship, Power, Truth, Romance, Knowledge, etc.
+  - **Goals/Dreams**: Long-term aspirations that produce happy thoughts when fulfilled.
+- Distribution follows a bell curve: 78% neutral (40-60), 8.5% high/low, <2% very high/low, <0.4% extreme.
+- Species-level defaults with individual variation (dwarves have altruism median 50, goblins have altruism median 25).
+- Facets affect which skills can be learned (CRUELTY > 75 blocks consoler skill; GREGARIOUSNESS < 25 blocks conversationalist).
+- **Critical insight for our project**: Facets and beliefs CAN CONFLICT. A dwarf can deeply value romance but have a facet that prevents forming romantic bonds, producing: *"She never falls in love, and she is bothered by this since she sees romance as one of the highest ideals."* This internal contradiction is what makes characters feel real — the scholar who craves excitement, the warrior who values peace.
 
 **RimWorld**: Streamlined but impactful.
-- Discrete traits (not continuous) with clear gameplay effects
-- Backgrounds that combine into a life story
-- Key insight: **Traits are intentionally unbalanced.** Working around deficiencies creates stories.
+- 2-3 discrete traits per pawn from a curated list, plus a backstory (childhood + adulthood)
+- Every trait has visible, direct consequences (Pyromaniac sets fires; Kind gives mood buffs to others)
+- Key insight: **Traits are intentionally unbalanced.** Working around deficiencies creates stories. A balanced colony is a boring place.
 
 **Crusader Kings 3**: Dynasty and relationship simulation.
-- Characters have traits that affect AI decision-making, relationships, and events
-- Traits can be gained/lost through life events
-- Lifestyle focuses allow characters to develop expertise over time
-- Key insight: **Traits change through experience.** A kind person can become cruel through trauma.
+- Up to 3 personality traits from mutually exclusive pairs (Brave/Craven, Honest/Deceitful)
+- Characters experience **stress** when acting against their personality traits
+- Traits are inheritable with genetic modeling
+- **Opinion inheritance**: 25% of positive opinions and 50% of negative opinions pass to heirs
+- Key insight: **Traits change through experience.** A kind person can become cruel through trauma. And grudges outlive the people who created them.
 
-**The Sims**: Needs-based behavior.
-- Traits modify how needs decay and what actions satisfy them
-- Aspirations provide long-term goals
+**The Sims 4**: Needs-based behavior with aspirations.
+- Up to 3 personality traits (6 with Growing Together's self-discovery system)
+- Traits drive **Whims** (short-term contextual desires) that interact with **Aspirations** (long-term goals)
+- Feedback loop: traits → whims → satisfaction points → aspiration progress → permanent reward traits
 - Key insight: **Needs drive immediate behavior; traits modify how needs feel and what satisfies them.**
 
 ### 2.2 Complex Identity: Beyond Archetypes
@@ -125,6 +130,18 @@ A single person might be:
 
 This is NOT definable in one word. The baker is also a poet is also a survivor is also a mother.
 
+#### Recommended Composite Approach (from research)
+
+| Layer | Model | What It Captures | Update Frequency |
+|-------|-------|------------------|------------------|
+| Behavioral Tendencies | HEXACO (6 continuous floats) | HOW agents act | Slow drift from major life events |
+| Motivational Values | Schwartz (10 values) | WHY agents act | Very slow drift; mostly stable |
+| Facets/Quirks | DF-style facets (additional dimensions, 0-100) | Emotional predispositions, quirks | Medium drift from memories |
+| Goals/Aspirations | Sims-style aspirations | WHAT agents want to achieve | Change at life stage transitions |
+| Role Identities | Tags earned/lost through actions | Social roles (Scholar, Warrior, Caretaker) | Dynamic, event-driven |
+
+The key Dwarf Fortress insight: **internal conflict between layers creates the most believable characters.** A warrior who values peace. A scholar who craves excitement. These contradictions are not bugs — they are features.
+
 ### 2.3 Social Networks and Friend Groups
 
 #### Current Problem
@@ -132,12 +149,30 @@ The system only has formal "groups" (factions with leaders). Real social life is
 
 #### Research: Social Network Dynamics
 
-**Dunbar's Number Model**:
-- ~5 intimate friends (inner circle)
-- ~15 good friends
-- ~50 friends
-- ~150 acquaintances
-- Each layer has different interaction frequency and emotional closeness
+**Dunbar's Number Model** (validated across mobile phone networks, Facebook, Christmas card lists, military units, churches, Anglo-Saxon villages, and Bronze Age communities):
+
+| Layer | Size | Description | Interaction Frequency |
+|-------|------|-------------|----------------------|
+| **Support clique** | ~1.5 | Partner/best friend | Daily |
+| **Sympathy group** | ~5 | Intimate friends — would call in crisis | Multiple times/week |
+| **Close friends** | ~15 | Good friends — regular socializing | Weekly |
+| **Affinity group** | ~50 | Friends — would invite to a party | Monthly |
+| **Active network** | ~150 | Acquaintances — know by name | Yearly |
+| **Mega-band** | ~500 | Faces you recognize | Rarely |
+| **Tribe** | ~1500 | Names you recognize | Almost never |
+
+Each layer is ~3x the size of the one inside it. This is a *fractal* structure.
+
+**Trust Dynamics** (Sutcliffe et al., JASSS):
+- Trust increases with cooperative interactions (with diminishing returns — trust reaches an asymptote)
+- Trust decays over time without interaction
+- **Strong ties resist occasional defections** — best friends are given the benefit of the doubt
+- Strategies favoring existing strong ties produce more Dunbar-conformant networks than strategies favoring many weak ties
+
+**Friend/Foe Networks** (PLOS ONE, 2024):
+- Each agent has a **private opinion** and a **public opinion** (shared with the group)
+- Social network represented as adjacency matrix with positive (friend) and negative (foe) weights
+- Validated against longitudinal data from real schools
 
 **Proposed: Social Circles**
 
@@ -156,6 +191,7 @@ class Relationship:
 **Social Circles** emerge naturally from relationship clusters:
 - Characters with mutual high-affinity relationships form implicit friend groups
 - No formal membership — it's detected from the relationship graph
+- Dunbar layers emerge organically: sort relationships by trust/affinity → top 5 are inner circle, top 15 are close friends, etc.
 - The birthday party scenario works: "Who are my top 5-15 friends?" → invite them
 - Others are excluded not by malice but by social distance
 
@@ -193,14 +229,35 @@ For the "expand friend group" scenario:
 ### 2.5 Memory and Personality Evolution
 
 #### Current Problem
-Personality traits are frozen at creation. Memory is keyword-based.
+Personality traits are frozen at creation. Memory is keyword-based (matches on words like "betray", "cooperat"). Beliefs are simple binary labels ("untrustworthy", "ally").
 
-#### Research: Episodic vs. Semantic Memory
+#### Research: The Stanford Generative Agents Architecture (Park et al., 2023)
 
-Academic ABM research distinguishes:
-- **Episodic Memory**: "On tick 450, John betrayed me at the market"
-- **Semantic Memory**: "John is untrustworthy" (generalized from episodes)
-- **Emotional Memory**: "I felt afraid when John approached" (visceral associations)
+The landmark paper "Generative Agents: Interactive Simulacra of Human Behavior" created 25 agents in a Sims-like sandbox with a three-component memory system:
+
+1. **Observation/Memory Stream**: Complete record of experiences in natural language. Each memory tagged with recency, importance (mundane → poignant), and relevance.
+
+2. **Reflection**: When accumulated importance of recent memories exceeds a threshold, generate higher-level abstractions. *"Klaus Mueller is dedicated to his research on gentrification (because of memories 1, 2, 8, 15)."* Reflections recursively reference other reflections, building an abstraction hierarchy.
+
+3. **Planning**: Top-down recursive plans. Day-level → hour-level → 5-15 minute action chunks. Plans revised when significant new observations occur.
+
+**Result**: Agents autonomously spread Valentine's Day party invitations over two days, made new acquaintances, asked each other on dates, and coordinated to show up at the right time — from a single user seed. Crowdworkers rated generative agents as more believable than humans pretending to be those agents.
+
+#### Research: Memory Taxonomy for Agents (2025 Survey)
+
+| Memory Type | What It Stores | How It's Retrieved | Update Frequency |
+|-------------|---------------|-------------------|-----------------|
+| **Working** | Current context, active task | Direct access | Every tick |
+| **Episodic** | Specific events with (time, place, people, emotion, importance) | Weighted by recency + importance + relevance | On each experience |
+| **Semantic** | Generalized knowledge ("Bob is unreliable", "market is busy on Tuesdays") | Query by subject/predicate | Consolidated from episodes |
+| **Procedural** | Behavioral rules ("when confronted by a bully, stand your ground") | Pattern matching on situation | Strengthened by repeated success |
+
+**Key mechanism**: Episodic-to-semantic consolidation. Novel experiences → stored as episodes → background process identifies patterns → abstracts into semantic rules → agents query semantic memory before acting. This mirrors hippocampal-cortical consolidation in neuroscience.
+
+**Advanced approaches**:
+- **A-MEM** (2025): Organizes memories as interconnected knowledge graphs (Zettelkasten method), not flat lists
+- **AriGraph** (IJCAI 2025): Knowledge graph as world model with episodic memory — significantly outperforms unstructured memory in planning tasks
+- **Divergent beliefs**: Without synchronization, agents develop incompatible beliefs about the same facts. This is actually realistic (humans do this too) and creates interesting conflict.
 
 #### Proposed: Personality Drift
 
@@ -219,6 +276,26 @@ def process_life_event(character, event):
 ```
 
 **Key constraint**: Drift must be slow (0.01-0.03 per major event) and bounded. Core personality is ~60% stable, ~40% shaped by experience. This matches psychological research.
+
+#### Proposed: Grudges and Forgiveness
+
+```python
+class Grudge:
+    cause: str              # "stole from me", "betrayed my trust"
+    source_event_id: str    # The specific memory
+    severity: float         # 0.0 to 1.0
+    created_tick: int
+    decay_rate: float       # Very slow (0.001/tick)
+
+# Forgiveness is probabilistic, based on:
+# - Agent's Agreeableness trait (high = more forgiving)
+# - Relationship's historical trust level (deep history = more forgiveness)
+# - Number of positive interactions since the grudge
+# - Time elapsed (grudges fade, slowly)
+# - The other person's apparent remorse (did they apologize?)
+```
+
+Strong relationships absorb occasional defections (you forgive your best friend). Weak relationships shatter from a single betrayal (you never trust that stranger again). This matches the trust dynamics from Sutcliffe et al.
 
 ### 2.6 Scaling to 100 Million: The Architecture Challenge
 
@@ -260,19 +337,40 @@ LOD 3 — "City" (1,000,000-100,000,000 agents)
 
 1. **Spatial Hashing**: Agents only interact with nearby agents. O(n) instead of O(n^2).
 2. **Event-Driven Activation**: Most agents sleep. Only wake when something happens to them.
-3. **Statistical Twins**: Groups of similar agents share computation. 1000 "young extroverted bakers" can be batch-processed.
-4. **GPU Acceleration**: Trait calculations are embarrassingly parallel. NumPy/CuPy for batch personality math.
-5. **Database-Backed State**: Not all agents in memory. SQLite/PostgreSQL for cold storage, Redis for hot agents.
+3. **Agent Compression / Group Agents**: Groups of similar agents share computation. GA-S3 (ACL 2025) models collections of similar individuals as a single "group agent" with emotion fading and forgetting probability.
+4. **GPU Acceleration**: FLAME GPU 2 simulates **hundreds of millions of agents** on NVIDIA GPUs — at least 1000x faster than next best simulator. Has simulated tumors with 3 billion cells. Active research toward billion-agent simulations.
+5. **Database-Backed State**: Not all agents in memory. SQLite/PostgreSQL for cold storage, Redis for hot agents. Lazy evaluation delays non-critical computations until needed.
 6. **Temporal Batching**: Not every agent needs to decide every tick. Spread computation across ticks.
+7. **Hybrid Agent/Statistical**: JASSS research on combining individual agents (foreground) with statistical distributions (background). When a background event affects a foreground agent, instantiate a new individual from the statistical model.
+
+#### CPU Budget by LOD:
+
+| LOD Level | Agents | Simulation Detail | CPU Budget |
+|-----------|--------|-------------------|------------|
+| LOD 0 (Full) | 10-100 | Full personality, memory, social reasoning | ~60% |
+| LOD 1 (Simplified) | 1K-10K | HEXACO + values + top relationships, decisions every N ticks | ~20% |
+| LOD 2 (Aggregate) | 100K | Major life events sampled from statistical distributions | ~10% |
+| LOD 3 (Statistical) | 1M+ | Pure demographics, economic indicators, migration flows | ~5% |
+| LOD 4 (Background) | 100M | Population numbers only, no individuals active | ~5% |
+
+#### Available Frameworks for Scale:
+
+| Framework | Language | Max Scale | GPU | Best For |
+|-----------|----------|-----------|-----|----------|
+| **FLAME GPU 2** | CUDA/Python | Billions | Native | Maximum performance |
+| **Repast HPC** | C++ | Millions | Via MPI | HPC clusters |
+| **Mesa 3** | Python | ~100K | No | Rapid prototyping (our current tier) |
+| **Agents.jl** | Julia | ~1M | Possible | Performance + usability |
+| **krABMaga** | Rust | ~1M | Possible | Performance-critical |
 
 #### Realistic Milestones:
 
-| Milestone | Agent Count | Architecture |
-|-----------|------------|--------------|
-| **Phase 1** (now → next) | 100-500 | Enhanced single-thread, full simulation |
-| **Phase 2** | 5,000-50,000 | LOD 0+1, spatial partitioning, batch processing |
-| **Phase 3** | 50,000-1,000,000 | LOD 0+1+2, database-backed, event-driven |
-| **Phase 4** | 1M-100M | Full LOD stack, GPU acceleration, distributed |
+| Milestone | Agent Count | Architecture | Tech Stack |
+|-----------|------------|--------------|------------|
+| **Phase 1** (now → next) | 100-500 | Enhanced single-thread, full simulation | Python + FastAPI (current) |
+| **Phase 2** | 5,000-50,000 | LOD 0+1, spatial partitioning, batch processing | Python + NumPy, PostgreSQL |
+| **Phase 3** | 50K-1M | LOD 0+1+2, database-backed, event-driven | Python + FLAME GPU or Julia |
+| **Phase 4** | 1M-100M | Full LOD stack, GPU acceleration, distributed | FLAME GPU / custom CUDA + distributed DB |
 
 ---
 
@@ -386,15 +484,27 @@ class Relationship(BaseModel):
     target_id: str
     affinity: float          # -1.0 to 1.0 (like/dislike)
     familiarity: float       # 0.0 to 1.0 (how well known)
-    trust: float             # 0.0 to 1.0
+    trust: float             # -1.0 to 1.0 (negative = distrust/grudge)
     respect: float           # 0.0 to 1.0
     attraction: float        # 0.0 to 1.0 (romantic interest)
     types: set[str]          # {"friend", "romantic", "spouse", "parent", "child", "colleague", "rival", "mentor"}
     shared_experiences: int  # Count of shared events
     last_interaction: int    # Last tick of interaction
-    grievances: list[str]    # Unresolved conflicts (grudges!)
-    forgiven: list[str]      # Past grievances that were forgiven
+    grievances: list[Grudge] # Unresolved conflicts (grudges!)
+    forgiven: list[Grudge]   # Past grievances that were forgiven
+    decay_rate: float        # Relationship-type-dependent
 ```
+
+**Trust Dynamics** (from Sutcliffe et al.):
+- Trust increases linearly with cooperation, then switches to **logarithmic growth** (diminishing returns — trust reaches an asymptote, like real relationships)
+- Strong ties resist occasional defections (**forgiveness in strong ties**)
+- Betrayal from a high-trust relationship hurts more than from a stranger
+- Without reinforcing interactions, even strong ties decay
+
+**Parent-Child Relationships**:
+- Asymmetric: parent's investment is high and unconditional (barring extreme traits)
+- Child's attachment shaped by parenting quality and evolves with age
+- **Opinion inheritance** (from CK3): 25% of positive opinions and 50% of negative opinions pass to children. Grudges outlive the people who created them.
 
 ### 3.4 Marriage, Divorce, and Family
 
@@ -435,6 +545,12 @@ This is exactly what agent-based modeling (ABM) research confirms:
 3. Large numbers smooth out individual chaos (Law of Large Numbers)
 4. Structure emerges from simple rules (self-organization)
 
+**Key properties of emergent ABM systems:**
+- **Non-linearity**: Small changes in micro-rules can produce dramatic macro-level shifts
+- **Feedback loops**: Macro patterns constrain individual choices, which in turn reinforce or alter the macro patterns
+- **Path dependence**: The same micro-rules can produce different macro outcomes depending on initial conditions
+- **Phase transitions**: Systems can flip between qualitatively different macro states at critical parameter thresholds
+
 At 100 million agents, you don't need to predict any individual. You need to correctly model:
 - The **distribution** of personality types
 - The **rules** of interaction
@@ -442,6 +558,19 @@ At 100 million agents, you don't need to predict any individual. You need to cor
 - The **constraints** (geography, resources, time)
 
 The emergent patterns — empires rising, communities forming, cultures diverging — come from the math, not from scripting.
+
+### 4.1 Designing for Emergence
+
+Based on ABM research, the rules for rich emergent behavior:
+
+1. **Keep individual rules simple but interconnected.** Each rule understandable alone, but rules interact in non-obvious ways.
+2. **Include positive AND negative feedback loops.** Positive (success breeds success) creates amplification. Negative (overcrowding reduces resources) creates stabilization. The interplay produces complexity.
+3. **Model spatial and social proximity.** Agents interact primarily with nearby agents (physical or social), not globally. Local interaction is the engine of emergence.
+4. **Allow heterogeneity.** Agents with identical rules but different parameters (personalities, values) produce richer emergence than homogeneous populations.
+5. **Implement indirect effects (stigmergy).** Agents modify the environment (leave reputations, deplete resources, build structures). Other agents respond to these environmental changes. Coordination without direct communication.
+6. **Run at sufficient scale.** Schelling needs hundreds. Wealth inequality needs thousands. Cultural evolution needs tens of thousands. Empires need millions.
+
+Recent research (2024-2025) shows LLM agents in Sugarscape-style environments exhibit emergent survival-directed behavior from pre-training alone, without explicit survival rules. OASIS (2024) demonstrates group polarization and herd effects emerging naturally at scale, with larger populations producing more pronounced dynamics.
 
 ---
 
@@ -480,11 +609,45 @@ Priority enhancements to make each agent a complex being:
 
 ## References
 
-- Ashton & Lee (2007). HEXACO Personality Model empirical advantages.
-- Schwartz (1992). Theory of Basic Human Values.
-- Schelling (1971). Dynamic Models of Segregation.
-- Epstein & Axtell (1996). Growing Artificial Societies (Sugarscape).
-- Adams, Tarn (2006-present). Dwarf Fortress personality system.
-- Sylvester, Tynan (2013-present). RimWorld trait system design.
-- JASSS — Journal of Artificial Societies and Social Simulation (various papers on value-based ABM).
-- Mercer et al. (2025). Applying Psychometrics to LLM Simulated Populations: HEXACO experiment.
+### Personality & Values
+- Ashton & Lee (2007). [150 Empirical Advantages of the HEXACO Model](https://differentialclub.wdfiles.com/local--files/5fm/Ashton%202007%20HEXACO%20Model%20JPSP.pdf)
+- Mercer et al. (2025). [Applying Psychometrics to LLM Simulated Populations: HEXACO experiment](https://arxiv.org/abs/2508.00742)
+- Schwartz (1992). Theory of Basic Human Values. [Wikipedia](https://en.wikipedia.org/wiki/Theory_of_basic_human_values)
+- JASSS (2024). [Schwartz Human Values and Economic Performance in ABM](https://www.jasss.org/27/1/2.html)
+- JASSS (2020). [Agent-Based Modelling of Values: Refugee Logistics](https://www.jasss.org/23/4/6.html)
+- Nature Scientific Reports (2025). [Value-Based LLM Agent Dialogue Simulation](https://www.nature.com/articles/s41598-025-25531-1)
+
+### Game Design
+- [Dwarf Fortress Personality Facets Wiki](https://dwarffortresswiki.org/index.php/Personality_facet)
+- [Dwarf Fortress Personality Values Wiki](https://dwarffortresswiki.org/index.php/Personality_value)
+- [RimWorld Design Analysis — Game Developer](https://www.gamedeveloper.com/design/how-i-rimworld-i-fleshes-out-the-i-dwarf-fortress-i-formula)
+- [CK3 Traits — Paradox Wiki](https://ck3.paradoxwikis.com/Traits)
+- [The Sims 4 Traits — Sims Wiki](https://sims.fandom.com/wiki/Trait_(The_Sims_4))
+
+### Social Networks & Relationships
+- Sutcliffe et al. [Trust and Social Relationships — JASSS](https://www.jasss.org/15/1/3.html)
+- [Friend/Foe Networks — PLOS ONE (2024)](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0298791)
+- [Dunbar's Number in Motion (2024)](https://www.researchgate.net/publication/388135232)
+- [Marriage Market Models — Springer](https://link.springer.com/chapter/10.1007/978-3-658-26042-2_3)
+
+### Memory & Learning
+- Park et al. (2023). [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)
+- (2025). [Memory in the Age of AI Agents — Survey](https://arxiv.org/abs/2512.13564)
+- (2025). [A-MEM: Agentic Memory with Zettelkasten Method](https://arxiv.org/abs/2502.12110)
+
+### Scaling & Frameworks
+- [FLAME GPU 2](https://flamegpu.com/) — GPU-accelerated agent simulation (billions of agents)
+- [FLAME GPU — NVIDIA Blog](https://developer.nvidia.com/blog/fast-large-scale-agent-based-simulations-on-nvidia-gpus-with-flame-gpu/)
+- [OASIS: One Million Social Media Agents](https://arxiv.org/html/2411.11581v3)
+- [GA-S3: Group Agents for Social Simulation — ACL 2025](https://aclanthology.org/2025.findings-acl.468/)
+- [LOD AI for Virtual Characters](https://www.researchgate.net/publication/221252089_Level_of_Detail_AI_for_Virtual_Characters_in_Games_and_Simulation)
+- [Hybrid Agent Modeling in Population Simulation — JASSS](https://www.jasss.org/19/1/12.html)
+- [ScaleSim: Scaling LLM Agent Simulation](https://arxiv.org/html/2601.21473v1)
+- [Mesa ABM Framework](https://github.com/mesa/mesa)
+- [Agents.jl Comparison](https://juliadynamics.github.io/Agents.jl/stable/comparison/)
+
+### Emergence
+- Schelling (1971). Dynamic Models of Segregation. [Explained](https://medium.com/data-science/schellings-model-of-racial-segregation-4852fad06c13)
+- Epstein & Axtell (1996). Growing Artificial Societies (Sugarscape). [Wikipedia](https://en.wikipedia.org/wiki/Sugarscape)
+- [On Complexity: Emergence in ABM](https://runestone.academy/ns/books/published/complex/AgentBasedModels/Emergence.html)
+- [Generative Social Simulation — Emergent Mind](https://www.emergentmind.com/topics/generative-social-simulation)
