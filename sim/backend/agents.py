@@ -240,6 +240,20 @@ class AgentBrain:
         influence = character.resources.get("influence", 50)
         urgency: dict[ActionType, float] = {}
 
+        # ── Night cycle: agents should sleep at night ──
+        if state:
+            hour = state.tick % 24
+            is_night = hour >= 21 or hour <= 4
+            if is_night:
+                if character.house_id:
+                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 2.0
+                else:
+                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 0.8
+                # Penalize most non-rest actions at night
+                for at in (ActionType.EXPLORE, ActionType.GATHER, ActionType.COMPETE,
+                           ActionType.ATTACK, ActionType.COURT, ActionType.BUILD_HOME):
+                    urgency[at] = urgency.get(at, 0) - 0.8
+
         # ── Needs-based urgency (hunger, energy need, social) ──
         hunger = character.needs.hunger
         energy_need = character.needs.energy
@@ -736,6 +750,15 @@ class AgentBrain:
         energy = character.resources.get("energy", 50)
         if energy < 20:
             scores.append((ActionType.REST, 2.0))
+
+        # Night cycle: strongly prefer rest
+        hour = state.tick % 24
+        is_night = hour >= 21 or hour <= 4
+        if is_night:
+            if character.house_id:
+                scores.append((ActionType.REST, 2.5))
+            else:
+                scores.append((ActionType.REST, 1.5))
 
         # Pick best
         scores.sort(key=lambda x: x[1], reverse=True)

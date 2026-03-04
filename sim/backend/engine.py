@@ -488,6 +488,8 @@ class SimulationEngine:
 
     def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
         """Decay needs each tick and apply boosts from actions. Low needs affect emotions."""
+        house_index: dict[str, House] = {h.id: h for h in sim.environment.houses}
+
         for char_id, char in sim.characters.items():
             if not char.alive:
                 continue
@@ -502,20 +504,85 @@ class SimulationEngine:
             # Apply action boosts
             action = actions.get(char_id)
             if action:
-                boosts = self._ACTION_NEEDS_BOOST.get(action.type.value, {})
+                boosts = dict(self._ACTION_NEEDS_BOOST.get(action.type.value, {}))
+
+                # ── Rest quality depends on location ──
+                if action.type.value == "rest":
+                    hour = sim.tick % 24
+                    is_night = hour >= 21 or hour <= 4
+                    if char.house_id and char.house_id in house_index:
+                        house = house_index[char.house_id]
+                        dx = char.position["x"] - house.position["x"]
+                        dy = char.position["y"] - house.position["y"]
+                        if dx * dx + dy * dy < 400:  # within ~20 units of home
+                            boosts["energy"] = 30.0
+                            boosts["hygiene"] = 10.0
+                        else:
+                            boosts["energy"] = 15.0  # resting but not home yet
+                    else:
+                        # Homeless: rest at cafe/park — worse recovery
+                        boosts["energy"] = 15.0
+                        boosts["hygiene"] = 0.0
+
+                # ── Location-based economy ──
+                # Gathering at farm = earning wealth (working for pay)
+                if action.type.value == "gather":
+                    for loc in sim.environment.locations:
+                        if loc.type == "farm":
+                            dx = char.position["x"] - loc.x
+                            dy = char.position["y"] - loc.y
+                            if dx * dx + dy * dy < 900:  # within ~30 units
+                                boosts["hunger"] = boosts.get("hunger", 25.0) * 1.5
+                                char.resources["wealth"] = char.resources.get("wealth", 0) + 3.0
+                                break
+
+                # Communicating at cafe/restaurant = spending wealth on food
+                if action.type.value == "communicate":
+                    for loc in sim.environment.locations:
+                        if loc.type in ("cafe", "restaurant", "fast_food"):
+                            dx = char.position["x"] - loc.x
+                            dy = char.position["y"] - loc.y
+                            if dx * dx + dy * dy < 900:
+                                wealth = char.resources.get("wealth", 0)
+                                if wealth >= 2:
+                                    char.resources["wealth"] = wealth - 2.0
+                                    boosts["hunger"] = boosts.get("hunger", 10.0) + 5.0
+                                    boosts["social"] = boosts.get("social", 25.0) + 5.0
+                                break
+
+                # Teaching = earning wealth (payment for services)
+                if action.type.value == "teach" and action.target_id:
+                    char.resources["wealth"] = char.resources.get("wealth", 0) + 2.0
+                    # Student pays if they can afford it
+                    student = sim.characters.get(action.target_id)
+                    if student and student.resources.get("wealth", 0) >= 2:
+                        student.resources["wealth"] -= 2.0
+
+                # Crafting = earning wealth (creating value)
+                if action.type.value == "craft":
+                    char.resources["wealth"] = char.resources.get("wealth", 0) + 3.0
+
+                # Resting at cafe without a house = small cost for shelter
+                if action.type.value == "rest" and not char.house_id:
+                    for loc in sim.environment.locations:
+                        if loc.type == "cafe":
+                            dx = char.position["x"] - loc.x
+                            dy = char.position["y"] - loc.y
+                            if dx * dx + dy * dy < 900:
+                                wealth = char.resources.get("wealth", 0)
+                                if wealth >= 1:
+                                    char.resources["wealth"] = wealth - 1.0
+                                    boosts["energy"] = max(boosts.get("energy", 15.0), 20.0)
+                                break
+
                 for need_name, amount in boosts.items():
-                    effective = amount
-                    # Agents gathering near a farm get bonus food
-                    if action.type.value == "gather" and need_name == "hunger":
-                        for loc in sim.environment.locations:
-                            if loc.type == "farm":
-                                dx = char.position["x"] - loc.x
-                                dy = char.position["y"] - loc.y
-                                if dx * dx + dy * dy < 900:  # within ~30 units
-                                    effective *= 1.5
-                                    break
-                    current = getattr(needs, need_name)
-                    setattr(needs, need_name, max(0.0, min(100.0, current + effective)))
+                    current = getattr(needs, need_name, None)
+                    if current is not None:
+                        setattr(needs, need_name, max(0.0, min(100.0, current + amount)))
+
+            # Homeless hygiene penalty
+            if not char.house_id:
+                needs.hygiene = max(0.0, needs.hygiene - 0.5)
 
             # Low needs affect emotions
             if needs.hunger < 20:
@@ -662,6 +729,10 @@ class SimulationEngine:
             else:
                 # Walk toward target at constant speed (personality-affected)
                 speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
+                # Rush home at night
+                hour = sim.tick % 24
+                if (hour >= 21 or hour <= 4) and action.type.value == "rest" and char.house_id:
+                    speed *= 1.5
                 if dist > 0:
                     move = min(speed, dist)
                     char.position["x"] += (dx / dist) * move

@@ -865,16 +865,26 @@ class EventGenerator:
                 )
 
             case ActionType.BUILD_HOME:
+                wealth = char.resources.get("wealth", 0)
+                # Building a home requires wealth >= 20
+                if wealth < 20:
+                    return Event(
+                        tick=tick, type=EventType.DECISION,
+                        title=f"{char.name} can't afford to build",
+                        description=f"{char.name} wants to build but lacks wealth ({wealth:.0f}/20 needed).",
+                        participants=[char_id],
+                        outcomes=[f"{char.name} needs to earn more before building"],
+                        importance=0.2,
+                    )
                 char.resources["energy"] = max(0, char.resources.get("energy", 0) - 15)
-                cost = min(10, char.resources.get("wealth", 0))
-                char.resources["wealth"] = max(0, char.resources.get("wealth", 0) - cost)
+                char.resources["wealth"] = wealth - 20.0
                 char.resources["influence"] = char.resources.get("influence", 0) + 3
                 return Event(
                     tick=tick, type=EventType.DECISION,
                     title=f"{char.name} builds",
                     description=f"{char.name} invests time and resources into building and improving their home.",
                     participants=[char_id],
-                    outcomes=[f"{char.name} spent {cost:.0f} wealth on construction", f"{char.name} gains 3 influence from visible progress"],
+                    outcomes=[f"{char.name} spent 20 wealth on construction", f"{char.name} gains 3 influence"],
                     importance=0.4,
                 )
 
