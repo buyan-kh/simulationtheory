@@ -11,12 +11,13 @@ PERSONALITY_ACTION_WEIGHTS: dict[str, dict[ActionType, float]] = {
     "openness": {
         ActionType.EXPLORE: 0.9, ActionType.COMMUNICATE: 0.6, ActionType.NEGOTIATE: 0.5,
         ActionType.COOPERATE: 0.4, ActionType.SHARE: 0.5, ActionType.OBSERVE: 0.7,
-        ActionType.LEARN: 0.8, ActionType.TEACH: 0.5,
+        ActionType.LEARN: 0.8, ActionType.TEACH: 0.5, ActionType.CRAFT: 0.7,
     },
     "conscientiousness": {
         ActionType.GATHER: 0.8, ActionType.DEFEND: 0.6, ActionType.REST: 0.5,
         ActionType.OBSERVE: 0.6, ActionType.COOPERATE: 0.5,
         ActionType.BUILD_HOME: 0.7, ActionType.LEARN: 0.6, ActionType.TEACH: 0.6,
+        ActionType.CRAFT: 0.6,
     },
     "extraversion": {
         ActionType.COMMUNICATE: 0.9, ActionType.NEGOTIATE: 0.7, ActionType.ALLY: 0.7,
@@ -58,7 +59,12 @@ GOAL_ACTION_MAP: dict[str, list[ActionType]] = {
     "freedom": [ActionType.EXPLORE, ActionType.LEAVE_GROUP, ActionType.COMPETE],
     "legacy": [ActionType.TEACH, ActionType.BUILD_HOME, ActionType.ALLY],
     "community": [ActionType.COOPERATE, ActionType.SHARE, ActionType.FORM_GROUP, ActionType.TEACH],
-    "create": [ActionType.BUILD_HOME, ActionType.GATHER, ActionType.EXPLORE],
+    "create": [ActionType.BUILD_HOME, ActionType.GATHER, ActionType.EXPLORE, ActionType.CRAFT],
+    "craft": [ActionType.CRAFT, ActionType.BUILD_HOME, ActionType.GATHER],
+    "build": [ActionType.BUILD_HOME, ActionType.CRAFT, ActionType.GATHER],
+    "art": [ActionType.CRAFT, ActionType.EXPLORE, ActionType.OBSERVE],
+    "beauty": [ActionType.CRAFT, ActionType.EXPLORE, ActionType.OBSERVE],
+    "comfort": [ActionType.CRAFT, ActionType.BUILD_HOME, ActionType.REST],
 }
 
 MOTIVATION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
@@ -77,7 +83,7 @@ MOTIVATION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
     "duty": {ActionType.DEFEND: 0.6, ActionType.TEACH: 0.5, ActionType.COOPERATE: 0.5, ActionType.BUILD_HOME: 0.4},
     "rebellion": {ActionType.COMPETE: 0.5, ActionType.LEAVE_GROUP: 0.5, ActionType.ATTACK: 0.3, ActionType.BULLY: 0.3},
     "faith": {ActionType.COOPERATE: 0.5, ActionType.SHARE: 0.4, ActionType.TEACH: 0.4, ActionType.BETRAY: -0.5},
-    "creativity": {ActionType.BUILD_HOME: 0.6, ActionType.EXPLORE: 0.5, ActionType.LEARN: 0.5, ActionType.OBSERVE: 0.4},
+    "creativity": {ActionType.BUILD_HOME: 0.6, ActionType.EXPLORE: 0.5, ActionType.LEARN: 0.5, ActionType.OBSERVE: 0.4, ActionType.CRAFT: 0.8},
 }
 
 WEATHER_ACTION_MODIFIERS: dict[str, dict[ActionType, float]] = {
@@ -104,7 +110,7 @@ EMOTION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
     "happiness": {
         ActionType.COOPERATE: 0.5, ActionType.SHARE: 0.6, ActionType.COMMUNICATE: 0.4,
         ActionType.ALLY: 0.3, ActionType.COURT: 0.4, ActionType.TEACH: 0.3,
-        ActionType.BUILD_HOME: 0.3,
+        ActionType.BUILD_HOME: 0.3, ActionType.CRAFT: 0.4,
     },
     "anger": {
         ActionType.ATTACK: 0.7, ActionType.COMPETE: 0.5, ActionType.BETRAY: 0.3,

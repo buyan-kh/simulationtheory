@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback } from 'react';
-import type { Character, Location } from '@/lib/types';
+import type { Character, Location, WorldItem } from '@/lib/types';
 import { locationToBuildingType, type BuildingType } from '@/lib/sprites/buildings';
 
 interface BuildingInteriorProps {
@@ -9,6 +9,7 @@ interface BuildingInteriorProps {
   locations: Location[];
   characters: Record<string, Character>;
   onClose: () => void;
+  worldItems?: WorldItem[];
 }
 
 // Interior dimensions (pixels before scale)
@@ -625,6 +626,7 @@ export default function BuildingInterior({
   locations,
   characters,
   onClose,
+  worldItems = [],
 }: BuildingInteriorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -634,6 +636,14 @@ export default function BuildingInterior({
   const buildingType = locationToBuildingType(location.type, location.name);
   const info = BUILDING_INFO[buildingType];
   const nearbyChars = getCharactersNearBuilding(characters, location);
+
+  // Find items placed near this location (by position proximity or house_id)
+  const locationItems = worldItems.filter((item) => {
+    if (!location) return false;
+    const dx = item.position.x - location.x;
+    const dy = item.position.y - location.y;
+    return Math.sqrt(dx * dx + dy * dy) < 20;
+  });
 
   const drawInterior = useCallback(() => {
     const canvas = canvasRef.current;
@@ -651,8 +661,36 @@ export default function BuildingInterior({
       drawer(ctx, INTERIOR_W, INTERIOR_H);
     }
 
+    // Render crafted items inside the building
+    const itemsToRender = locationItems.slice(0, 6); // max 6 items shown
+    for (let i = 0; i < itemsToRender.length; i++) {
+      const item = itemsToRender[i];
+      if (!item.pixels || item.pixels.length === 0) continue;
+
+      // Position items along the floor area
+      const ix = 10 + (i % 3) * 50;
+      const iy = INTERIOR_H - 15 - Math.floor(i / 3) * 20;
+
+      for (let row = 0; row < item.height; row++) {
+        for (let col = 0; col < item.width; col++) {
+          const color = item.pixels[row * item.width + col];
+          if (color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(ix + col, iy + row, 1, 1);
+          }
+        }
+      }
+
+      // Tiny label
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(ix, iy - 5, item.width + 2, 4);
+      ctx.fillStyle = '#cccccc';
+      ctx.font = '3px monospace';
+      ctx.fillText(item.name.split(' by ')[0] || item.name, ix, iy - 2);
+    }
+
     ctx.restore();
-  }, [buildingType]);
+  }, [buildingType, locationItems]);
 
   useEffect(() => {
     drawInterior();
@@ -718,6 +756,20 @@ export default function BuildingInterior({
                 </div>
               ))}
             </div>
+
+            {/* Crafted items */}
+            {locationItems.length > 0 && (
+              <div className="mb-4">
+                <div className="text-pixel-xs text-gray-400 tracking-wider mb-2">
+                  ITEMS ({locationItems.length})
+                </div>
+                {locationItems.slice(0, 8).map((item) => (
+                  <div key={item.id} className="text-pixel-xs text-gray-500 mb-1 truncate">
+                    - {item.name}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Characters inside */}
             <div>

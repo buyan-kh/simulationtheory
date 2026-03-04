@@ -10,6 +10,7 @@ from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
 from groups import GroupManager
 from trade import TradeManager
+from crafting import process_crafting
 from db import SimulationDB
 from spatial import SpatialGrid
 from lod import LODManager, LODTier
@@ -315,6 +316,10 @@ class SimulationEngine:
         trade_events = self.trade_mgr.process_market(sim, actions)
         all_events.extend(trade_events)
 
+        # ── 10b. Crafting ──
+        craft_events = process_crafting(sim, actions)
+        all_events.extend(craft_events)
+
         # ── 11. Location resource regeneration ──
         self._regen_location_resources(sim)
 
@@ -478,6 +483,7 @@ class SimulationEngine:
         "learn": {"fun": 10.0, "energy": -5.0},
         "teach": {"social": 15.0, "fun": 5.0, "energy": -5.0},
         "court": {"social": 20.0, "fun": 15.0, "energy": -5.0},
+        "craft": {"fun": 20.0, "energy": -10.0},
     }
 
     def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
@@ -540,6 +546,7 @@ class SimulationEngine:
         "rest": "cafe",
         "learn": "knowledge",
         "teach": "knowledge",
+        "craft": "knowledge",
     }
 
     # Fallback coordinates if no matching location found
@@ -567,6 +574,7 @@ class SimulationEngine:
         "rest": (50, 50),
         "learn": (50, 50),
         "teach": (50, 50),
+        "craft": (50, 50),
     }
 
     _location_type_cache: dict[str, dict[str, Location]] = {}  # sim_id -> {type -> Location}

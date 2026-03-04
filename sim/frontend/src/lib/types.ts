@@ -36,7 +36,8 @@ export type ActionType =
   | 'explore' | 'rest' | 'gather' | 'share' | 'attack' | 'defend'
   | 'observe' | 'communicate'
   | 'trade' | 'form_group' | 'join_group' | 'leave_group'
-  | 'build_home' | 'kill' | 'bully' | 'learn' | 'teach' | 'court';
+  | 'build_home' | 'kill' | 'bully' | 'learn' | 'teach' | 'court'
+  | 'craft';
 
 export interface Action {
   type: ActionType;
@@ -198,6 +199,20 @@ export interface MarketState {
   price_index: Record<string, number>;
 }
 
+export interface WorldItem {
+  id: string;
+  name: string;
+  creator_id: string;
+  created_tick: number;
+  position: { x: number; y: number };
+  width: number;
+  height: number;
+  pixels: (string | null)[];
+  item_type: string;
+  usable: boolean;
+  placed_in_house: string | null;
+}
+
 export interface SimulationState {
   id: string;
   name: string;
@@ -212,6 +227,7 @@ export interface SimulationState {
   chat_log: ChatMessage[];
   groups: Record<string, Group>;
   market: MarketState;
+  world_items: WorldItem[];
 }
 
 export interface SimulationSummary {

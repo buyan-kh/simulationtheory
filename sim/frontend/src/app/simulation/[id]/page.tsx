@@ -245,6 +245,7 @@ export default function SimulationPage() {
               onClickBuilding={(name) => setSelectedBuilding(name)}
               chatMessages={chatMessages}
               currentTick={simulation.tick}
+              worldItems={simulation.world_items || []}
             />
           </div>
 
@@ -320,6 +321,7 @@ export default function SimulationPage() {
           locations={simulation.environment.locations}
           characters={simulation.characters}
           onClose={() => setSelectedBuilding(null)}
+          worldItems={simulation.world_items || []}
         />
       )}
 

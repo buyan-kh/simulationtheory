@@ -63,6 +63,7 @@ class ActionType(str, Enum):
     LEARN = "learn"
     TEACH = "teach"
     COURT = "court"
+    CRAFT = "craft"
 
 
 class Action(BaseModel):
@@ -211,6 +212,22 @@ class Environment(BaseModel):
     houses: list[House] = []
 
 
+class WorldItem(BaseModel):
+    """An item created by an agent — pixel art stored as a flat color grid."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    creator_id: str
+    created_tick: int = 0
+    position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    width: int = 8   # pixel grid width
+    height: int = 8  # pixel grid height
+    # Flat list of hex color strings (or null for transparent), row-major order
+    pixels: list[str | None] = []
+    item_type: str = "decoration"  # furniture, tool, decoration, food, art
+    usable: bool = True
+    placed_in_house: str | None = None  # house_id if placed inside a house
+
+
 class SimulationConfig(BaseModel):
     randomness: float = Field(default=0.3, ge=0.0, le=1.0)
     information_symmetry: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -304,6 +321,7 @@ class SimulationState(BaseModel):
     updated_at: float = Field(default_factory=time.time)
     groups: dict[str, Group] = {}
     market: MarketState = Field(default_factory=MarketState)
+    world_items: list[WorldItem] = []
 
 
 class SimulationSummary(BaseModel):

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback } from 'react';
-import type { Character, Location, ChatMessage } from '@/lib/types';
+import type { Character, Location, ChatMessage, WorldItem } from '@/lib/types';
 import { PixelRenderer, Sprite, getDayNightState } from '@/lib/sprites/renderer';
 import { generateWorld, simToWorld, WORLD_SIZE, SCALE } from '@/lib/world';
 import {
@@ -21,6 +21,7 @@ interface PixelCanvasProps {
   onClickBuilding?: (buildingName: string) => void;
   chatMessages: ChatMessage[];
   currentTick: number;
+  worldItems?: WorldItem[];
 }
 
 const CHAR_SPRITE_W = 16 * SCALE;
@@ -64,6 +65,7 @@ export default function PixelCanvas({
   onClickBuilding,
   chatMessages,
   currentTick,
+  worldItems = [],
 }: PixelCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,6 +224,63 @@ export default function PixelCanvas({
     return sprites;
   }, [characters, selectedCharacterId, chatMessages, currentTick]);
 
+  // Build world item sprites
+  const buildWorldItemSprites = useCallback((): Sprite[] => {
+    const sprites: Sprite[] = [];
+
+    for (const item of worldItems) {
+      if (!item.pixels || item.pixels.length === 0) continue;
+      // Only render items placed in the world (not inside houses for now)
+      if (item.placed_in_house) continue;
+
+      const { wx, wy } = simToWorld(item.position.x, item.position.y);
+      const itemScale = SCALE;
+      const px = wx * SCALE - (item.width * itemScale) / 2;
+      const py = wy * SCALE - (item.height * itemScale);
+
+      sprites.push({
+        x: px,
+        y: py,
+        width: item.width * itemScale,
+        height: item.height * itemScale,
+        layer: 1,
+        draw: (ctx: CanvasRenderingContext2D) => {
+          for (let row = 0; row < item.height; row++) {
+            for (let col = 0; col < item.width; col++) {
+              const color = item.pixels[row * item.width + col];
+              if (color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(
+                  px + col * itemScale,
+                  py + row * itemScale,
+                  itemScale,
+                  itemScale,
+                );
+              }
+            }
+          }
+
+          // Item name label on hover (always show small label)
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          const labelW = item.name.length * 3.5 + 6;
+          const labelX = px + (item.width * itemScale) / 2 - labelW / 2;
+          const labelY = py - 8;
+          ctx.beginPath();
+          ctx.roundRect(labelX, labelY, labelW, 8, 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#cccccc';
+          ctx.font = '5px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(item.name, px + (item.width * itemScale) / 2, labelY + 6);
+          ctx.textAlign = 'start';
+        },
+      });
+    }
+
+    return sprites;
+  }, [worldItems]);
+
   // Build relationship lines
   const buildRelationshipSprites = useCallback((): Sprite[] => {
     if (!selectedCharacterId || !characters[selectedCharacterId]) return [];
@@ -277,6 +336,7 @@ export default function PixelCanvas({
       ...world.decorationSprites,
       ...world.houseSprites,
       ...world.locationSprites,
+      ...buildWorldItemSprites(),
       ...buildRelationshipSprites(),
       ...buildCharacterSprites(),
     ];
@@ -288,7 +348,7 @@ export default function PixelCanvas({
     for (const [id, char] of Object.entries(characters)) {
       prev.set(id, { x: char.position.x, y: char.position.y });
     }
-  }, [characters, locations, selectedCharacterId, chatMessages, currentTick, buildCharacterSprites, buildRelationshipSprites]);
+  }, [characters, locations, selectedCharacterId, chatMessages, currentTick, worldItems, buildCharacterSprites, buildRelationshipSprites, buildWorldItemSprites]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden relative bg-[#0a0a1a]">
