@@ -71,6 +71,7 @@ class SimulationEngine:
         sim = self.simulations[sim_id]
         rng = random.Random(hash((sim_id, char_create.name, len(sim.characters))))
 
+        age = rng.randint(16, 65)
         char = Character(
             name=char_create.name,
             profile=char_create.profile,
@@ -79,6 +80,8 @@ class SimulationEngine:
             motivations=char_create.motivations,
             image_url=char_create.image_url,
             position={"x": rng.uniform(-80, 80), "y": rng.uniform(-80, 80)},
+            age=age,
+            max_age=rng.randint(max(age + 15, 60), 100),
         )
         sim.characters[char.id] = char
         self._assign_house(sim, char)
@@ -755,8 +758,9 @@ class SimulationEngine:
             if not char.alive:
                 continue
 
-            # Aging
-            char.age += sim.config.aging_rate
+            # Aging: once per in-game day (24 ticks), not every tick
+            if sim.tick % 24 == 0:
+                char.age += sim.config.aging_rate
             self._apply_age_effects(char)
 
             # Death checks
