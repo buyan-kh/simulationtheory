@@ -68,6 +68,13 @@ export async function addCharacter(simId: string, character: CharacterCreate): P
   });
 }
 
+export async function batchCreateCharacters(simId: string, count: number, namePrefix = ''): Promise<Character[]> {
+  return request(`/simulations/${simId}/characters/batch`, {
+    method: 'POST',
+    body: JSON.stringify({ count, name_prefix: namePrefix }),
+  });
+}
+
 export async function getCharacter(simId: string, charId: string): Promise<Character> {
   return request(`/simulations/${simId}/characters/${charId}`);
 }

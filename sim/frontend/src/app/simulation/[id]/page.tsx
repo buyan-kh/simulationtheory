@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSimStore } from '@/lib/store';
-import { getSimulation, stepSimulation, updateConfig, addCharacter, getReplayTicks, getReplayState } from '@/lib/api';
+import { getSimulation, stepSimulation, updateConfig, addCharacter, batchCreateCharacters, getReplayTicks, getReplayState } from '@/lib/api';
 import type { SimulationConfig, CharacterCreate, PersonalityTraits } from '@/lib/types';
 import CharacterCard from '@/components/CharacterCard';
 import PixelCanvas from '@/components/PixelCanvas';
@@ -311,6 +311,12 @@ export default function SimulationPage() {
             setSimulation(sim);
             setShowAddChar(false);
           }}
+          onBatchAdd={async (count, prefix) => {
+            await batchCreateCharacters(simId, count, prefix);
+            const sim = await getSimulation(simId);
+            setSimulation(sim);
+            setShowAddChar(false);
+          }}
         />
       )}
 
@@ -471,16 +477,21 @@ const TEMPLATES: CharTemplate[] = [
   { label: 'Spy', icon: '⊘', color: '#7a8a9a', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
 ];
 
-function QuickAddCharacter({ onClose, onAdd }: {
+function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
   onClose: () => void;
   onAdd: (data: CharacterCreate) => void;
+  onBatchAdd: (count: number, prefix: string) => void;
 }) {
+  const [mode, setMode] = useState<'single' | 'batch'>('single');
   const [name, setName] = useState('');
   const [profile, setProfile] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const [traits, setTraits] = useState<PersonalityTraits>({ openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5 });
   const [goals, setGoals] = useState('');
   const [showTraits, setShowTraits] = useState(false);
+  const [batchCount, setBatchCount] = useState(10);
+  const [batchPrefix, setBatchPrefix] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   function selectTemplate(idx: number) {
     const t = TEMPLATES[idx];
@@ -496,125 +507,208 @@ function QuickAddCharacter({ onClose, onAdd }: {
       <div className="pixel-panel p-5 w-[560px] max-h-[85vh] overflow-y-auto pixel-scrollbar" onClick={(e) => e.stopPropagation()}
         style={{ borderColor: '#ff00aa', boxShadow: '0 0 12px rgba(255,0,170,0.3), 4px 4px 0 #000' }}
       >
-        <div className="text-pixel-sm text-neon-magenta mb-3 tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
-          ADD CHARACTER
-        </div>
-
-        <div className="text-pixel-xs text-gray-500 mb-2 tracking-wider">TEMPLATES</div>
-        <div className="grid grid-cols-7 gap-1.5 mb-4">
-          {TEMPLATES.map((t, i) => (
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-pixel-sm text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+            ADD {mode === 'batch' ? 'AGENTS' : 'CHARACTER'}
+          </div>
+          <div className="flex" style={{ border: '2px solid #4a4a8a' }}>
             <button
-              key={t.label}
-              onClick={() => selectTemplate(i)}
-              className="pixel-panel p-1.5 text-center hover:bg-white/5 transition-colors"
-              style={selectedTemplate === i ? { borderColor: t.color, boxShadow: `0 0 6px ${t.color}40` } : {}}
-              title={t.label}
+              onClick={() => setMode('single')}
+              className="px-3 py-1 text-pixel-xs tracking-wider transition-colors"
+              style={mode === 'single' ? { background: '#ff00aa30', color: '#ff00aa', borderRight: '2px solid #4a4a8a' } : { color: '#6a6a9a', borderRight: '2px solid #4a4a8a' }}
             >
-              <div className="mb-0.5" style={{ fontSize: '14px', color: t.color }}>{t.icon}</div>
-              <div className="text-gray-400 truncate" style={{ fontSize: '6px' }}>{t.label}</div>
+              SINGLE
             </button>
-          ))}
+            <button
+              onClick={() => setMode('batch')}
+              className="px-3 py-1 text-pixel-xs tracking-wider transition-colors"
+              style={mode === 'batch' ? { background: '#00e5ff30', color: '#00e5ff' } : { color: '#6a6a9a' }}
+            >
+              BATCH
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">NAME</label>
+        {mode === 'batch' ? (
+          <div className="space-y-4">
+            <div className="p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+              <div className="text-pixel-xs text-gray-400 mb-2">Spawn many agents at once with randomized traits, goals, and personalities.</div>
+            </div>
+
+            <div>
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">NUMBER OF AGENTS</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={batchCount}
+                  onChange={(e) => setBatchCount(Math.max(1, Math.min(10000, Number(e.target.value) || 1)))}
+                  min={1}
+                  max={10000}
+                  className="pixel-input text-pixel-xs w-32"
+                />
+                <div className="flex gap-1.5">
+                  {[10, 50, 100, 500, 1000].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setBatchCount(n)}
+                      className="px-2 py-1 text-pixel-xs transition-colors"
+                      style={batchCount === n
+                        ? { background: '#00e5ff20', color: '#00e5ff', border: '1px solid #00e5ff' }
+                        : { color: '#6a6a9a', border: '1px solid #3a3a6a' }
+                      }
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">NAME PREFIX (OPTIONAL)</label>
               <input
-                value={name}
-                onChange={(e) => { setName(e.target.value); setSelectedTemplate(null); }}
-                placeholder="Enter any name..."
+                value={batchPrefix}
+                onChange={(e) => setBatchPrefix(e.target.value)}
+                placeholder="e.g. Villager, Soldier..."
                 className="pixel-input text-pixel-xs w-full"
               />
+              <div className="text-gray-600 mt-1" style={{ fontSize: '7px' }}>
+                Leave empty for random names
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button onClick={onClose} className="pixel-btn text-pixel-xs">
+                CANCEL
+              </button>
+              <button
+                onClick={() => { setSubmitting(true); onBatchAdd(batchCount, batchPrefix); }}
+                disabled={submitting}
+                className="pixel-btn pixel-btn-cyan text-pixel-xs"
+              >
+                {submitting ? 'SPAWNING...' : `SPAWN ${batchCount} AGENTS`}
+              </button>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="text-pixel-xs text-gray-500 mb-2 tracking-wider">TEMPLATES</div>
+            <div className="grid grid-cols-7 gap-1.5 mb-4">
+              {TEMPLATES.map((t, i) => (
+                <button
+                  key={t.label}
+                  onClick={() => selectTemplate(i)}
+                  className="pixel-panel p-1.5 text-center hover:bg-white/5 transition-colors"
+                  style={selectedTemplate === i ? { borderColor: t.color, boxShadow: `0 0 6px ${t.color}40` } : {}}
+                  title={t.label}
+                >
+                  <div className="mb-0.5" style={{ fontSize: '14px', color: t.color }}>{t.icon}</div>
+                  <div className="text-gray-400 truncate" style={{ fontSize: '6px' }}>{t.label}</div>
+                </button>
+              ))}
+            </div>
 
-          <div>
-            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">BACKSTORY</label>
-            <textarea
-              value={profile}
-              onChange={(e) => setProfile(e.target.value)}
-              placeholder="Who is this character? What drives them?"
-              rows={2}
-              className="pixel-input text-pixel-xs w-full resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">GOALS</label>
-            <input
-              value={goals}
-              onChange={(e) => setGoals(e.target.value)}
-              placeholder="Comma-separated goals..."
-              className="pixel-input text-pixel-xs w-full"
-            />
-          </div>
-
-          <div>
-            <button
-              onClick={() => setShowTraits(!showTraits)}
-              className="text-pixel-xs text-neon-cyan hover:text-white transition-colors tracking-wider flex items-center gap-1"
-            >
-              <span style={{ fontSize: '8px' }}>{showTraits ? '▼' : '▶'}</span>
-              PERSONALITY TRAITS
-            </button>
-            {showTraits && (
-              <div className="mt-2 space-y-1.5 p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                {([
-                  ['Openness', 'openness', 'purple'],
-                  ['Conscientiousness', 'conscientiousness', 'cyan'],
-                  ['Extraversion', 'extraversion', 'gold'],
-                  ['Agreeableness', 'agreeableness', 'green'],
-                  ['Neuroticism', 'neuroticism', 'red'],
-                ] as const).map(([label, key, color]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="text-gray-400 w-28 truncate uppercase" style={{ fontSize: '7px', fontFamily: 'var(--font-pixel, monospace)' }}>{label}</span>
-                    <div className="flex-1 relative" style={{ height: '10px' }}>
-                      <div className="pixel-bar-container" style={{ height: '10px' }}>
-                        <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color] }} />
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={Math.round(traits[key] * 100)}
-                        onChange={(e) => setTraits({ ...traits, [key]: Number(e.target.value) / 100 })}
-                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                      />
-                    </div>
-                    <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
-                      {Math.round(traits[key] * 100)}
-                    </span>
-                  </div>
-                ))}
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">NAME</label>
+                  <input
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setSelectedTemplate(null); }}
+                    placeholder="Enter any name..."
+                    className="pixel-input text-pixel-xs w-full"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={onClose} className="pixel-btn text-pixel-xs">
-            CANCEL
-          </button>
-          <button
-            onClick={() => {
-              if (!name.trim()) return;
-              const goalList = goals.split(',').map(g => g.trim()).filter(Boolean);
-              const tmpl = selectedTemplate !== null ? TEMPLATES[selectedTemplate] : null;
-              onAdd({
-                name: name.trim(),
-                profile: profile.trim() || undefined,
-                traits,
-                goals: goalList.length > 0 ? goalList : undefined,
-                motivations: tmpl?.motivations,
-              });
-            }}
-            disabled={!name.trim()}
-            className="pixel-btn pixel-btn-cyan text-pixel-xs"
-          >
-            ADD
-          </button>
-        </div>
+              <div>
+                <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">BACKSTORY</label>
+                <textarea
+                  value={profile}
+                  onChange={(e) => setProfile(e.target.value)}
+                  placeholder="Who is this character? What drives them?"
+                  rows={2}
+                  className="pixel-input text-pixel-xs w-full resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-pixel-xs text-gray-500 tracking-wider block mb-1">GOALS</label>
+                <input
+                  value={goals}
+                  onChange={(e) => setGoals(e.target.value)}
+                  placeholder="Comma-separated goals..."
+                  className="pixel-input text-pixel-xs w-full"
+                />
+              </div>
+
+              <div>
+                <button
+                  onClick={() => setShowTraits(!showTraits)}
+                  className="text-pixel-xs text-neon-cyan hover:text-white transition-colors tracking-wider flex items-center gap-1"
+                >
+                  <span style={{ fontSize: '8px' }}>{showTraits ? '▼' : '▶'}</span>
+                  PERSONALITY TRAITS
+                </button>
+                {showTraits && (
+                  <div className="mt-2 space-y-1.5 p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                    {([
+                      ['Openness', 'openness', 'purple'],
+                      ['Conscientiousness', 'conscientiousness', 'cyan'],
+                      ['Extraversion', 'extraversion', 'gold'],
+                      ['Agreeableness', 'agreeableness', 'green'],
+                      ['Neuroticism', 'neuroticism', 'red'],
+                    ] as const).map(([label, key, color]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-gray-400 w-28 truncate uppercase" style={{ fontSize: '7px', fontFamily: 'var(--font-pixel, monospace)' }}>{label}</span>
+                        <div className="flex-1 relative" style={{ height: '10px' }}>
+                          <div className="pixel-bar-container" style={{ height: '10px' }}>
+                            <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color] }} />
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={Math.round(traits[key] * 100)}
+                            onChange={(e) => setTraits({ ...traits, [key]: Number(e.target.value) / 100 })}
+                            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
+                          {Math.round(traits[key] * 100)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button onClick={onClose} className="pixel-btn text-pixel-xs">
+                CANCEL
+              </button>
+              <button
+                onClick={() => {
+                  if (!name.trim()) return;
+                  const goalList = goals.split(',').map(g => g.trim()).filter(Boolean);
+                  const tmpl = selectedTemplate !== null ? TEMPLATES[selectedTemplate] : null;
+                  onAdd({
+                    name: name.trim(),
+                    profile: profile.trim() || undefined,
+                    traits,
+                    goals: goalList.length > 0 ? goalList : undefined,
+                    motivations: tmpl?.motivations,
+                  });
+                }}
+                disabled={!name.trim()}
+                className="pixel-btn pixel-btn-cyan text-pixel-xs"
+              >
+                ADD
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
