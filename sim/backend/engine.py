@@ -459,12 +459,12 @@ class SimulationEngine:
         char.house_id = house.id
 
     # ── Needs decay rates per tick ──
-    _NEEDS_DECAY = {"hunger": 1.0, "energy": 1.5, "social": 1.0, "fun": 0.8, "hygiene": 0.5}
+    _NEEDS_DECAY = {"hunger": 2.0, "energy": 3.0, "social": 1.5, "fun": 1.0, "hygiene": 0.5}
 
     # ── Action → needs satisfaction mapping ──
     _ACTION_NEEDS_BOOST: dict[str, dict[str, float]] = {
         "rest": {"energy": 30.0, "hygiene": 5.0},
-        "gather": {"hunger": 35.0, "fun": 5.0},
+        "gather": {"hunger": 25.0, "fun": 5.0},
         "communicate": {"social": 25.0, "fun": 10.0, "hunger": 10.0},
         "ally": {"social": 15.0},
         "negotiate": {"social": 10.0},
