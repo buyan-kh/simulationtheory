@@ -22,7 +22,9 @@ export type BuildingType =
   | 'cafe'
   | 'restaurant'
   | 'fast_food'
-  | 'park';
+  | 'park'
+  | 'farm'
+  | 'cemetery';
 
 // ── Color Palette ──────────────────────────────────────────────────────
 
@@ -868,6 +870,109 @@ function makePark(): BuildingDef {
 
 // ── Building Cache ─────────────────────────────────────────────────────
 
+function makeFarm(): BuildingDef {
+  const w = 36, h = 24, g = grid(w, h);
+  const BR = '#8b6914'; // barn wood
+  const BD2 = '#6b4a0e'; // barn dark
+  const BL2 = '#9a7820'; // barn light
+  const RB = '#aa3322'; // barn roof
+  const RD2 = '#882211'; // barn roof dark
+  const CR = '#44aa44'; // crop green
+  const CD = '#228833'; // crop dark
+  const CY = '#ccaa33'; // crop yellow
+  const DT = '#8a7a5a'; // dirt
+
+  // Barn roof
+  for (let r = 0; r < 4; r++) {
+    const hw = 5 + r;
+    for (let x = 8 - r; x <= 8 + hw; x++) px(g, x, r, ((r + x) & 1) ? RD2 : RB);
+  }
+  // Barn body
+  rc(g, 4, 4, 14, 10, BR);
+  rc(g, 4, 4, 1, 10, BD2); // left wall shadow
+  rc(g, 17, 4, 1, 10, BD2); // right wall edge
+  // Barn door
+  rc(g, 8, 8, 4, 6, BD2);
+  rc(g, 9, 9, 2, 5, BL2);
+  // Silo
+  rc(g, 19, 2, 4, 12, ST);
+  rc(g, 19, 2, 1, 12, SD);
+  rc(g, 22, 2, 1, 12, SL);
+  rc(g, 19, 1, 4, 1, SD);
+
+  // Crop rows
+  for (let row = 0; row < 3; row++) {
+    const fy = 16 + row * 3;
+    for (let x = 0; x < 36; x += 2) {
+      const c = (x + row) % 6 < 3 ? CR : (row % 2 === 0 ? CY : CD);
+      px(g, x, fy, c);
+      px(g, x, fy + 1, CD);
+    }
+    // Dirt between rows
+    hl(g, 0, fy + 2, 36, DT);
+  }
+
+  // Fence posts
+  for (let x = 0; x < 36; x += 4) {
+    px(g, x, 14, BD2);
+    px(g, x, 15, BD2);
+  }
+  // Fence rails
+  hl(g, 0, 14, 36, BL2);
+
+  return { pixels: g, width: w, height: h };
+}
+
+function makeCemetery(): BuildingDef {
+  const w = 32, h = 20, g = grid(w, h);
+  const GS = '#7a7a8a'; // gravestone
+  const GD2 = '#5a5a6a'; // grave dark
+  const GL2 = '#9a9aaa'; // grave light
+  const FE = '#3a3a3a'; // iron fence
+  const GR = '#336633'; // grass dark
+  const FL = '#cc4466'; // flower
+
+  // Iron fence along top and sides
+  for (let x = 0; x < w; x += 2) {
+    px(g, x, 0, FE);
+    px(g, x, 1, FE);
+    if (x % 4 === 0) px(g, x, 2, FE); // fence points
+  }
+  vl(g, 0, 0, h, FE);
+  vl(g, w - 1, 0, h, FE);
+
+  // Gate opening
+  g[0][15] = null; g[1][15] = null; g[2][15] = null;
+  g[0][16] = null; g[1][16] = null; g[2][16] = null;
+
+  // Gravestones in rows
+  const positions = [
+    [4, 5], [9, 5], [14, 5], [20, 5], [25, 5],
+    [6, 10], [12, 10], [18, 10], [24, 10],
+    [4, 15], [10, 15], [16, 15], [22, 15], [27, 15],
+  ];
+  for (const [gx, gy] of positions) {
+    // Gravestone
+    px(g, gx, gy, GL2);
+    px(g, gx + 1, gy, GS);
+    px(g, gx, gy + 1, GS);
+    px(g, gx + 1, gy + 1, GD2);
+    px(g, gx, gy + 2, GD2);
+    px(g, gx + 1, gy + 2, GD2);
+    // Dirt mound
+    px(g, gx - 1, gy + 3, GR);
+    px(g, gx, gy + 3, GR);
+    px(g, gx + 1, gy + 3, GR);
+    px(g, gx + 2, gy + 3, GR);
+  }
+
+  // Scattered flowers
+  px(g, 7, 7, FL); px(g, 17, 12, FL); px(g, 26, 7, FL);
+  px(g, 3, 17, FL); px(g, 21, 17, FL);
+
+  return { pixels: g, width: w, height: h };
+}
+
 const BUILDINGS: Record<BuildingType, BuildingDef> = {
   house_small: makeHouseSmall(),
   house_medium: makeHouseMedium(),
@@ -883,6 +988,8 @@ const BUILDINGS: Record<BuildingType, BuildingDef> = {
   restaurant: makeRestaurant(),
   fast_food: makeFastFood(),
   park: makePark(),
+  farm: makeFarm(),
+  cemetery: makeCemetery(),
 };
 
 // ── Chimney Smoke Animation ────────────────────────────────────────────
@@ -1031,6 +1138,8 @@ export function locationToBuildingType(locType: string, locName: string): Buildi
   if (t === 'diplomacy' || t === 'council' || n.includes('council') || n.includes('hall')) return 'council';
   if (t === 'knowledge' || t === 'library' || n.includes('library')) return 'library';
   if (t === 'exploration' || t === 'wilderness' || n.includes('tavern') || n.includes('inn')) return 'tavern';
+  if (t === 'farm' || n.includes('farm')) return 'farm';
+  if (t === 'cemetery' || n.includes('cemetery') || n.includes('graveyard')) return 'cemetery';
   if (n.includes('well')) return 'well';
   if (n.includes('fountain')) return 'fountain';
   return 'tavern';

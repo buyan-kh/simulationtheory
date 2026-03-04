@@ -424,6 +424,53 @@ function drawDeadEyes(
   }
 }
 
+function drawGravestone(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  scale: number,
+): void {
+  const s = scale;
+  // Stone base color
+  const stone = '#7a7a8a';
+  const stoneDark = '#5a5a6a';
+  const stoneLight = '#9a9aaa';
+  const dirt = '#5a4a3a';
+
+  // Dirt mound at base
+  ctx.fillStyle = dirt;
+  ctx.fillRect(x + 4 * s, y + 13 * s, 8 * s, 2 * s);
+  ctx.fillRect(x + 3 * s, y + 14 * s, 10 * s, s);
+
+  // Gravestone body (rounded top)
+  ctx.fillStyle = stone;
+  ctx.fillRect(x + 5 * s, y + 5 * s, 6 * s, 9 * s);
+  // Rounded top
+  ctx.fillRect(x + 6 * s, y + 4 * s, 4 * s, s);
+  ctx.fillRect(x + 7 * s, y + 3 * s, 2 * s, s);
+
+  // Left edge highlight
+  ctx.fillStyle = stoneLight;
+  ctx.fillRect(x + 5 * s, y + 5 * s, s, 8 * s);
+  ctx.fillRect(x + 6 * s, y + 4 * s, s, s);
+
+  // Right edge shadow
+  ctx.fillStyle = stoneDark;
+  ctx.fillRect(x + 10 * s, y + 5 * s, s, 8 * s);
+  ctx.fillRect(x + 9 * s, y + 4 * s, s, s);
+
+  // Cross engraving
+  ctx.fillStyle = stoneDark;
+  ctx.fillRect(x + 7.5 * s, y + 6 * s, s, 4 * s);  // vertical
+  ctx.fillRect(x + 6.5 * s, y + 7 * s, 3 * s, s);   // horizontal
+
+  // Small flower
+  ctx.fillStyle = '#cc4466';
+  ctx.fillRect(x + 4 * s, y + 12 * s, s, s);
+  ctx.fillStyle = '#228833';
+  ctx.fillRect(x + 4 * s, y + 13 * s, s, s);
+}
+
 export function drawCharacterShadow(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -453,29 +500,33 @@ export function drawCharacterName(
   name: string,
   isSelected: boolean,
   scale: number,
+  isDead = false,
 ): void {
   const fontSize = Math.max(8, 5 * scale);
   ctx.font = `bold ${fontSize}px monospace`;
   ctx.textAlign = 'center';
 
   const textX = x + 8 * scale;
-  const textY = y - 3 * scale;
+  const textY = isDead ? y + 2 * scale : y - 3 * scale;
+  const displayName = isDead ? name : name;
 
   // Background pill
-  const metrics = ctx.measureText(name);
+  const metrics = ctx.measureText(displayName);
   const padding = 3;
   const bgX = textX - metrics.width / 2 - padding;
   const bgY = textY - fontSize + 1;
   const bgW = metrics.width + padding * 2;
   const bgH = fontSize + 2;
 
-  ctx.fillStyle = isSelected ? 'rgba(255, 215, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)';
+  ctx.fillStyle = isDead
+    ? 'rgba(60, 50, 70, 0.7)'
+    : isSelected ? 'rgba(255, 215, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)';
   ctx.beginPath();
   ctx.roundRect(bgX, bgY, bgW, bgH, 3);
   ctx.fill();
 
   // Text
-  ctx.fillStyle = isSelected ? '#1a1a2a' : '#FFFFFF';
+  ctx.fillStyle = isDead ? '#9a8aaa' : isSelected ? '#1a1a2a' : '#FFFFFF';
   ctx.fillText(name, textX, textY);
   ctx.textAlign = 'left';
 }
@@ -562,16 +613,19 @@ export function drawCharacter(
   // Apply hat
   sprite = applyHat(sprite, hatStyle);
 
+  if (isDead) {
+    drawGravestone(ctx, x, y, scale);
+    if (isSelected) {
+      drawSelectionIndicator(ctx, x, y, scale, frame);
+    }
+    return;
+  }
+
   // Draw shadow first
   drawCharacterShadow(ctx, x, y, scale);
 
   // Render the sprite
-  renderSprite(ctx, x, y, sprite, colors, isDead, scale);
-
-  // Draw X eyes if dead
-  if (isDead) {
-    drawDeadEyes(ctx, x, y, direction, scale);
-  }
+  renderSprite(ctx, x, y, sprite, colors, false, scale);
 
   // Selection indicator
   if (isSelected) {

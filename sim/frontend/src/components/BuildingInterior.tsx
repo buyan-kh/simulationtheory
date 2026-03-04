@@ -586,6 +586,8 @@ const INTERIOR_DRAWERS: Record<BuildingType, DrawFn> = {
   restaurant: drawRestaurantInterior,
   fast_food: drawFastFoodInterior,
   park: drawParkInterior,
+  farm: drawParkInterior,
+  cemetery: drawParkInterior,
 };
 
 const BUILDING_INFO: Record<BuildingType, { label: string; details: string[] }> = {
@@ -603,6 +605,8 @@ const BUILDING_INFO: Record<BuildingType, { label: string; details: string[] }> 
   restaurant: { label: 'RESTAURANT', details: ['Fine dining', 'Evening gatherings', 'Special occasions'] },
   fast_food: { label: 'FAST FOOD', details: ['Quick bites', 'Affordable meals', 'Drive-thru service'] },
   park: { label: 'PARK', details: ['Peaceful walks', 'Romantic meetups', 'Nature watching'] },
+  farm: { label: 'FARM', details: ['Crop fields', 'Food production', 'Harvest gathering'] },
+  cemetery: { label: 'CEMETERY', details: ['Final resting place', 'Graves of the fallen', 'Memorial grounds'] },
 };
 
 function getCharactersNearBuilding(

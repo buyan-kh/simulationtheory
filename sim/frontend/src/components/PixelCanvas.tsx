@@ -169,7 +169,7 @@ export default function PixelCanvas({
         id,
         draw: (ctx: CanvasRenderingContext2D, _sx: number, _sy: number, frame: number) => {
           drawCharacter(ctx, px, py, palette, dir, frame, walking, !char.alive, selected, hatStyle, SCALE);
-          drawCharacterName(ctx, px, py, char.name, selected, SCALE);
+          drawCharacterName(ctx, px, py, char.name, selected, SCALE, !char.alive);
         },
       });
 

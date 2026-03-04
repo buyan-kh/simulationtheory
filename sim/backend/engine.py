@@ -726,6 +726,16 @@ class SimulationEngine:
         char.cause_of_death = cause
         char.death_tick = sim.tick
 
+        # Move to cemetery
+        cemetery = next((loc for loc in sim.environment.locations if loc.type == "cemetery"), None)
+        if cemetery:
+            # Stagger graves so they don't overlap
+            dead_count = sum(1 for c in sim.characters.values() if not c.alive and c.id != char.id)
+            row = dead_count // 6
+            col = dead_count % 6
+            char.position["x"] = cemetery.x - 12 + col * 5
+            char.position["y"] = cemetery.y - 8 + row * 5
+
         # Remove from group
         if char.group_id and char.group_id in sim.groups:
             group = sim.groups[char.group_id]

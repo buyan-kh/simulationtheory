@@ -200,6 +200,10 @@ def _default_locations() -> list[Location]:
                  resources={"food": 50.0, "materials": 5.0},
                  resource_regen_rate={"food": 3.0, "materials": 0.2},
                  capacity=15, is_removable=False),
+        Location(name="Cemetery", x=90, y=80, type="cemetery", biome="plains",
+                 resources={"food": 0.0, "materials": 0.0},
+                 resource_regen_rate={"food": 0.0, "materials": 0.0},
+                 capacity=100, is_removable=False),
     ]
 
 
