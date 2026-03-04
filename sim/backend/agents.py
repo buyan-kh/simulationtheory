@@ -266,6 +266,15 @@ class AgentBrain:
             urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.5
             urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) + 0.3
 
+        fun_need = character.needs.fun
+        if fun_need < 30:
+            urgency[ActionType.CRAFT] = urgency.get(ActionType.CRAFT, 0) + 0.6
+            urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) + 0.4
+
+        # Homeless agents want to build
+        if not character.house_id:
+            urgency[ActionType.BUILD_HOME] = urgency.get(ActionType.BUILD_HOME, 0) + 1.0
+
         # Health urgency
         if character.health < 30:
             urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.0
@@ -532,9 +541,21 @@ class AgentBrain:
 
                 # Additional contextual solo scoring
                 if action_type == ActionType.REST and energy > 80:
-                    base_score -= 0.5  # Penalize resting when energy is high
+                    base_score -= 0.5
                 elif action_type == ActionType.EXPLORE and energy > 60:
-                    base_score += 0.15  # Slight bonus if we have energy to explore
+                    base_score += 0.15
+
+                # Craft/build get proximity bonus when near the right location
+                if action_type in {ActionType.CRAFT, ActionType.LEARN, ActionType.BUILD_HOME}:
+                    for nl in perception.get("nearby_locations", []):
+                        if nl["type"] == "knowledge" and nl["distance"] < 50:
+                            base_score += 0.3
+                            break
+
+                # Crowding penalty: if many agents nearby, solo actions become more attractive
+                num_nearby = len(nearby)
+                if num_nearby > 5 and action_type in {ActionType.EXPLORE, ActionType.GATHER, ActionType.CRAFT, ActionType.BUILD_HOME}:
+                    base_score += min(0.5, num_nearby * 0.05)
 
                 detail = self._build_solo_detail(action_type, character, perception)
                 reasoning = self._build_solo_reasoning(action_type, character, base_score)
@@ -657,6 +678,7 @@ class AgentBrain:
     _SOLO_ACTIONS = [
         ActionType.REST, ActionType.GATHER, ActionType.EXPLORE,
         ActionType.OBSERVE, ActionType.BUILD_HOME, ActionType.LEARN,
+        ActionType.CRAFT,
     ]
     _TARGETED_ACTIONS = [
         ActionType.COOPERATE, ActionType.ATTACK, ActionType.SHARE,
