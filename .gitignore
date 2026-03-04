@@ -39,3 +39,4 @@ next-env.d.ts
 .coverage
 htmlcov/
 .mypy_cache/
+.claude/worktrees/
