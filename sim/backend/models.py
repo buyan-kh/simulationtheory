@@ -196,6 +196,10 @@ def _default_locations() -> list[Location]:
         Location(name="The Cozy Cafe", x=30, y=-30, type="cafe", biome="plains", is_removable=False),
         Location(name="Golden Plate", x=-30, y=-60, type="restaurant", biome="plains", is_removable=False),
         Location(name="McBurger's", x=70, y=-50, type="fast_food", biome="plains", is_removable=False),
+        Location(name="The Farm", x=-60, y=-60, type="farm", biome="plains",
+                 resources={"food": 50.0, "materials": 5.0},
+                 resource_regen_rate={"food": 3.0, "materials": 0.2},
+                 capacity=15, is_removable=False),
     ]
 
 

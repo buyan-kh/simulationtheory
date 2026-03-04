@@ -10,22 +10,22 @@ from spatial import SpatialGrid
 PERSONALITY_ACTION_WEIGHTS: dict[str, dict[ActionType, float]] = {
     "openness": {
         ActionType.EXPLORE: 0.9, ActionType.COMMUNICATE: 0.6, ActionType.NEGOTIATE: 0.5,
-        ActionType.COOPERATE: 0.4, ActionType.SHARE: 0.5, ActionType.OBSERVE: 0.7,
+        ActionType.COOPERATE: 0.3, ActionType.SHARE: 0.5, ActionType.OBSERVE: 0.7,
         ActionType.LEARN: 0.8, ActionType.TEACH: 0.5, ActionType.CRAFT: 0.7,
     },
     "conscientiousness": {
-        ActionType.GATHER: 0.8, ActionType.DEFEND: 0.6, ActionType.REST: 0.5,
-        ActionType.OBSERVE: 0.6, ActionType.COOPERATE: 0.5,
-        ActionType.BUILD_HOME: 0.7, ActionType.LEARN: 0.6, ActionType.TEACH: 0.6,
-        ActionType.CRAFT: 0.6,
+        ActionType.GATHER: 0.9, ActionType.DEFEND: 0.6, ActionType.REST: 0.5,
+        ActionType.OBSERVE: 0.6, ActionType.COOPERATE: 0.3,
+        ActionType.BUILD_HOME: 0.8, ActionType.LEARN: 0.6, ActionType.TEACH: 0.6,
+        ActionType.CRAFT: 0.7,
     },
     "extraversion": {
         ActionType.COMMUNICATE: 0.9, ActionType.NEGOTIATE: 0.7, ActionType.ALLY: 0.7,
-        ActionType.COOPERATE: 0.6, ActionType.COMPETE: 0.5, ActionType.SHARE: 0.4,
+        ActionType.COOPERATE: 0.4, ActionType.COMPETE: 0.5, ActionType.SHARE: 0.4,
         ActionType.COURT: 0.6, ActionType.TEACH: 0.4, ActionType.BULLY: 0.2,
     },
     "agreeableness": {
-        ActionType.COOPERATE: 0.9, ActionType.SHARE: 0.8, ActionType.ALLY: 0.7,
+        ActionType.COOPERATE: 0.6, ActionType.SHARE: 0.8, ActionType.ALLY: 0.7,
         ActionType.NEGOTIATE: 0.5, ActionType.COMMUNICATE: 0.5,
         ActionType.TEACH: 0.5, ActionType.COURT: 0.3,
         ActionType.ATTACK: -0.6, ActionType.BETRAY: -0.8, ActionType.COMPETE: -0.3,
@@ -234,11 +234,37 @@ class AgentBrain:
         return [m for m, _ in relevant[:10]]
 
     def _compute_resource_urgency(self, character: Character, state: SimulationState | None = None) -> dict[ActionType, float]:
-        """Compute strong urgency bonuses based on resource levels, health, age, group, trade."""
+        """Compute strong urgency bonuses based on resource levels, needs, health, age, group, trade."""
         energy = character.resources.get("energy", 50)
         wealth = character.resources.get("wealth", 50)
         influence = character.resources.get("influence", 50)
         urgency: dict[ActionType, float] = {}
+
+        # ── Needs-based urgency (hunger, energy need, social) ──
+        hunger = character.needs.hunger
+        energy_need = character.needs.energy
+        social_need = character.needs.social
+
+        if hunger < 25:
+            # Critical hunger: strongly prioritize gathering food
+            urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 1.5
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.5
+            urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) - 0.4
+            urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) - 0.4
+            urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) - 0.5
+        elif hunger < 50:
+            urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.6
+
+        if energy_need < 25:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.2
+            urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) - 0.5
+            urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) - 0.5
+        elif energy_need < 50:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 0.4
+
+        if social_need < 20:
+            urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.5
+            urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) + 0.3
 
         # Health urgency
         if character.health < 30:
@@ -677,7 +703,14 @@ class AgentBrain:
                 score += rng.gauss(0, 0.3)
                 scores.append((action_type, score))
 
-        # Resource urgency (critical only)
+        # Needs urgency (critical)
+        if character.needs.hunger < 30:
+            scores.append((ActionType.GATHER, 2.5))
+        elif character.needs.hunger < 50:
+            scores.append((ActionType.GATHER, 1.2))
+
+        if character.needs.energy < 25:
+            scores.append((ActionType.REST, 2.0))
         energy = character.resources.get("energy", 50)
         if energy < 20:
             scores.append((ActionType.REST, 2.0))

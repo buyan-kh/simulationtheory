@@ -459,12 +459,12 @@ class SimulationEngine:
         char.house_id = house.id
 
     # ── Needs decay rates per tick ──
-    _NEEDS_DECAY = {"hunger": 2.0, "energy": 3.0, "social": 1.5, "fun": 1.0, "hygiene": 0.5}
+    _NEEDS_DECAY = {"hunger": 1.0, "energy": 1.5, "social": 1.0, "fun": 0.8, "hygiene": 0.5}
 
     # ── Action → needs satisfaction mapping ──
     _ACTION_NEEDS_BOOST: dict[str, dict[str, float]] = {
         "rest": {"energy": 30.0, "hygiene": 5.0},
-        "gather": {"hunger": 25.0, "fun": 5.0},
+        "gather": {"hunger": 35.0, "fun": 5.0},
         "communicate": {"social": 25.0, "fun": 10.0, "hunger": 10.0},
         "ally": {"social": 15.0},
         "negotiate": {"social": 10.0},
@@ -504,8 +504,18 @@ class SimulationEngine:
             if action:
                 boosts = self._ACTION_NEEDS_BOOST.get(action.type.value, {})
                 for need_name, amount in boosts.items():
+                    effective = amount
+                    # Agents gathering near a farm get bonus food
+                    if action.type.value == "gather" and need_name == "hunger":
+                        for loc in sim.environment.locations:
+                            if loc.type == "farm":
+                                dx = char.position["x"] - loc.x
+                                dy = char.position["y"] - loc.y
+                                if dx * dx + dy * dy < 900:  # within ~30 units
+                                    effective *= 1.5
+                                    break
                     current = getattr(needs, need_name)
-                    setattr(needs, need_name, max(0.0, min(100.0, current + amount)))
+                    setattr(needs, need_name, max(0.0, min(100.0, current + effective)))
 
             # Low needs affect emotions
             if needs.hunger < 20:
@@ -523,8 +533,8 @@ class SimulationEngine:
 
     # Action type -> location type mapping (resolved dynamically)
     _ACTION_LOCATION_TYPE = {
-        "cooperate": "trade",
-        "share": "trade",
+        "cooperate": "diplomacy",
+        "share": "park",
         "negotiate": "trade",
         "trade": "trade",
         "attack": "conflict",
@@ -540,7 +550,7 @@ class SimulationEngine:
         "leave_group": "diplomacy",
         "court": "park",
         "explore": "exploration",
-        "gather": "exploration",
+        "gather": "farm",
         "build_home": "exploration",
         "observe": "park",
         "rest": "cafe",
@@ -551,30 +561,30 @@ class SimulationEngine:
 
     # Fallback coordinates if no matching location found
     _ACTION_LOCATION_MAP = {
-        "cooperate": (0, 0),
-        "share": (0, 0),
-        "negotiate": (0, 0),
-        "trade": (0, 0),
-        "attack": (100, 0),
-        "defend": (100, 0),
-        "compete": (100, 0),
-        "betray": (100, 0),
-        "kill": (100, 0),
-        "bully": (100, 0),
-        "ally": (0, 100),
-        "communicate": (0, 100),
-        "form_group": (0, 100),
-        "join_group": (0, 100),
-        "leave_group": (0, 100),
-        "court": (0, 100),
-        "explore": (-100, -100),
-        "gather": (-100, -100),
-        "build_home": (-100, -100),
-        "observe": (50, 50),
-        "rest": (50, 50),
-        "learn": (50, 50),
-        "teach": (50, 50),
-        "craft": (50, 50),
+        "cooperate": (0, 100),       # Council Hall
+        "share": (-50, 30),          # Central Park
+        "negotiate": (0, 0),         # Market Square
+        "trade": (0, 0),             # Market Square
+        "attack": (100, 0),          # Arena
+        "defend": (100, 0),          # Arena
+        "compete": (100, 0),         # Arena
+        "betray": (100, 0),          # Arena
+        "kill": (100, 0),            # Arena
+        "bully": (100, 0),           # Arena
+        "ally": (0, 100),            # Council Hall
+        "communicate": (30, -30),    # Cafe
+        "form_group": (0, 100),      # Council Hall
+        "join_group": (0, 100),      # Council Hall
+        "leave_group": (0, 100),     # Council Hall
+        "court": (-50, 30),          # Central Park
+        "explore": (-100, -100),     # Wilderness
+        "gather": (-60, -60),        # Farm
+        "build_home": (-100, -100),  # Wilderness
+        "observe": (-50, 30),        # Central Park
+        "rest": (30, -30),           # Cafe (fallback if no house)
+        "learn": (50, 50),           # Library
+        "teach": (50, 50),           # Library
+        "craft": (50, 50),           # Library
     }
 
     _location_type_cache: dict[str, dict[str, Location]] = {}  # sim_id -> {type -> Location}
@@ -616,10 +626,18 @@ class SimulationEngine:
                 else:
                     target_x, target_y = self._ACTION_LOCATION_MAP.get("rest", (50, 50))
             elif action.target_id and action.target_id in sim.characters:
-                # Move toward interaction target (for social actions)
+                # Move toward interaction target, biased toward the relevant location
                 target_char = sim.characters[action.target_id]
-                target_x = target_char.position["x"]
-                target_y = target_char.position["y"]
+                tx, ty = target_char.position["x"], target_char.position["y"]
+                # Blend with the action's preferred location so agents spread toward it
+                loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
+                loc = loc_index.get(loc_type) if loc_type else None
+                if loc:
+                    # 60% toward target character, 40% toward location
+                    target_x = tx * 0.6 + loc.x * 0.4
+                    target_y = ty * 0.6 + loc.y * 0.4
+                else:
+                    target_x, target_y = tx, ty
             else:
                 # Try dynamic location lookup first (O(1) with index)
                 loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
@@ -638,7 +656,7 @@ class SimulationEngine:
 
             if dist < 5:
                 # At destination — wander around the location naturally
-                wander_r = 6.0
+                wander_r = 10.0
                 char.position["x"] += rng.uniform(-wander_r, wander_r)
                 char.position["y"] += rng.uniform(-wander_r, wander_r)
             else:
@@ -763,10 +781,10 @@ class SimulationEngine:
         # Only pairs with mutual rel > 0.7 can produce offspring, so use relationships as the index.
         alive_ids = {c.id for c in sim.characters.values() if c.alive}
 
-        for c1 in sim.characters.values():
+        for c1 in list(sim.characters.values()):
             if not c1.alive:
                 continue
-            for c2_id, rel1 in c1.relationships.items():
+            for c2_id, rel1 in list(c1.relationships.items()):
                 if rel1 <= 0.7 or c2_id not in alive_ids:
                     continue
                 if c1.id >= c2_id:
