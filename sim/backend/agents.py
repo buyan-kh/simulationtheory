@@ -4,6 +4,7 @@ from models import (
     Character, SimulationState, Action, ActionType, Event, EventType,
     MemoryEntry, EmotionalState, ChatMessage,
 )
+from spatial import SpatialGrid
 
 
 PERSONALITY_ACTION_WEIGHTS: dict[str, dict[ActionType, float]] = {
@@ -136,37 +137,63 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 class AgentBrain:
 
-    def perceive(self, character: Character, state: SimulationState) -> dict:
+    def perceive(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> dict:
+        visibility = state.config.information_symmetry
+        perception_radius = 200 * visibility + 50
+
+        # Use spatial grid for O(1) neighbor lookup when available
+        if grid is not None:
+            candidate_ids = grid.get_nearby_for_char(
+                character.id, perception_radius, state.characters,
+            )
+        else:
+            # Fallback: brute-force scan (backwards compatible)
+            candidate_ids = [
+                cid for cid, other in state.characters.items()
+                if cid != character.id and other.alive
+            ]
+
         nearby_chars: list[dict] = []
-        for cid, other in state.characters.items():
-            if cid == character.id or not other.alive:
+        for cid in candidate_ids:
+            other = state.characters[cid]
+            if not other.alive:
                 continue
             dx = other.position["x"] - character.position["x"]
             dy = other.position["y"] - character.position["y"]
             dist = math.sqrt(dx * dx + dy * dy)
 
-            visibility = state.config.information_symmetry
-            visible = dist < 200 * visibility + 50
+            if dist > perception_radius:
+                continue
 
-            if visible:
-                relationship = character.relationships.get(cid, 0.0)
-                belief = character.memory.beliefs.get(cid)
-                nearby_chars.append({
-                    "id": cid,
-                    "name": other.name,
-                    "distance": dist,
-                    "relationship": relationship,
-                    "belief": belief,
-                    "last_action": other.last_action.type.value if other.last_action else None,
-                    "resources_visible": {
-                        k: v for k, v in other.resources.items()
-                    } if visibility > 0.7 else {},
-                })
+            relationship = character.relationships.get(cid, 0.0)
+            belief = character.memory.beliefs.get(cid)
+            nearby_chars.append({
+                "id": cid,
+                "name": other.name,
+                "distance": dist,
+                "relationship": relationship,
+                "belief": belief,
+                "last_action": other.last_action.type.value if other.last_action else None,
+                "resources_visible": {
+                    k: v for k, v in other.resources.items()
+                } if visibility > 0.7 else {},
+            })
 
-        recent_events = [
-            e for e in state.events
-            if e.tick >= state.tick - 3 and character.id in e.participants
-        ]
+        # Cap nearby characters to closest 15 — agents focus on people
+        # nearest to them, not the entire visible population.
+        # This is both realistic and turns O(N²) into O(N×15).
+        nearby_chars.sort(key=lambda nc: nc["distance"])
+        nearby_chars = nearby_chars[:15]
+
+        # Only scan the last few ticks of events, not the full history.
+        # Walk backwards from the end (events are appended in tick order).
+        min_tick = state.tick - 3
+        recent_events: list = []
+        for e in reversed(state.events):
+            if e.tick < min_tick:
+                break
+            if character.id in e.participants:
+                recent_events.append(e)
 
         nearby_locations = []
         for loc in state.environment.locations:
@@ -367,6 +394,7 @@ class AgentBrain:
                 ActionType.COOPERATE, ActionType.COMPETE, ActionType.NEGOTIATE,
                 ActionType.ALLY, ActionType.BETRAY, ActionType.ATTACK,
                 ActionType.DEFEND, ActionType.SHARE, ActionType.COMMUNICATE,
+                ActionType.KILL, ActionType.BULLY, ActionType.TEACH, ActionType.COURT,
             }
 
             # Group/trade actions are solo (no target needed)
@@ -389,9 +417,11 @@ class AgentBrain:
                     rel = nc["relationship"]
 
                     # Relationship influence (scaled stronger)
-                    if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE, ActionType.COMMUNICATE}:
+                    if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE, ActionType.COMMUNICATE, ActionType.TEACH}:
                         target_score += rel * 0.6
-                    elif action_type in {ActionType.ATTACK, ActionType.BETRAY, ActionType.COMPETE}:
+                    elif action_type == ActionType.COURT:
+                        target_score += rel * 0.4  # Positive relationship helps courting
+                    elif action_type in {ActionType.ATTACK, ActionType.BETRAY, ActionType.COMPETE, ActionType.KILL, ActionType.BULLY}:
                         target_score -= rel * 0.5
                         # Strongly negative relationships boost hostile actions
                         if rel < -0.4:
@@ -483,8 +513,8 @@ class AgentBrain:
 
         return options
 
-    def decide(self, character: Character, state: SimulationState) -> Action:
-        perception = self.perceive(character, state)
+    def decide(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> Action:
+        perception = self.perceive(character, state, grid)
 
         context_parts = []
         for nc in perception["nearby_characters"]:
@@ -587,6 +617,77 @@ class AgentBrain:
         character.last_action = chosen
         character.last_reasoning = chosen.reasoning
         return chosen
+
+    # ── Simplified decision for BACKGROUND tier ──
+    # ~10x faster than full decide(): personality-only scoring, max 3 nearby,
+    # no memory recall, no reciprocity, no belief modifiers, no dialogue strings.
+
+    _SOLO_ACTIONS = [
+        ActionType.REST, ActionType.GATHER, ActionType.EXPLORE,
+        ActionType.OBSERVE, ActionType.BUILD_HOME, ActionType.LEARN,
+    ]
+    _TARGETED_ACTIONS = [
+        ActionType.COOPERATE, ActionType.ATTACK, ActionType.SHARE,
+        ActionType.COMMUNICATE, ActionType.COMPETE, ActionType.COURT,
+        ActionType.TEACH, ActionType.BULLY,
+    ]
+
+    def decide_simple(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> Action:
+        """Fast decision for background agents. Personality + urgency only."""
+        rng = random.Random(hash((character.id, state.tick)))
+        traits = character.traits
+
+        # Score a small set of actions using personality weights only
+        scores: list[tuple[ActionType, float]] = []
+        for action_type in self._SOLO_ACTIONS:
+            score = 0.0
+            for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
+                score += getattr(traits, trait_name) * action_weights.get(action_type, 0.0)
+            score += rng.gauss(0, 0.3)
+            scores.append((action_type, score))
+
+        # Get up to 3 nearby characters for targeted actions
+        if grid is not None:
+            nearby_ids = grid.get_nearby_for_char(character.id, 50.0, state.characters)
+        else:
+            nearby_ids = [
+                cid for cid, c in state.characters.items()
+                if cid != character.id and c.alive
+            ]
+        nearby_ids = nearby_ids[:3]
+
+        if nearby_ids:
+            target_id = rng.choice(nearby_ids)
+            rel = character.relationships.get(target_id, 0.0)
+            for action_type in self._TARGETED_ACTIONS:
+                score = 0.0
+                for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
+                    score += getattr(traits, trait_name) * action_weights.get(action_type, 0.0)
+                # Simple relationship modifier
+                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT}:
+                    score += rel * 0.5
+                elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY}:
+                    score -= rel * 0.5
+                score += rng.gauss(0, 0.3)
+                scores.append((action_type, score))
+
+        # Resource urgency (critical only)
+        energy = character.resources.get("energy", 50)
+        if energy < 20:
+            scores.append((ActionType.REST, 2.0))
+
+        # Pick best
+        scores.sort(key=lambda x: x[1], reverse=True)
+        best_type = scores[0][0]
+
+        # Assign target if needed
+        target_id_final = None
+        if best_type in self._TARGETED_ACTIONS and nearby_ids:
+            target_id_final = rng.choice(nearby_ids)
+
+        action = Action(type=best_type, target_id=target_id_final)
+        character.last_action = action
+        return action
 
     def update_emotions(self, character: Character, events: list[Event]):
         emo = character.emotional_state

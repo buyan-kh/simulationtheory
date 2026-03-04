@@ -28,22 +28,32 @@ const CHAR_SPRITE_H = 16 * SCALE;
 
 const HAT_STYLES: HatStyle[] = ['none', 'wizard', 'warrior', 'hood', 'crown'];
 
+// Track last known direction per character so they face the right way when idle
+const lastDirections = new Map<string, Direction>();
+
 function getDirection(char: Character, prevPositions: Map<string, { x: number; y: number }>): Direction {
   const prev = prevPositions.get(char.id);
-  if (!prev) return 'down';
+  if (!prev) return lastDirections.get(char.id) || 'down';
   const dx = char.position.x - prev.x;
   const dy = char.position.y - prev.y;
-  if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return 'down';
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return dx > 0 ? 'right' : 'left';
+  if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3) {
+    // Not moving enough — keep last direction
+    return lastDirections.get(char.id) || 'down';
   }
-  return dy > 0 ? 'down' : 'up';
+  let dir: Direction;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    dir = dx > 0 ? 'right' : 'left';
+  } else {
+    dir = dy > 0 ? 'down' : 'up';
+  }
+  lastDirections.set(char.id, dir);
+  return dir;
 }
 
 function isWalking(char: Character, prevPositions: Map<string, { x: number; y: number }>): boolean {
   const prev = prevPositions.get(char.id);
   if (!prev) return false;
-  return Math.abs(char.position.x - prev.x) > 0.1 || Math.abs(char.position.y - prev.y) > 0.1;
+  return Math.abs(char.position.x - prev.x) > 0.3 || Math.abs(char.position.y - prev.y) > 0.3;
 }
 
 export default function PixelCanvas({

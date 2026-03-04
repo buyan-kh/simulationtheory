@@ -35,7 +35,8 @@ export type ActionType =
   | 'cooperate' | 'compete' | 'negotiate' | 'ally' | 'betray'
   | 'explore' | 'rest' | 'gather' | 'share' | 'attack' | 'defend'
   | 'observe' | 'communicate'
-  | 'trade' | 'form_group' | 'join_group' | 'leave_group';
+  | 'trade' | 'form_group' | 'join_group' | 'leave_group'
+  | 'build_home' | 'kill' | 'bully' | 'learn' | 'teach' | 'court';
 
 export interface Action {
   type: ActionType;

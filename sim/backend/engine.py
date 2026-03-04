@@ -587,15 +587,19 @@ class SimulationEngine:
                 return loc
         return None
 
+    # Base movement speed per tick (in simulation units)
+    _BASE_SPEED = 5.0  # ~5 units per tick for steady walking
+
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
         # Build O(1) lookup indexes once per tick
         house_index: dict[str, House] = {h.id: h for h in sim.environment.houses}
         loc_index = self._build_location_index(sim)
+        rng = random.Random(hash(("move", sim.tick)))
 
         for char_id, action in actions.items():
             char = sim.characters[char_id]
 
-            # When resting, move toward assigned house
+            # Determine target position based on action
             if action.type.value == "rest" and char.house_id:
                 house = house_index.get(char.house_id)
                 if house:
@@ -603,6 +607,11 @@ class SimulationEngine:
                     target_y = house.position["y"]
                 else:
                     target_x, target_y = self._ACTION_LOCATION_MAP.get("rest", (50, 50))
+            elif action.target_id and action.target_id in sim.characters:
+                # Move toward interaction target (for social actions)
+                target_char = sim.characters[action.target_id]
+                target_x = target_char.position["x"]
+                target_y = target_char.position["y"]
             else:
                 # Try dynamic location lookup first (O(1) with index)
                 loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
@@ -617,16 +626,23 @@ class SimulationEngine:
 
             dx = target_x - char.position["x"]
             dy = target_y - char.position["y"]
-
-            speed = 0.3 + random.uniform(0, 0.2)
-            char.position["x"] += dx * speed
-            char.position["y"] += dy * speed
-
-            # Add random offset when near the target location
             dist = (dx * dx + dy * dy) ** 0.5
-            if dist < 10:
-                char.position["x"] += random.uniform(-8, 8)
-                char.position["y"] += random.uniform(-8, 8)
+
+            if dist < 5:
+                # At destination — wander around the location naturally
+                wander_r = 6.0
+                char.position["x"] += rng.uniform(-wander_r, wander_r)
+                char.position["y"] += rng.uniform(-wander_r, wander_r)
+            else:
+                # Walk toward target at constant speed (personality-affected)
+                speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
+                if dist > 0:
+                    move = min(speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                # Small lateral sway for natural walking
+                char.position["x"] += rng.uniform(-0.5, 0.5)
+                char.position["y"] += rng.uniform(-0.5, 0.5)
 
             # Clamp to world bounds
             char.position["x"] = max(-120, min(120, char.position["x"]))

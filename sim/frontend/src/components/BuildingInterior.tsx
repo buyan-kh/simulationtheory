@@ -490,6 +490,86 @@ const drawFountainInterior: DrawFn = (ctx, w, h) => {
   rect(ctx, cx + 33, 36, 1, 18, WATER);
 };
 
+// Cafe interior — tables, counter, coffee machines
+const drawCafeInterior: DrawFn = (ctx, w, h) => {
+  const cx = w / 2 - 20;
+  // Counter
+  rect(ctx, cx, h - 30, 40, 6, '#6a4a2a');
+  rect(ctx, cx, h - 24, 40, 2, '#5a3a1a');
+  // Coffee machine
+  rect(ctx, cx + 30, h - 44, 8, 14, '#4a4a4a');
+  rect(ctx, cx + 31, h - 42, 6, 4, '#8a6a2a');
+  // Tables
+  rect(ctx, cx - 14, h - 50, 10, 2, '#7a5a3a');
+  rect(ctx, cx - 10, h - 48, 2, 8, '#5a3a1a');
+  rect(ctx, cx + 24, h - 50, 10, 2, '#7a5a3a');
+  rect(ctx, cx + 28, h - 48, 2, 8, '#5a3a1a');
+  // Menu board
+  rect(ctx, cx + 10, 8, 20, 14, '#1a1a2a');
+  rect(ctx, cx + 12, 10, 16, 10, '#2a2a3a');
+};
+
+// Restaurant interior — elegant tables, kitchen
+const drawRestaurantInterior: DrawFn = (ctx, w, h) => {
+  const cx = w / 2 - 20;
+  // Tables with tablecloths
+  rect(ctx, cx - 10, h - 50, 14, 2, '#cc2222');
+  rect(ctx, cx - 6, h - 48, 2, 8, '#5a3a1a');
+  rect(ctx, cx + 16, h - 50, 14, 2, '#cc2222');
+  rect(ctx, cx + 22, h - 48, 2, 8, '#5a3a1a');
+  // Candles on tables
+  rect(ctx, cx - 5, h - 54, 2, 4, '#ffdd44');
+  rect(ctx, cx + 21, h - 54, 2, 4, '#ffdd44');
+  // Kitchen area
+  rect(ctx, cx, h - 24, 40, 4, '#5a5a5a');
+  rect(ctx, cx + 4, h - 28, 8, 4, '#3a3a3a');
+  // Chandelier
+  rect(ctx, cx + 15, 6, 10, 2, '#ccaa00');
+  rect(ctx, cx + 18, 8, 4, 6, '#ffdd44');
+};
+
+// Fast food interior — service counter, menu boards
+const drawFastFoodInterior: DrawFn = (ctx, w, h) => {
+  const cx = w / 2 - 20;
+  // Service counter
+  rect(ctx, cx, h - 28, 40, 6, '#cc0000');
+  rect(ctx, cx, h - 22, 40, 2, '#aa0000');
+  // Cash registers
+  rect(ctx, cx + 8, h - 36, 6, 8, '#3a3a3a');
+  rect(ctx, cx + 26, h - 36, 6, 8, '#3a3a3a');
+  // Menu boards above
+  rect(ctx, cx + 4, 6, 14, 10, '#1a1a1a');
+  rect(ctx, cx + 22, 6, 14, 10, '#1a1a1a');
+  // Menu text dots
+  for (let i = 0; i < 5; i++) {
+    rect(ctx, cx + 6 + i * 2, 9, 1, 1, '#ffdd44');
+    rect(ctx, cx + 24 + i * 2, 9, 1, 1, '#ffdd44');
+  }
+  // Booths
+  rect(ctx, cx - 14, h - 50, 10, 14, '#cc3333');
+  rect(ctx, cx + 24, h - 50, 10, 14, '#cc3333');
+};
+
+// Park interior — gazebo view, benches, fountain
+const drawParkInterior: DrawFn = (ctx, w, h) => {
+  const cx = w / 2 - 20;
+  // Gazebo posts
+  rect(ctx, cx - 4, 10, 2, h - 20, '#6a4a2a');
+  rect(ctx, cx + 42, 10, 2, h - 20, '#6a4a2a');
+  // Gazebo roof
+  rect(ctx, cx - 8, 6, 56, 4, '#7a5a3a');
+  // Benches
+  rect(ctx, cx, h - 26, 14, 2, '#7a5a3a');
+  rect(ctx, cx + 2, h - 24, 2, 6, '#5a3a1a');
+  rect(ctx, cx + 10, h - 24, 2, 6, '#5a3a1a');
+  rect(ctx, cx + 26, h - 26, 14, 2, '#7a5a3a');
+  rect(ctx, cx + 28, h - 24, 2, 6, '#5a3a1a');
+  rect(ctx, cx + 36, h - 24, 2, 6, '#5a3a1a');
+  // Small fountain
+  rect(ctx, cx + 16, h - 42, 8, 12, '#7a7a8a');
+  rect(ctx, cx + 18, h - 46, 4, 4, WATER_LT);
+};
+
 const INTERIOR_DRAWERS: Record<BuildingType, DrawFn> = {
   shop: drawShopInterior,
   arena: drawArenaInterior,
@@ -501,6 +581,10 @@ const INTERIOR_DRAWERS: Record<BuildingType, DrawFn> = {
   house_large: drawHouseInterior,
   well: drawWellInterior,
   fountain: drawFountainInterior,
+  cafe: drawCafeInterior,
+  restaurant: drawRestaurantInterior,
+  fast_food: drawFastFoodInterior,
+  park: drawParkInterior,
 };
 
 const BUILDING_INFO: Record<BuildingType, { label: string; details: string[] }> = {
@@ -514,6 +598,10 @@ const BUILDING_INFO: Record<BuildingType, { label: string; details: string[] }> 
   house_large: { label: 'MANOR', details: ['Spacious estate', 'Noble residence'] },
   well: { label: 'WELL', details: ['Fresh water source', 'Village gathering spot'] },
   fountain: { label: 'FOUNTAIN', details: ['Town centerpiece', 'Flowing water'] },
+  cafe: { label: 'CAFE', details: ['Fresh coffee & pastries', 'Social hangout', 'Morning conversations'] },
+  restaurant: { label: 'RESTAURANT', details: ['Fine dining', 'Evening gatherings', 'Special occasions'] },
+  fast_food: { label: 'FAST FOOD', details: ['Quick bites', 'Affordable meals', 'Drive-thru service'] },
+  park: { label: 'PARK', details: ['Peaceful walks', 'Romantic meetups', 'Nature watching'] },
 };
 
 function getCharactersNearBuilding(
