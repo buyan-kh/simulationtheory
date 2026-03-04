@@ -1,8 +1,8 @@
 // Pixel art terrain tiles and nature objects for Canvas rendering
 // Tiles: 16x16, Objects: various sizes
 
-export type TileType = 'grass' | 'grass2' | 'grass3' | 'grass_dark' | 'dirt' | 'cobblestone' | 'water' | 'water2' | 'sand' | 'flowers';
-export type ObjectType = 'tree' | 'tree2' | 'tree3' | 'pine' | 'bush' | 'rock_small' | 'rock_large' | 'rock_mossy' | 'fence_h' | 'fence_post' | 'bridge_h' | 'bridge_v' | 'lamp_post' | 'sign_post' | 'flower_patch' | 'tall_grass';
+export type TileType = 'grass' | 'grass2' | 'grass3' | 'grass_dark' | 'dirt' | 'cobblestone' | 'water' | 'water2' | 'sand' | 'flowers' | 'road' | 'road_line' | 'sidewalk';
+export type ObjectType = 'tree' | 'tree2' | 'tree3' | 'pine' | 'bush' | 'rock_small' | 'rock_large' | 'rock_mossy' | 'fence_h' | 'fence_post' | 'bridge_h' | 'bridge_v' | 'lamp_post' | 'sign_post' | 'flower_patch' | 'tall_grass' | 'car_red' | 'car_blue' | 'bench' | 'trash_can';
 
 // ==================== TILE DATA (16x16 each) ====================
 
@@ -118,6 +118,52 @@ const FLOWERS_TILE = makeTile(G2, [
   [1, 8, G4], [5, 3, G4], [8, 13, G4], [11, 1, G4], [13, 10, G4],
 ]);
 
+// ── Road tiles ──────────────────────────────────────────────────────
+
+const R1 = '#3a3a3a'; // asphalt dark
+const R2 = '#4a4a4a'; // asphalt mid
+const R3 = '#5a5a5a'; // asphalt light
+const R4 = '#6a6a6a'; // asphalt highlight
+
+const ROAD_TILE = makeTile(R2, [
+  [0, 3, R3], [1, 10, R1], [3, 7, R3], [4, 13, R1],
+  [6, 2, R3], [7, 9, R1], [9, 5, R3], [10, 12, R1],
+  [12, 1, R3], [13, 8, R1], [14, 14, R3], [15, 4, R1],
+]);
+
+const ROAD_LINE_TILE: string[][] = (() => {
+  const t = makeTile(R2, [
+    [0, 3, R3], [1, 10, R1], [3, 7, R3], [5, 13, R1],
+    [7, 2, R3], [9, 9, R1], [11, 5, R3], [13, 12, R1],
+  ]);
+  // Yellow center line
+  for (let r = 0; r < 16; r++) {
+    if (r % 4 < 3) { // dashed line
+      t[r][7] = '#ccaa00';
+      t[r][8] = '#ccaa00';
+    }
+  }
+  return t;
+})();
+
+const SW1 = '#9a9a9a'; // sidewalk light
+const SW2 = '#8a8a8a'; // sidewalk mid
+const SW3 = '#7a7a7a'; // sidewalk dark
+
+const SIDEWALK_TILE: string[][] = (() => {
+  const t: string[][] = [];
+  for (let r = 0; r < 16; r++) {
+    const row: string[] = [];
+    for (let c = 0; c < 16; c++) {
+      const isGrid = r % 8 === 0 || c % 8 === 0;
+      if (isGrid) row.push(SW3);
+      else row.push(((r + c) % 5 < 1) ? SW1 : SW2);
+    }
+    t.push(row);
+  }
+  return t;
+})();
+
 const TILE_MAP: Record<string, string[][] | string[][][]> = {
   grass: [GRASS_V1, GRASS_V2, GRASS_V3],
   grass2: [GRASS_V2],
@@ -129,6 +175,9 @@ const TILE_MAP: Record<string, string[][] | string[][][]> = {
   water2: [WATER_F2, WATER_F1],
   sand: [SAND_TILE],
   flowers: [FLOWERS_TILE],
+  road: [ROAD_TILE],
+  road_line: [ROAD_LINE_TILE],
+  sidewalk: [SIDEWALK_TILE],
 };
 
 export function drawTile(
@@ -530,6 +579,117 @@ const BRIDGE_V_OBJ: ObjectDef = {
   })(),
 };
 
+// ── Car (side view, facing right) ────────────────────────────────────
+
+const CAR_RED: ObjectDef = {
+  width: 20, height: 10,
+  pixels: (() => {
+    const body = '#cc3333';
+    const dk = '#aa2222';
+    const wn = '#4a6a9a'; // windshield
+    const wl = '#6a8aba';
+    const tire = '#2a2a2a';
+    const hub = '#8a8a8a';
+    const chr = '#cccccc'; // chrome
+    const p: PixelGrid = [];
+    // Row 0: roof
+    p.push([T,T,T,T,T,T,body,body,body,body,body,body,body,body,T,T,T,T,T,T]);
+    // Row 1: top of cabin
+    p.push([T,T,T,T,T,body,body,body,body,body,body,body,body,body,body,T,T,T,T,T]);
+    // Row 2: windshield
+    p.push([T,T,T,T,body,wn,wn,wl,body,body,body,body,wn,wn,wl,body,T,T,T,T]);
+    // Row 3: body top
+    p.push([T,T,T,body,body,wn,wl,wn,body,body,body,body,wn,wl,wn,body,body,T,T,T]);
+    // Row 4: hood & trunk
+    p.push([T,T,body,body,body,body,body,body,body,body,body,body,body,body,body,body,body,body,T,T]);
+    // Row 5: body mid
+    p.push([T,chr,body,dk,dk,body,body,body,body,body,body,body,body,body,body,dk,dk,body,chr,T]);
+    // Row 6: body lower
+    p.push([T,chr,body,dk,dk,body,body,body,body,body,body,body,body,body,body,dk,dk,body,chr,T]);
+    // Row 7: undercarriage
+    p.push([T,T,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,T,T]);
+    // Row 8: wheels
+    p.push([T,T,T,tire,tire,tire,T,T,T,T,T,T,T,T,tire,tire,tire,T,T,T]);
+    // Row 9: wheel bottoms
+    p.push([T,T,T,tire,hub,tire,T,T,T,T,T,T,T,T,tire,hub,tire,T,T,T]);
+    return p;
+  })(),
+};
+
+const CAR_BLUE: ObjectDef = {
+  width: 20, height: 10,
+  pixels: (() => {
+    const body = '#3366cc';
+    const dk = '#2244aa';
+    const wn = '#4a6a9a';
+    const wl = '#6a8aba';
+    const tire = '#2a2a2a';
+    const hub = '#8a8a8a';
+    const chr = '#cccccc';
+    const p: PixelGrid = [];
+    p.push([T,T,T,T,T,T,body,body,body,body,body,body,body,body,T,T,T,T,T,T]);
+    p.push([T,T,T,T,T,body,body,body,body,body,body,body,body,body,body,T,T,T,T,T]);
+    p.push([T,T,T,T,body,wn,wn,wl,body,body,body,body,wn,wn,wl,body,T,T,T,T]);
+    p.push([T,T,T,body,body,wn,wl,wn,body,body,body,body,wn,wl,wn,body,body,T,T,T]);
+    p.push([T,T,body,body,body,body,body,body,body,body,body,body,body,body,body,body,body,body,T,T]);
+    p.push([T,chr,body,dk,dk,body,body,body,body,body,body,body,body,body,body,dk,dk,body,chr,T]);
+    p.push([T,chr,body,dk,dk,body,body,body,body,body,body,body,body,body,body,dk,dk,body,chr,T]);
+    p.push([T,T,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,dk,T,T]);
+    p.push([T,T,T,tire,tire,tire,T,T,T,T,T,T,T,T,tire,tire,tire,T,T,T]);
+    p.push([T,T,T,tire,hub,tire,T,T,T,T,T,T,T,T,tire,hub,tire,T,T,T]);
+    return p;
+  })(),
+};
+
+// ── Park bench ──────────────────────────────────────────────────────
+
+const BENCH_OBJ: ObjectDef = {
+  width: 14, height: 8,
+  pixels: (() => {
+    const w1 = '#6a4a2a';
+    const w2 = '#7a5a3a';
+    const w3 = '#5a3a1a';
+    const iron = '#4a4a4a';
+    const p: PixelGrid = [];
+    // Backrest
+    p.push([T,iron,w2,w2,w2,w2,w2,w2,w2,w2,w2,w2,iron,T]);
+    p.push([T,iron,w1,w1,w1,w1,w1,w1,w1,w1,w1,w1,iron,T]);
+    p.push([T,T,T,T,T,T,T,T,T,T,T,T,T,T]);
+    // Seat
+    p.push([iron,w2,w2,w2,w2,w2,w2,w2,w2,w2,w2,w2,w2,iron]);
+    p.push([iron,w1,w1,w1,w1,w1,w1,w1,w1,w1,w1,w1,w1,iron]);
+    // Legs
+    p.push([T,iron,T,T,T,T,T,T,T,T,T,T,iron,T]);
+    p.push([T,iron,T,T,T,T,T,T,T,T,T,T,iron,T]);
+    p.push([iron,iron,T,T,T,T,T,T,T,T,T,T,iron,iron]);
+    return p;
+  })(),
+};
+
+// ── Trash can ──────────────────────────────────────────────────────
+
+const TRASH_CAN: ObjectDef = {
+  width: 6, height: 10,
+  pixels: (() => {
+    const m1 = '#5a5a5a'; // metal
+    const m2 = '#6a6a6a';
+    const m3 = '#4a4a4a';
+    const lid = '#7a7a7a';
+    const p: PixelGrid = [];
+    p.push([T,lid,lid,lid,lid,T]);
+    p.push([T,m2,m2,m2,m2,T]);
+    p.push([m3,m1,m2,m2,m1,m3]);
+    p.push([m3,m1,m2,m2,m1,m3]);
+    p.push([m3,m1,m1,m1,m1,m3]);
+    p.push([m3,m1,m1,m1,m1,m3]);
+    p.push([m3,m1,m1,m1,m1,m3]);
+    p.push([m3,m1,m1,m1,m1,m3]);
+    p.push([m3,m3,m3,m3,m3,m3]);
+    p.push([T,T,T,T,T,T]);
+    return p;
+  })(),
+};
+
 const OBJECT_MAP: Record<string, ObjectDef | ObjectDef[]> = {
   tree: TREE_1,
   tree2: TREE_2,
@@ -547,6 +707,10 @@ const OBJECT_MAP: Record<string, ObjectDef | ObjectDef[]> = {
   tall_grass: [TALL_GRASS_F1, TALL_GRASS_F2],
   bridge_h: BRIDGE_H_OBJ,
   bridge_v: BRIDGE_V_OBJ,
+  car_red: CAR_RED,
+  car_blue: CAR_BLUE,
+  bench: BENCH_OBJ,
+  trash_can: TRASH_CAN,
 };
 
 // Module-level lamp glow intensity (set by renderer based on day/night)

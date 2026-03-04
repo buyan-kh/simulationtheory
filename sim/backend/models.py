@@ -63,6 +63,7 @@ class ActionType(str, Enum):
     LEARN = "learn"
     TEACH = "teach"
     COURT = "court"
+    CRAFT = "craft"
 
 
 class Action(BaseModel):
@@ -191,6 +192,10 @@ def _default_locations() -> list[Location]:
         Location(name="Council Hall", x=0, y=100, type="diplomacy", biome="plains", is_removable=False),
         Location(name="Wilderness", x=-100, y=-100, type="exploration", biome="forest", is_removable=False),
         Location(name="Library", x=50, y=50, type="knowledge", biome="plains", is_removable=False),
+        Location(name="Central Park", x=-50, y=30, type="park", biome="plains", is_removable=False),
+        Location(name="The Cozy Cafe", x=30, y=-30, type="cafe", biome="plains", is_removable=False),
+        Location(name="Golden Plate", x=-30, y=-60, type="restaurant", biome="plains", is_removable=False),
+        Location(name="McBurger's", x=70, y=-50, type="fast_food", biome="plains", is_removable=False),
     ]
 
 
@@ -205,6 +210,22 @@ class Environment(BaseModel):
     })
     locations: list[Location] = Field(default_factory=_default_locations)
     houses: list[House] = []
+
+
+class WorldItem(BaseModel):
+    """An item created by an agent — pixel art stored as a flat color grid."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    creator_id: str
+    created_tick: int = 0
+    position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    width: int = 8   # pixel grid width
+    height: int = 8  # pixel grid height
+    # Flat list of hex color strings (or null for transparent), row-major order
+    pixels: list[str | None] = []
+    item_type: str = "decoration"  # furniture, tool, decoration, food, art
+    usable: bool = True
+    placed_in_house: str | None = None  # house_id if placed inside a house
 
 
 class SimulationConfig(BaseModel):
@@ -300,6 +321,7 @@ class SimulationState(BaseModel):
     updated_at: float = Field(default_factory=time.time)
     groups: dict[str, Group] = {}
     market: MarketState = Field(default_factory=MarketState)
+    world_items: list[WorldItem] = []
 
 
 class SimulationSummary(BaseModel):

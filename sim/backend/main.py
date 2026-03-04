@@ -235,6 +235,47 @@ def get_prices(sim_id: str):
     return sim.market.price_index
 
 
+# ── Spotlight / LOD ──
+
+class SpotlightRequest(BaseModel):
+    character_ids: list[str]
+
+
+@app.get("/api/simulations/{sim_id}/lod")
+def get_lod_stats(sim_id: str):
+    sim = _get_sim(sim_id)
+    lod = engine.get_lod(sim_id)
+    return lod.get_stats(sim.characters)
+
+
+@app.put("/api/simulations/{sim_id}/spotlight")
+def set_spotlight(sim_id: str, req: SpotlightRequest):
+    sim = _get_sim(sim_id)
+    for cid in req.character_ids:
+        if cid not in sim.characters:
+            raise HTTPException(status_code=404, detail=f"Character {cid} not found")
+    lod = engine.get_lod(sim_id)
+    lod.set_spotlight(set(req.character_ids))
+    return {"spotlight": req.character_ids}
+
+
+@app.post("/api/simulations/{sim_id}/spotlight/{char_id}")
+def add_to_spotlight(sim_id: str, char_id: str):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    lod = engine.get_lod(sim_id)
+    lod.add_spotlight(char_id)
+    return {"status": "added", "spotlight": list(lod.spotlight_ids)}
+
+
+@app.delete("/api/simulations/{sim_id}/spotlight/{char_id}")
+def remove_from_spotlight(sim_id: str, char_id: str):
+    lod = engine.get_lod(sim_id)
+    lod.remove_spotlight(char_id)
+    return {"status": "removed", "spotlight": list(lod.spotlight_ids)}
+
+
 # ── Replay ──
 
 @app.get("/api/simulations/{sim_id}/replay/ticks")

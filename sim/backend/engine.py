@@ -10,7 +10,10 @@ from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
 from groups import GroupManager
 from trade import TradeManager
+from crafting import process_crafting
 from db import SimulationDB
+from spatial import SpatialGrid
+from lod import LODManager, LODTier
 
 HOUSE_PLOTS = [
     {"x": -30, "y": -30}, {"x": -15, "y": -35}, {"x": 0, "y": -40},
@@ -43,6 +46,13 @@ class SimulationEngine:
         self.dialogue = DialogueGenerator()
         self.group_mgr = GroupManager()
         self.trade_mgr = TradeManager()
+        self.grid = SpatialGrid(cell_size=30.0)
+        self.lod_managers: dict[str, LODManager] = {}  # sim_id -> LODManager
+
+    def get_lod(self, sim_id: str) -> LODManager:
+        if sim_id not in self.lod_managers:
+            self.lod_managers[sim_id] = LODManager()
+        return self.lod_managers[sim_id]
 
     def create_simulation(self, config: SimulationConfig | None = None, name: str = "") -> SimulationState:
         sim = SimulationState()
@@ -208,23 +218,80 @@ class SimulationEngine:
             return [], []
 
         chat_messages: list[ChatMessage] = []
+        lod = self.get_lod(sim_id)
 
+        # ── 1. Rebuild spatial grid ──
+        self.grid.rebuild(sim.characters)
+
+        # ── 2. Classify agents by LOD tier ──
+        tiers = lod.classify(sim.characters, self.grid)
+
+        # ── 3. Decision phase (tier-aware) ──
         actions: dict[str, Action] = {}
-        for char_id, char in sim.characters.items():
-            if not char.alive:
-                continue
-            action = self.brain.decide(char, sim)
+
+        # Spotlight: always full decision
+        for char_id in tiers[LODTier.SPOTLIGHT]:
+            char = sim.characters[char_id]
+            action = self.brain.decide(char, sim, self.grid)
             actions[char_id] = action
 
-        for char_id, action in actions.items():
+        # Active: full decision if population is small enough, else simplified
+        # Budget: ~100 full decisions is fast (~0.3s). Above that, use simple.
+        active_ids = tiers[LODTier.ACTIVE]
+        full_budget = max(0, 100 - len(tiers[LODTier.SPOTLIGHT]))
+        if len(active_ids) <= full_budget:
+            for char_id in active_ids:
+                char = sim.characters[char_id]
+                action = self.brain.decide(char, sim, self.grid)
+                actions[char_id] = action
+        else:
+            # Give full decisions to closest active agents to spotlight
+            # and simplified to the rest
+            active_by_priority: list[tuple[float, str]] = []
+            for char_id in active_ids:
+                char = sim.characters[char_id]
+                # Priority: distance to nearest spotlight agent (closer = higher priority)
+                min_dist = float("inf")
+                for sid in tiers[LODTier.SPOTLIGHT]:
+                    sc = sim.characters[sid]
+                    dx = char.position["x"] - sc.position["x"]
+                    dy = char.position["y"] - sc.position["y"]
+                    d = dx * dx + dy * dy
+                    if d < min_dist:
+                        min_dist = d
+                active_by_priority.append((min_dist, char_id))
+            active_by_priority.sort()
+
+            for i, (_, char_id) in enumerate(active_by_priority):
+                char = sim.characters[char_id]
+                if i < full_budget:
+                    action = self.brain.decide(char, sim, self.grid)
+                else:
+                    action = self.brain.decide_simple(char, sim, self.grid)
+                actions[char_id] = action
+
+        # Background: simplified decisions every N ticks
+        if lod.should_update(LODTier.BACKGROUND, sim.tick):
+            for char_id in tiers[LODTier.BACKGROUND]:
+                char = sim.characters[char_id]
+                action = self.brain.decide_simple(char, sim, self.grid)
+                actions[char_id] = action
+
+        # ── 4. Dialogue (spotlight only) ──
+        for char_id in tiers[LODTier.SPOTLIGHT]:
+            action = actions.get(char_id)
+            if not action:
+                continue
             char = sim.characters[char_id]
             target = sim.characters.get(action.target_id) if action.target_id else None
             msg = self.dialogue.generate_action_dialogue(char, action, target, sim)
             if msg:
                 chat_messages.append(msg)
 
+        # ── 5. Movement ──
         self._move_characters(sim, actions)
 
+        # ── 6. Event resolution ──
         interaction_events = self.event_gen.resolve_actions(sim.characters, actions, sim)
         environmental_events = self.event_gen.generate_environmental_events(sim)
         all_events_so_far = interaction_events + environmental_events
@@ -234,38 +301,80 @@ class SimulationEngine:
 
         self.event_gen.apply_outcomes(all_events, sim)
 
+        # ── 7. Needs (all agents, cheap) ──
         self._update_needs(sim, actions)
 
-        # Lifecycle: aging, death, offspring
+        # ── 8. Lifecycle: aging, death, offspring ──
         lifecycle_events = self._process_lifecycle(sim)
         all_events.extend(lifecycle_events)
 
-        # Groups
+        # ── 9. Groups ──
         group_events = self.group_mgr.process_groups(sim, actions)
         all_events.extend(group_events)
 
-        # Trade/Market
+        # ── 10. Trade/Market ──
         trade_events = self.trade_mgr.process_market(sim, actions)
         all_events.extend(trade_events)
 
-        # Location resource regeneration
+        # ── 10b. Crafting ──
+        craft_events = process_crafting(sim, actions)
+        all_events.extend(craft_events)
+
+        # ── 11. Location resource regeneration ──
         self._regen_location_resources(sim)
+
+        # ── 12. Emotions, memory, reaction dialogue (tier-aware) ──
+        # Build participant lookup for fast event filtering
+        participant_events: dict[str, list[Event]] = {}
+        for event in all_events:
+            for pid in event.participants:
+                if pid not in participant_events:
+                    participant_events[pid] = []
+                participant_events[pid].append(event)
 
         for char in sim.characters.values():
             if not char.alive:
                 continue
-            self.brain.update_emotions(char, all_events)
-            self.brain.consolidate_memory(char, all_events, sim.tick)
-            for event in all_events:
-                msg = self.dialogue.generate_reaction_dialogue(char, event, sim)
-                if msg:
-                    chat_messages.append(msg)
+            tier = lod.get_tier(char.id)
 
+            # Emotions: spotlight+active process their own events; background skip
+            if tier in (LODTier.SPOTLIGHT, LODTier.ACTIVE):
+                my_events = participant_events.get(char.id, [])
+                self.brain.update_emotions(char, my_events)
+                self.brain.consolidate_memory(char, my_events, sim.tick)
+            elif tier == LODTier.BACKGROUND and lod.should_update(LODTier.BACKGROUND, sim.tick):
+                my_events = participant_events.get(char.id, [])
+                if my_events:
+                    self.brain.update_emotions(char, my_events)
+                    self.brain.consolidate_memory(char, my_events, sim.tick)
+
+            # Reaction dialogue: spotlight only
+            if tier == LODTier.SPOTLIGHT:
+                for event in participant_events.get(char.id, []):
+                    msg = self.dialogue.generate_reaction_dialogue(char, event, sim)
+                    if msg:
+                        chat_messages.append(msg)
+
+        # ── 13. Persist ──
         sim.events.extend(all_events)
         sim.chat_log.extend(chat_messages)
+
+        # Cap stored events/chat to prevent unbounded growth and serialization cost.
+        # Keep at most 1000 events (recent ticks). Full history in snapshots.
+        if len(sim.events) > 1000:
+            sim.events = sim.events[-1000:]
+        if len(sim.chat_log) > 200:
+            sim.chat_log = sim.chat_log[-200:]
+
         sim.tick += 1
-        self.db.save(sim)
-        self.db.save_snapshot(sim)
+
+        # At scale (100+ agents), only save/snapshot every N ticks.
+        # Serializing 1000+ characters to JSON is expensive.
+        pop = sum(1 for c in sim.characters.values() if c.alive)
+        save_interval = 1 if pop < 100 else (5 if pop < 500 else 10)
+        if sim.tick % save_interval == 0:
+            self.db.save(sim)
+            self.db.save_snapshot(sim)
 
         return all_events, chat_messages
 
@@ -355,8 +464,8 @@ class SimulationEngine:
     # ── Action → needs satisfaction mapping ──
     _ACTION_NEEDS_BOOST: dict[str, dict[str, float]] = {
         "rest": {"energy": 30.0, "hygiene": 5.0},
-        "gather": {"hunger": 20.0, "fun": 5.0},
-        "communicate": {"social": 25.0, "fun": 5.0},
+        "gather": {"hunger": 25.0, "fun": 5.0},
+        "communicate": {"social": 25.0, "fun": 10.0, "hunger": 10.0},
         "ally": {"social": 15.0},
         "negotiate": {"social": 10.0},
         "cooperate": {"social": 15.0, "fun": 5.0},
@@ -374,6 +483,7 @@ class SimulationEngine:
         "learn": {"fun": 10.0, "energy": -5.0},
         "teach": {"social": 15.0, "fun": 5.0, "energy": -5.0},
         "court": {"social": 20.0, "fun": 15.0, "energy": -5.0},
+        "craft": {"fun": 20.0, "energy": -10.0},
     }
 
     def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
@@ -424,18 +534,19 @@ class SimulationEngine:
         "kill": "conflict",
         "bully": "conflict",
         "ally": "diplomacy",
-        "communicate": "diplomacy",
+        "communicate": "cafe",
         "form_group": "diplomacy",
         "join_group": "diplomacy",
         "leave_group": "diplomacy",
-        "court": "diplomacy",
+        "court": "park",
         "explore": "exploration",
         "gather": "exploration",
         "build_home": "exploration",
-        "observe": "knowledge",
-        "rest": "knowledge",
+        "observe": "park",
+        "rest": "cafe",
         "learn": "knowledge",
         "teach": "knowledge",
+        "craft": "knowledge",
     }
 
     # Fallback coordinates if no matching location found
@@ -463,30 +574,56 @@ class SimulationEngine:
         "rest": (50, 50),
         "learn": (50, 50),
         "teach": (50, 50),
+        "craft": (50, 50),
     }
 
-    def _find_location_by_type(self, sim: SimulationState, loc_type: str) -> Location | None:
+    _location_type_cache: dict[str, dict[str, Location]] = {}  # sim_id -> {type -> Location}
+
+    def _build_location_index(self, sim: SimulationState) -> dict[str, Location]:
+        """Build a type->Location index for O(1) lookup. Cached per step."""
+        idx: dict[str, Location] = {}
+        for loc in sim.environment.locations:
+            if loc.type not in idx:
+                idx[loc.type] = loc
+        return idx
+
+    def _find_location_by_type(self, sim: SimulationState, loc_type: str, loc_index: dict[str, Location] | None = None) -> Location | None:
+        if loc_index is not None:
+            return loc_index.get(loc_type)
         for loc in sim.environment.locations:
             if loc.type == loc_type:
                 return loc
         return None
 
+    # Base movement speed per tick (in simulation units)
+    _BASE_SPEED = 5.0  # ~5 units per tick for steady walking
+
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
+        # Build O(1) lookup indexes once per tick
+        house_index: dict[str, House] = {h.id: h for h in sim.environment.houses}
+        loc_index = self._build_location_index(sim)
+        rng = random.Random(hash(("move", sim.tick)))
+
         for char_id, action in actions.items():
             char = sim.characters[char_id]
 
-            # When resting, move toward assigned house
+            # Determine target position based on action
             if action.type.value == "rest" and char.house_id:
-                house = next((h for h in sim.environment.houses if h.id == char.house_id), None)
+                house = house_index.get(char.house_id)
                 if house:
                     target_x = house.position["x"]
                     target_y = house.position["y"]
                 else:
                     target_x, target_y = self._ACTION_LOCATION_MAP.get("rest", (50, 50))
+            elif action.target_id and action.target_id in sim.characters:
+                # Move toward interaction target (for social actions)
+                target_char = sim.characters[action.target_id]
+                target_x = target_char.position["x"]
+                target_y = target_char.position["y"]
             else:
-                # Try dynamic location lookup first
+                # Try dynamic location lookup first (O(1) with index)
                 loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
-                loc = self._find_location_by_type(sim, loc_type) if loc_type else None
+                loc = loc_index.get(loc_type) if loc_type else None
                 if loc:
                     target_x, target_y = loc.x, loc.y
                 else:
@@ -497,16 +634,23 @@ class SimulationEngine:
 
             dx = target_x - char.position["x"]
             dy = target_y - char.position["y"]
-
-            speed = 0.3 + random.uniform(0, 0.2)
-            char.position["x"] += dx * speed
-            char.position["y"] += dy * speed
-
-            # Add random offset when near the target location
             dist = (dx * dx + dy * dy) ** 0.5
-            if dist < 10:
-                char.position["x"] += random.uniform(-8, 8)
-                char.position["y"] += random.uniform(-8, 8)
+
+            if dist < 5:
+                # At destination — wander around the location naturally
+                wander_r = 6.0
+                char.position["x"] += rng.uniform(-wander_r, wander_r)
+                char.position["y"] += rng.uniform(-wander_r, wander_r)
+            else:
+                # Walk toward target at constant speed (personality-affected)
+                speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
+                if dist > 0:
+                    move = min(speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                # Small lateral sway for natural walking
+                char.position["x"] += rng.uniform(-0.5, 0.5)
+                char.position["y"] += rng.uniform(-0.5, 0.5)
 
             # Clamp to world bounds
             char.position["x"] = max(-120, min(120, char.position["x"]))
@@ -571,9 +715,11 @@ class SimulationEngine:
             if group.leader_id == char.id:
                 group.leader_id = group.members[0].character_id if group.members else None
 
-        # Create legacy memories for witnesses
-        for other in sim.characters.values():
-            if other.id == char.id or not other.alive:
+        # Create legacy memories only for characters who had a relationship with the deceased
+        # (O(relationships) instead of O(n) scanning all characters)
+        for other_id in list(char.relationships.keys()):
+            other = sim.characters.get(other_id)
+            if not other or not other.alive:
                 continue
             rel = other.relationships.get(char.id, 0)
             if abs(rel) > 0.2:
@@ -584,13 +730,17 @@ class SimulationEngine:
                     related_characters=[char.id],
                 ))
 
-        # Redistribute some wealth
+        # Redistribute wealth to housemates only (not all alive chars)
         remaining_wealth = char.resources.get("wealth", 0) * 0.5
-        alive_chars = [c for c in sim.characters.values() if c.alive and c.id != char.id]
-        if alive_chars and remaining_wealth > 0:
-            share = remaining_wealth / len(alive_chars)
-            for c in alive_chars:
-                c.resources["wealth"] = c.resources.get("wealth", 0) + share
+        if remaining_wealth > 0 and char.house_id:
+            house = next((h for h in sim.environment.houses if h.id == char.house_id), None)
+            if house:
+                housemates = [sim.characters[rid] for rid in house.residents
+                              if rid in sim.characters and rid != char.id and sim.characters[rid].alive]
+                if housemates:
+                    share = remaining_wealth / len(housemates)
+                    for c in housemates:
+                        c.resources["wealth"] = c.resources.get("wealth", 0) + share
 
         return Event(
             tick=sim.tick, type=EventType.DEATH,
@@ -603,25 +753,32 @@ class SimulationEngine:
 
     def _check_offspring(self, sim: SimulationState) -> list[Event]:
         events: list[Event] = []
-        alive = [c for c in sim.characters.values() if c.alive]
-        if len(alive) >= sim.config.max_population:
+        if sum(1 for c in sim.characters.values() if c.alive) >= sim.config.max_population:
             return events
 
         rng = random.Random(hash(("offspring", sim.tick)))
         checked: set[tuple[str, str]] = set()
 
-        for c1 in alive:
-            for c2 in alive:
-                if c1.id >= c2.id:
+        # Instead of O(n²) all-pairs, iterate each alive character's relationships.
+        # Only pairs with mutual rel > 0.7 can produce offspring, so use relationships as the index.
+        alive_ids = {c.id for c in sim.characters.values() if c.alive}
+
+        for c1 in sim.characters.values():
+            if not c1.alive:
+                continue
+            for c2_id, rel1 in c1.relationships.items():
+                if rel1 <= 0.7 or c2_id not in alive_ids:
                     continue
-                pair = (c1.id, c2.id)
+                if c1.id >= c2_id:
+                    continue
+                pair = (c1.id, c2_id)
                 if pair in checked:
                     continue
                 checked.add(pair)
 
-                rel1 = c1.relationships.get(c2.id, 0)
+                c2 = sim.characters[c2_id]
                 rel2 = c2.relationships.get(c1.id, 0)
-                if rel1 > 0.7 and rel2 > 0.7 and rng.random() < 0.05:
+                if rel2 > 0.7 and rng.random() < 0.05:
                     child = self._create_offspring(c1, c2, sim, rng)
                     sim.characters[child.id] = child
                     self._assign_house(sim, child)
