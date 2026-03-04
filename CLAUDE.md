@@ -8,6 +8,8 @@ These three principles guide ALL design and implementation decisions:
 
 3. **The key: correctly model distributions, interaction rules, feedback loops, and constraints.** — Get these four things right and emergent phenomena (empires, cultures, economies, conflicts) arise naturally. Get any one wrong and the simulation feels artificial.
 
+4. **Never make survival artificially easy. Decisions must have real consequences.** — Give agents the *ability* to survive (tools, actions, locations), but never guarantee it. If an agent chooses to socialize instead of eating, it should starve. If it picks fights it can't win, it should die. Don't nerf decay rates, inflate rewards, or add safety nets to produce "better" outcomes. The simulation is interesting *because* bad decisions lead to failure. Protect agency, not agents.
+
 ## Git Workflow
 
 - Commit and push after every few meaningful changes (e.g., after completing a feature, fixing a bug, or finishing a logical unit of work)
