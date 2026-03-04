@@ -96,6 +96,18 @@ class EventGenerator:
                     importance=0.3,
                 ))
 
+            elif action.type == ActionType.KILL:
+                events.append(self._attempted_kill(char, target, tick, state))
+
+            elif action.type == ActionType.BULLY:
+                events.append(self._bullying(char, target, tick))
+
+            elif action.type == ActionType.TEACH:
+                events.append(self._teaching(char, target, tick))
+
+            elif action.type == ActionType.COURT:
+                events.append(self._courting(char, target, tick))
+
         return events
 
     def generate_environmental_events(self, state: SimulationState) -> list[Event]:
@@ -595,6 +607,160 @@ class EventGenerator:
             importance=0.5,
         )
 
+    def _attempted_kill(self, attacker: Character, victim: Character, tick: int, state: SimulationState) -> Event:
+        """Attempted murder — high risk, high consequence."""
+        rng = random.Random(hash(("kill", attacker.id, victim.id, tick)))
+        atk_power = attacker.resources.get("energy", 50) * 0.7 + rng.gauss(0, 10)
+        def_power = victim.resources.get("energy", 50) * 0.5 + victim.health * 0.3
+
+        attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 25)
+
+        if atk_power > def_power:
+            # Victim dies
+            victim.alive = False
+            victim.cause_of_death = f"killed by {attacker.name}"
+            victim.death_tick = tick
+
+            # Massive reputation and relationship damage for the killer
+            attacker.resources["influence"] = max(0, attacker.resources.get("influence", 0) - 20)
+            for cid, char in state.characters.items():
+                if cid == attacker.id or not char.alive:
+                    continue
+                # Witnesses turn against the killer
+                rel = char.relationships.get(attacker.id, 0)
+                char.relationships[attacker.id] = _clamp(rel - 0.5, -1, 1)
+                # Those close to the victim especially so
+                victim_rel = char.relationships.get(victim.id, 0)
+                if victim_rel > 0.3:
+                    char.relationships[attacker.id] = _clamp(char.relationships.get(attacker.id, 0) - 0.3, -1, 1)
+
+            stolen = min(15, victim.resources.get("wealth", 0))
+            attacker.resources["wealth"] = attacker.resources.get("wealth", 0) + stolen
+
+            return Event(
+                tick=tick, type=EventType.DEATH,
+                title=f"{attacker.name} kills {victim.name}",
+                description=f"{attacker.name} has murdered {victim.name} in a violent act. The community is shocked and outraged.",
+                participants=[attacker.id, victim.id],
+                outcomes=[
+                    f"{victim.name} is dead",
+                    f"{attacker.name} loses 20 influence — community turns against them",
+                    f"{attacker.name} stole {stolen:.0f} wealth",
+                ],
+                importance=0.95,
+            )
+        else:
+            # Failed attempt — attacker is injured and exposed
+            attacker.health = max(0, attacker.health - rng.uniform(10, 25))
+            attacker.resources["influence"] = max(0, attacker.resources.get("influence", 0) - 15)
+            victim.relationships[attacker.id] = -1.0  # Permanent enemy
+            victim.health = max(0, victim.health - rng.uniform(5, 15))
+
+            return Event(
+                tick=tick, type=EventType.CONFLICT,
+                title=f"{attacker.name} attempts to kill {victim.name} — fails",
+                description=f"{attacker.name} tried to murder {victim.name} but was fought off. Both are injured. {attacker.name}'s reputation is destroyed.",
+                participants=[attacker.id, victim.id],
+                outcomes=[
+                    f"{attacker.name} is exposed and injured",
+                    f"{victim.name} is injured but alive",
+                    f"{attacker.name} loses 15 influence",
+                ],
+                importance=0.9,
+            )
+
+    def _bullying(self, bully: Character, victim: Character, tick: int) -> Event:
+        """Bullying — social aggression, damages victim's wellbeing."""
+        bully_power = bully.traits.extraversion * 0.5 + (1 - bully.traits.agreeableness) * 0.5
+        victim_resilience = victim.traits.conscientiousness * 0.3 + (1 - victim.traits.neuroticism) * 0.3
+
+        victim.emotional_state.sadness = _clamp(victim.emotional_state.sadness + 0.3, -1, 1)
+        victim.emotional_state.anger = _clamp(victim.emotional_state.anger + 0.2, -1, 1)
+        victim.emotional_state.trust = _clamp(victim.emotional_state.trust - 0.3, -1, 1)
+        victim.relationships[bully.id] = _clamp(victim.relationships.get(bully.id, 0) - 0.4, -1, 1)
+
+        if victim_resilience > bully_power:
+            # Victim stands up
+            bully.resources["influence"] = max(0, bully.resources.get("influence", 0) - 5)
+            victim.resources["influence"] = victim.resources.get("influence", 0) + 3
+            desc = f"{bully.name} tries to bully {victim.name}, but {victim.name} stands their ground. {bully.name} looks foolish."
+        else:
+            # Bullying succeeds
+            bully.resources["influence"] = bully.resources.get("influence", 0) + 2
+            victim.resources["influence"] = max(0, victim.resources.get("influence", 0) - 3)
+            desc = f"{bully.name} intimidates and belittles {victim.name}, who shrinks away. Others pretend not to notice."
+
+        return Event(
+            tick=tick, type=EventType.INTERACTION,
+            title=f"{bully.name} bullies {victim.name}",
+            description=desc,
+            participants=[bully.id, victim.id],
+            outcomes=[desc],
+            importance=0.5,
+        )
+
+    def _teaching(self, teacher: Character, student: Character, tick: int) -> Event:
+        """Teaching — knowledge transfer, builds relationships."""
+        effectiveness = teacher.traits.conscientiousness * 0.4 + teacher.traits.openness * 0.3
+        receptiveness = student.traits.openness * 0.5 + student.traits.conscientiousness * 0.3
+
+        knowledge_transfer = effectiveness * receptiveness * 8
+        teacher.resources["influence"] = teacher.resources.get("influence", 0) + 4
+        student.resources["influence"] = student.resources.get("influence", 0) + knowledge_transfer
+        teacher.resources["energy"] = max(0, teacher.resources.get("energy", 0) - 8)
+
+        teacher.relationships[student.id] = _clamp(teacher.relationships.get(student.id, 0) + 0.15, -1, 1)
+        student.relationships[teacher.id] = _clamp(student.relationships.get(teacher.id, 0) + 0.2, -1, 1)
+
+        return Event(
+            tick=tick, type=EventType.INTERACTION,
+            title=f"{teacher.name} teaches {student.name}",
+            description=f"{teacher.name} shares knowledge with {student.name}. {student.name} gains {knowledge_transfer:.0f} influence from the lesson.",
+            participants=[teacher.id, student.id],
+            outcomes=[
+                f"{student.name} gains {knowledge_transfer:.0f} influence from learning",
+                f"{teacher.name} gains 4 influence from teaching",
+                "Bond strengthened between teacher and student",
+            ],
+            importance=0.4,
+        )
+
+    def _courting(self, suitor: Character, target: Character, tick: int) -> Event:
+        """Courting — romantic pursuit, outcome depends on compatibility and existing relationship."""
+        # Chemistry based on trait compatibility (opposites attract for some, similarity for others)
+        similarity = 1.0 - (
+            abs(suitor.traits.openness - target.traits.openness) * 0.3
+            + abs(suitor.traits.agreeableness - target.traits.agreeableness) * 0.3
+            + abs(suitor.traits.conscientiousness - target.traits.conscientiousness) * 0.2
+        )
+        existing_rel = target.relationships.get(suitor.id, 0)
+        suitor_charm = suitor.traits.extraversion * 0.4 + suitor.traits.agreeableness * 0.3
+
+        success_chance = (similarity * 0.3 + existing_rel * 0.4 + suitor_charm * 0.3)
+
+        suitor.relationships[target.id] = _clamp(suitor.relationships.get(target.id, 0) + 0.2, -1, 1)
+
+        if success_chance > 0.3:
+            # Reciprocated interest
+            target.relationships[suitor.id] = _clamp(target.relationships.get(suitor.id, 0) + 0.2, -1, 1)
+            desc = f"{suitor.name} courts {target.name}, and the interest is reciprocated. A spark forms between them."
+            importance = 0.6
+        else:
+            # Rejected
+            target.relationships[suitor.id] = _clamp(target.relationships.get(suitor.id, 0) - 0.1, -1, 1)
+            suitor.emotional_state.sadness = _clamp(suitor.emotional_state.sadness + 0.2, -1, 1)
+            desc = f"{suitor.name} attempts to court {target.name}, but the advance is politely declined."
+            importance = 0.3
+
+        return Event(
+            tick=tick, type=EventType.INTERACTION,
+            title=f"{suitor.name} courts {target.name}",
+            description=desc,
+            participants=[suitor.id, target.id],
+            outcomes=[desc],
+            importance=importance,
+        )
+
     def _one_sided_competition(self, competitor: Character, target: Character, tick: int, state: SimulationState) -> Event:
         competitor.resources["energy"] = max(0, competitor.resources.get("energy", 0) - 5)
         competitor.resources["wealth"] = competitor.resources.get("wealth", 0) + 3
@@ -679,6 +845,33 @@ class EventGenerator:
                     participants=[char_id],
                     outcomes=["Information gathered through observation"],
                     importance=0.15,
+                )
+
+            case ActionType.BUILD_HOME:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 15)
+                cost = min(10, char.resources.get("wealth", 0))
+                char.resources["wealth"] = max(0, char.resources.get("wealth", 0) - cost)
+                char.resources["influence"] = char.resources.get("influence", 0) + 3
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} builds",
+                    description=f"{char.name} invests time and resources into building and improving their home.",
+                    participants=[char_id],
+                    outcomes=[f"{char.name} spent {cost:.0f} wealth on construction", f"{char.name} gains 3 influence from visible progress"],
+                    importance=0.4,
+                )
+
+            case ActionType.LEARN:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
+                knowledge_gain = 2 + char.traits.openness * 5
+                char.resources["influence"] = char.resources.get("influence", 0) + knowledge_gain
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} studies",
+                    description=f"{char.name} dedicates time to learning, absorbing new knowledge and skills.",
+                    participants=[char_id],
+                    outcomes=[f"{char.name} gains {knowledge_gain:.0f} influence from knowledge"],
+                    importance=0.3,
                 )
 
             case _:

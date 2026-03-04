@@ -56,6 +56,13 @@ class ActionType(str, Enum):
     FORM_GROUP = "form_group"
     JOIN_GROUP = "join_group"
     LEAVE_GROUP = "leave_group"
+    # Life actions
+    BUILD_HOME = "build_home"
+    KILL = "kill"
+    BULLY = "bully"
+    LEARN = "learn"
+    TEACH = "teach"
+    COURT = "court"
 
 
 class Action(BaseModel):
@@ -121,6 +128,11 @@ class CharacterCreate(BaseModel):
     goals: list[str] = []
     motivations: list[str] = []
     image_url: str | None = None
+
+
+class BatchCharacterCreate(BaseModel):
+    count: int = Field(default=10, ge=1, le=10000)
+    name_prefix: str = ""  # Optional prefix; names auto-generated if empty
 
 
 class EventType(str, Enum):
@@ -203,7 +215,7 @@ class SimulationConfig(BaseModel):
     aging_rate: int = Field(default=1, ge=0)
     enable_permadeath: bool = True
     enable_offspring: bool = True
-    max_population: int = 30
+    max_population: int = 1000
 
 
 class ChatMessage(BaseModel):
