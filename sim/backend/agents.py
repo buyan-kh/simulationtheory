@@ -246,13 +246,13 @@ class AgentBrain:
             is_night = hour >= 21 or hour <= 4
             if is_night:
                 if character.house_id:
-                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 2.0
+                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 5.0
                 else:
-                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 0.8
-                # Penalize most non-rest actions at night
-                for at in (ActionType.EXPLORE, ActionType.GATHER, ActionType.COMPETE,
-                           ActionType.ATTACK, ActionType.COURT, ActionType.BUILD_HOME):
-                    urgency[at] = urgency.get(at, 0) - 0.8
+                    urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 3.0
+                # Penalize ALL non-rest actions at night
+                for at in ActionType:
+                    if at != ActionType.REST:
+                        urgency[at] = urgency.get(at, 0) - 2.0
 
         # ── Needs-based urgency (hunger, energy need, social) ──
         hunger = character.needs.hunger
@@ -751,14 +751,16 @@ class AgentBrain:
         if energy < 20:
             scores.append((ActionType.REST, 2.0))
 
-        # Night cycle: strongly prefer rest
+        # Night cycle: override — go to sleep
         hour = state.tick % 24
         is_night = hour >= 21 or hour <= 4
         if is_night:
+            # Force rest at night by inserting a dominant score
+            scores = [(at, s - 2.0) for at, s in scores if at != ActionType.REST]
             if character.house_id:
-                scores.append((ActionType.REST, 2.5))
+                scores.append((ActionType.REST, 5.0))
             else:
-                scores.append((ActionType.REST, 1.5))
+                scores.append((ActionType.REST, 3.0))
 
         # Pick best
         scores.sort(key=lambda x: x[1], reverse=True)
