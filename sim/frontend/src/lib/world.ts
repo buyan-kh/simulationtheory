@@ -130,6 +130,37 @@ function buildRiverSet(): { river: Set<string>; sand: Set<string> } {
   return { river, sand };
 }
 
+// Farm crop fields (Stardew Valley style)
+let cropTiles: Set<string> | null = null;
+
+function buildCropSet(locations: Location[]): Set<string> {
+  const crops = new Set<string>();
+  for (const loc of locations) {
+    if (loc.type !== 'farm') continue;
+    const { wx, wy } = simToWorld(loc.x, loc.y);
+    const cr = Math.floor(wy / TILE_PX);
+    const cc = Math.floor(wx / TILE_PX);
+    // Create crop field rows around farm
+    for (let dr = 3; dr <= 10; dr++) {
+      for (let dc = -8; dc <= 8; dc++) {
+        // Alternating crop and plowed rows
+        if (dr % 2 === 0) {
+          crops.add(`${cr + dr},${cc + dc},crops`);
+        } else {
+          crops.add(`${cr + dr},${cc + dc},plowed`);
+        }
+      }
+    }
+    // Also some behind
+    for (let dr = -6; dr <= -3; dr++) {
+      for (let dc = -5; dc <= 5; dc++) {
+        crops.add(`${cr + dr},${cc + dc},crops`);
+      }
+    }
+  }
+  return crops;
+}
+
 function buildDirtSet(locations: Location[]): Set<string> {
   const dirt = new Set<string>();
   for (const loc of locations) {
@@ -160,6 +191,12 @@ function getTileAt(row: number, col: number): TileInfo {
   }
   if (sandTiles?.has(key)) {
     return { type: 'sand', variant: 0 };
+  }
+
+  // Check crop fields near farms
+  if (cropTiles) {
+    if (cropTiles.has(`${key},crops`)) return { type: 'crops', variant: 0 };
+    if (cropTiles.has(`${key},plowed`)) return { type: 'plowed', variant: 0 };
   }
 
   // Check dirt near buildings
@@ -539,6 +576,7 @@ export function generateWorld(locations: Location[], characterCount: number): Wo
   const riverData = buildRiverSet();
   riverTiles = riverData.river;
   sandTiles = riverData.sand;
+  cropTiles = buildCropSet(locations);
   dirtTiles = buildDirtSet(locations);
 
   const decorations = generateDecorations(seededRandom(123), locations);
