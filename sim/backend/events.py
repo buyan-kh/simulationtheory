@@ -876,16 +876,60 @@ class EventGenerator:
                         outcomes=[f"{char.name} needs to earn more before building"],
                         importance=0.2,
                     )
+
                 char.resources["energy"] = max(0, char.resources.get("energy", 0) - 15)
                 char.resources["wealth"] = wealth - 20.0
                 char.resources["influence"] = char.resources.get("influence", 0) + 3
+
+                # Actually build or upgrade the house
+                desc = f"{char.name} invests time and resources into construction."
+                outcomes = [f"{char.name} spent 20 wealth on construction", f"{char.name} gains 3 influence"]
+
+                if char.house_id:
+                    # Upgrade existing house
+                    house = None
+                    for h in state.environment.houses:
+                        if h.id == char.house_id:
+                            house = h
+                            break
+                    if house and house.size == "small":
+                        house.size = "medium"
+                        house.max_residents = 2
+                        desc = f"{char.name} expanded their cottage into a proper house!"
+                        outcomes.append("House upgraded to medium")
+                    elif house and house.size == "medium":
+                        house.size = "large"
+                        house.max_residents = 3
+                        desc = f"{char.name} renovated their house into a grand manor!"
+                        outcomes.append("House upgraded to large")
+                    else:
+                        desc = f"{char.name} made improvements to their home."
+                        outcomes.append("Home improvements completed")
+                else:
+                    # Build a new house for homeless agent
+                    from models import House
+                    import random as _rng
+                    px = char.position["x"] + _rng.uniform(-10, 10)
+                    py = char.position["y"] + _rng.uniform(-10, 10)
+                    new_house = House(
+                        name=f"House of {char.name}",
+                        position={"x": px, "y": py},
+                        size="small",
+                        max_residents=1,
+                        residents=[char.id],
+                    )
+                    state.environment.houses.append(new_house)
+                    char.house_id = new_house.id
+                    desc = f"{char.name} built a brand new cottage!"
+                    outcomes = [f"{char.name} now has a home!", f"{char.name} spent 20 wealth"]
+
                 return Event(
                     tick=tick, type=EventType.DECISION,
                     title=f"{char.name} builds",
-                    description=f"{char.name} invests time and resources into building and improving their home.",
+                    description=desc,
                     participants=[char_id],
-                    outcomes=[f"{char.name} spent 20 wealth on construction", f"{char.name} gains 3 influence"],
-                    importance=0.4,
+                    outcomes=outcomes,
+                    importance=0.5,
                 )
 
             case ActionType.LEARN:

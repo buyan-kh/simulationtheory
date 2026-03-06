@@ -1,5 +1,6 @@
 // World generation and town layout
-// Creates an 80x80 tile grid (1280x1280 world px) with terrain, buildings, decorations
+// Creates a 200x200 tile grid (3200x3200 world px) with terrain, buildings, decorations
+// Chunks are generated lazily — only visible tiles get rendered
 // Designed so PixelCanvas can consume it as Sprite[]
 
 import type { Sprite } from './sprites/renderer';
@@ -9,10 +10,11 @@ import { drawBuilding, getBuildingSize, locationToBuildingType, type BuildingTyp
 
 // ==================== CONSTANTS ====================
 const TILE_PX = 16;        // pixels per tile at scale=1
-const WORLD_TILES = 80;    // tiles across
-const WORLD_PX = WORLD_TILES * TILE_PX; // 1280
+const WORLD_TILES = 200;   // tiles across (200x200 = 40,000 tiles)
+const WORLD_PX = WORLD_TILES * TILE_PX; // 3200
 const SCALE = 2;           // draw at 2x for chunky pixel look
-const COORD_RANGE = 240;   // sim coords go from -120 to 120
+const COORD_RANGE = 600;   // sim coords go from -300 to 300
+const CHUNK_SIZE = 16;     // tiles per terrain chunk (16x16 = 256 tiles per chunk)
 
 // ==================== SEEDED RNG ====================
 function seededRandom(seed: number): () => number {
@@ -23,148 +25,161 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+// Position-based seeded random (deterministic per tile, no full map needed)
+function tileRng(col: number, row: number, seed: number = 42): number {
+  let s = ((col * 73856093) ^ (row * 19349663) ^ (seed * 83492791)) & 0x7fffffff;
+  s = ((s * 16807) + 0) % 2147483647;
+  return s / 2147483647;
+}
+
 // ==================== COORDINATE MAPPING ====================
 export function simToWorld(sx: number, sy: number): { wx: number; wy: number } {
   return {
-    wx: ((sx + 120) / COORD_RANGE) * WORLD_PX,
-    wy: ((sy + 120) / COORD_RANGE) * WORLD_PX,
+    wx: ((sx + 300) / COORD_RANGE) * WORLD_PX,
+    wy: ((sy + 300) / COORD_RANGE) * WORLD_PX,
   };
 }
 
 export function worldToSim(wx: number, wy: number): { sx: number; sy: number } {
   return {
-    sx: (wx / WORLD_PX) * COORD_RANGE - 120,
-    sy: (wy / WORLD_PX) * COORD_RANGE - 120,
+    sx: (wx / WORLD_PX) * COORD_RANGE - 300,
+    sy: (wy / WORLD_PX) * COORD_RANGE - 300,
   };
 }
 
 export const WORLD_SIZE = WORLD_PX * SCALE;
 
-// ==================== TILE MAP GENERATION ====================
+// ==================== LAZY TILE GENERATION ====================
+// Instead of generating a full 200x200 array, we compute tile type on the fly
+// using deterministic seeded random based on position
 
 interface TileInfo {
   type: TileType;
   variant: number;
 }
 
-function generateTileMap(rng: () => number, locations: Location[]): TileInfo[][] {
-  const map: TileInfo[][] = [];
+// Pre-computed sets for road tiles and river tiles
+let roadTiles: Set<string> | null = null;
+let riverTiles: Set<string> | null = null;
+let sandTiles: Set<string> | null = null;
+let dirtTiles: Set<string> | null = null;
 
-  // Initialize all grass
-  for (let row = 0; row < WORLD_TILES; row++) {
-    map[row] = [];
-    for (let col = 0; col < WORLD_TILES; col++) {
-      const v = rng();
-      let type: TileType = 'grass';
-      if (v < 0.1) type = 'grass2';
-      else if (v < 0.2) type = 'grass3';
-      else if (v < 0.22) type = 'flowers';
-      map[row][col] = { type, variant: Math.floor(rng() * 3) };
-    }
-  }
-
-  // Add a river running roughly from top-left to bottom-right
-  const riverBaseCol = 55;
-  for (let row = 0; row < WORLD_TILES; row++) {
-    const wobble = Math.floor(Math.sin(row * 0.15) * 3);
-    const col = riverBaseCol + wobble;
-    for (let w = -1; w <= 1; w++) {
-      const c = col + w;
-      if (c >= 0 && c < WORLD_TILES) {
-        map[row][c] = { type: (row + c) % 2 === 0 ? 'water' : 'water2', variant: 0 };
-      }
-    }
-    // Sand banks
-    for (const w of [-2, 2]) {
-      const c = col + w;
-      if (c >= 0 && c < WORLD_TILES) {
-        map[row][c] = { type: 'sand', variant: 0 };
-      }
-    }
-  }
-
-  // Roads between locations (cobblestone paths)
+function buildRoadSet(locations: Location[]): Set<string> {
+  const roads = new Set<string>();
   const locPositions = locations.map(l => {
     const { wx, wy } = simToWorld(l.x, l.y);
     return { col: Math.floor(wx / TILE_PX), row: Math.floor(wy / TILE_PX) };
   });
 
-  // Connect each location to the nearest town center (Market Square = first location)
+  function addRoad(c1: number, r1: number, c2: number, r2: number) {
+    const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+    const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+    // Horizontal segment (3 tiles wide)
+    for (let c = minC; c <= maxC; c++) {
+      roads.add(`${r1 - 1},${c},sidewalk`);
+      roads.add(`${r1},${c},road_line`);
+      roads.add(`${r1 + 1},${c},sidewalk`);
+    }
+    // Vertical segment (3 tiles wide)
+    for (let r = minR; r <= maxR; r++) {
+      roads.add(`${r},${c2 - 1},sidewalk`);
+      roads.add(`${r},${c2},road_line`);
+      roads.add(`${r},${c2 + 1},sidewalk`);
+    }
+  }
+
   if (locPositions.length > 0) {
     const center = locPositions[0];
     for (let i = 1; i < locPositions.length; i++) {
-      const target = locPositions[i];
-      drawRoad(map, center.col, center.row, target.col, target.row);
+      addRoad(center.col, center.row, locPositions[i].col, locPositions[i].row);
     }
-    // Also connect neighbors
+    // Connect nearby locations
     for (let i = 1; i < locPositions.length; i++) {
       for (let j = i + 1; j < locPositions.length; j++) {
         const dist = Math.abs(locPositions[i].col - locPositions[j].col) + Math.abs(locPositions[i].row - locPositions[j].row);
-        if (dist < 30) {
-          drawRoad(map, locPositions[i].col, locPositions[i].row, locPositions[j].col, locPositions[j].row);
+        if (dist < 60) {
+          addRoad(locPositions[i].col, locPositions[i].row, locPositions[j].col, locPositions[j].row);
         }
       }
     }
   }
+  return roads;
+}
 
-  // Dark grass patches around edges (forest boundary)
+function buildRiverSet(): { river: Set<string>; sand: Set<string> } {
+  const river = new Set<string>();
+  const sand = new Set<string>();
+  // River runs diagonally across the map with meander
+  const riverBaseCol = 140;
   for (let row = 0; row < WORLD_TILES; row++) {
-    for (let col = 0; col < WORLD_TILES; col++) {
-      const edgeDist = Math.min(row, col, WORLD_TILES - 1 - row, WORLD_TILES - 1 - col);
-      if (edgeDist < 4 && map[row][col].type.startsWith('grass')) {
-        map[row][col] = { type: 'grass_dark', variant: 0 };
+    const wobble = Math.floor(Math.sin(row * 0.08) * 5 + Math.cos(row * 0.03) * 3);
+    const col = riverBaseCol + wobble;
+    for (let w = -2; w <= 2; w++) {
+      const c = col + w;
+      if (c >= 0 && c < WORLD_TILES) {
+        river.add(`${row},${c}`);
+      }
+    }
+    for (const w of [-3, 3]) {
+      const c = col + w;
+      if (c >= 0 && c < WORLD_TILES) {
+        sand.add(`${row},${c}`);
       }
     }
   }
+  return { river, sand };
+}
 
-  // Dirt patches near buildings
-  for (const pos of locPositions) {
-    for (let dr = -2; dr <= 2; dr++) {
-      for (let dc = -2; dc <= 2; dc++) {
-        const r = pos.row + dr;
-        const c = pos.col + dc;
-        if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES) {
-          if (map[r][c].type.startsWith('grass')) {
-            map[r][c] = { type: 'dirt', variant: 0 };
-          }
-        }
+function buildDirtSet(locations: Location[]): Set<string> {
+  const dirt = new Set<string>();
+  for (const loc of locations) {
+    const { wx, wy } = simToWorld(loc.x, loc.y);
+    const cr = Math.floor(wy / TILE_PX);
+    const cc = Math.floor(wx / TILE_PX);
+    for (let dr = -3; dr <= 3; dr++) {
+      for (let dc = -3; dc <= 3; dc++) {
+        dirt.add(`${cr + dr},${cc + dc}`);
       }
     }
   }
-
-  return map;
+  return dirt;
 }
 
-function isWaterTile(map: TileInfo[][], r: number, c: number): boolean {
-  if (r < 0 || r >= WORLD_TILES || c < 0 || c >= WORLD_TILES) return true;
-  return map[r][c].type === 'water' || map[r][c].type === 'water2';
-}
+function getTileAt(row: number, col: number): TileInfo {
+  const key = `${row},${col}`;
 
-function setRoadTile(map: TileInfo[][], r: number, c: number, type: TileType) {
-  if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES && !isWaterTile(map, r, c)) {
-    map[r][c] = { type, variant: 0 };
+  // Check road first (highest priority)
+  if (roadTiles) {
+    if (roadTiles.has(`${key},road_line`)) return { type: 'road_line', variant: 0 };
+    if (roadTiles.has(`${key},sidewalk`)) return { type: 'sidewalk', variant: 0 };
   }
-}
 
-function drawRoad(map: TileInfo[][], c1: number, r1: number, c2: number, r2: number) {
-  // 3-tile-wide road: sidewalk, road (with center line), sidewalk
-  const minC = Math.min(c1, c2);
-  const maxC = Math.max(c1, c2);
-  const minR = Math.min(r1, r2);
-  const maxR = Math.max(r1, r2);
+  // Check river
+  if (riverTiles?.has(key)) {
+    return { type: (row + col) % 2 === 0 ? 'water' : 'water2', variant: 0 };
+  }
+  if (sandTiles?.has(key)) {
+    return { type: 'sand', variant: 0 };
+  }
 
-  // Horizontal segment at r1 (3 tiles wide)
-  for (let c = minC; c <= maxC; c++) {
-    setRoadTile(map, r1 - 1, c, 'sidewalk');
-    setRoadTile(map, r1, c, 'road_line');
-    setRoadTile(map, r1 + 1, c, 'sidewalk');
+  // Check dirt near buildings
+  if (dirtTiles?.has(key)) {
+    return { type: 'dirt', variant: 0 };
   }
-  // Vertical segment at c2 (3 tiles wide)
-  for (let r = minR; r <= maxR; r++) {
-    setRoadTile(map, r, c2 - 1, 'sidewalk');
-    setRoadTile(map, r, c2, 'road_line');
-    setRoadTile(map, r, c2 + 1, 'sidewalk');
+
+  // Edge forest
+  const edgeDist = Math.min(row, col, WORLD_TILES - 1 - row, WORLD_TILES - 1 - col);
+  if (edgeDist < 6) {
+    return { type: 'grass_dark', variant: 0 };
   }
+
+  // Regular terrain — deterministic per position
+  const v = tileRng(col, row, 42);
+  let type: TileType = 'grass';
+  if (v < 0.08) type = 'grass2';
+  else if (v < 0.16) type = 'grass3';
+  else if (v < 0.18) type = 'flowers';
+  return { type, variant: Math.floor(tileRng(col, row, 99) * 3) };
 }
 
 // ==================== DECORATION GENERATION ====================
@@ -175,101 +190,97 @@ interface Decoration {
   row: number;
 }
 
-function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations: Location[]): Decoration[] {
+function generateDecorations(rng: () => number, locations: Location[]): Decoration[] {
   const decorations: Decoration[] = [];
 
-  // Mark tiles near locations as "no-spawn" zone
+  // No-spawn zones near buildings
   const noSpawn = new Set<string>();
   for (const loc of locations) {
     const { wx, wy } = simToWorld(loc.x, loc.y);
     const cr = Math.floor(wy / TILE_PX);
     const cc = Math.floor(wx / TILE_PX);
-    for (let dr = -4; dr <= 4; dr++) {
-      for (let dc = -4; dc <= 4; dc++) {
+    for (let dr = -5; dr <= 5; dr++) {
+      for (let dc = -5; dc <= 5; dc++) {
         noSpawn.add(`${cr + dr},${cc + dc}`);
       }
     }
   }
 
-  // Forest around edges
-  for (let i = 0; i < 120; i++) {
+  // Dense forest around edges (bigger map = more trees)
+  for (let i = 0; i < 400; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     const edgeDist = Math.min(row, col, WORLD_TILES - 1 - row, WORLD_TILES - 1 - col);
-    if (edgeDist < 8 && !noSpawn.has(`${row},${col}`)) {
-      const tile = tileMap[row]?.[col];
-      if (tile && !tile.type.startsWith('water') && tile.type !== 'cobblestone' && tile.type !== 'sand') {
+    if (edgeDist < 15 && !noSpawn.has(`${row},${col}`)) {
+      const tile = getTileAt(row, col);
+      if (!tile.type.startsWith('water') && tile.type !== 'sand' && !tile.type.startsWith('road') && tile.type !== 'sidewalk') {
         decorations.push({ type: rng() < 0.5 ? 'pine' : 'tree', col, row });
       }
     }
   }
 
-  // Scattered trees in meadow
-  for (let i = 0; i < 30; i++) {
+  // Scattered trees throughout meadows
+  for (let i = 0; i < 120; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
-      const tile = tileMap[row]?.[col];
-      if (tile && tile.type.startsWith('grass')) {
+      const tile = getTileAt(row, col);
+      if (tile.type.startsWith('grass')) {
         decorations.push({ type: rng() < 0.3 ? 'pine' : 'tree', col, row });
       }
     }
   }
 
   // Bushes
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < 80; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
-      const tile = tileMap[row]?.[col];
-      if (tile && tile.type.startsWith('grass')) {
+      const tile = getTileAt(row, col);
+      if (tile.type.startsWith('grass')) {
         decorations.push({ type: 'bush', col, row });
       }
     }
   }
 
-  // Rocks near river
-  for (let i = 0; i < 15; i++) {
+  // Rocks
+  for (let i = 0; i < 40; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
-    const tile = tileMap[row]?.[col];
-    if (tile && (tile.type === 'sand' || tile.type === 'dirt')) {
+    const tile = getTileAt(row, col);
+    if (tile.type === 'sand' || tile.type === 'dirt') {
       decorations.push({ type: rng() < 0.5 ? 'rock_small' : 'rock_large', col, row });
     }
   }
 
-  // Lamp posts along roads near buildings
+  // Lamp posts near buildings
   for (const loc of locations) {
     const { wx, wy } = simToWorld(loc.x, loc.y);
     const cr = Math.floor(wy / TILE_PX);
     const cc = Math.floor(wx / TILE_PX);
-    // Place lamps at road edges near buildings
     for (const [dr, dc] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
       const r = cr + dr;
       const c = cc + dc;
       if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES) {
-        const tile = tileMap[r]?.[c];
-        if (tile && (tile.type === 'cobblestone' || tile.type === 'dirt')) {
-          decorations.push({ type: 'lamp_post', col: c, row: r });
-        }
+        decorations.push({ type: 'lamp_post', col: c, row: r });
       }
     }
   }
 
-  // Flower patches in meadows
-  for (let i = 0; i < 12; i++) {
+  // Flower patches
+  for (let i = 0; i < 40; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
-      const tile = tileMap[row]?.[col];
-      if (tile && tile.type.startsWith('grass')) {
+      const tile = getTileAt(row, col);
+      if (tile.type.startsWith('grass')) {
         decorations.push({ type: 'flower_patch', col, row });
       }
     }
   }
 
   // Fences near some locations
-  for (let i = 0; i < locations.length && i < 3; i++) {
+  for (let i = 0; i < Math.min(locations.length, 5); i++) {
     const { wx, wy } = simToWorld(locations[i].x, locations[i].y);
     const cr = Math.floor(wy / TILE_PX);
     const cc = Math.floor(wx / TILE_PX);
@@ -278,13 +289,12 @@ function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations
   }
 
   // Cars parked along roads
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 20; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
-    const tile = tileMap[row]?.[col];
-    if (tile && (tile.type === 'sidewalk' || tile.type === 'road' || tile.type === 'road_line')) {
-      const carType = rng() < 0.5 ? 'car_red' : 'car_blue';
-      decorations.push({ type: carType as ObjectType, col, row: row - 1 });
+    const tile = getTileAt(row, col);
+    if (tile.type === 'sidewalk' || tile.type === 'road_line') {
+      decorations.push({ type: (rng() < 0.5 ? 'car_red' : 'car_blue') as ObjectType, col, row: row - 1 });
     }
   }
 
@@ -300,7 +310,7 @@ function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations
     }
   }
 
-  // Trash cans near fast food and along roads
+  // Trash cans
   for (const loc of locations) {
     const t = loc.type?.toLowerCase() || '';
     if (t === 'fast_food' || t === 'trade') {
@@ -311,13 +321,13 @@ function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations
     }
   }
 
-  // Tall grass patches
-  for (let i = 0; i < 15; i++) {
+  // Tall grass
+  for (let i = 0; i < 50; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
-      const tile = tileMap[row]?.[col];
-      if (tile && tile.type.startsWith('grass')) {
+      const tile = getTileAt(row, col);
+      if (tile.type.startsWith('grass')) {
         decorations.push({ type: 'tall_grass', col, row });
       }
     }
@@ -328,20 +338,20 @@ function generateDecorations(rng: () => number, tileMap: TileInfo[][], locations
 
 // ==================== SPRITE BUILDERS ====================
 
-function buildTerrainSprites(tileMap: TileInfo[][]): Sprite[] {
-  // Instead of one sprite per tile (6400 sprites!), batch rows into chunks
-  const CHUNK_SIZE = 10; // tiles per chunk
+function buildTerrainSprites(): Sprite[] {
+  // Chunk-based terrain — each chunk is CHUNK_SIZE x CHUNK_SIZE tiles
+  // Chunks render lazily when their draw() is called
   const chunks: Sprite[] = [];
+  const numChunks = Math.ceil(WORLD_TILES / CHUNK_SIZE);
 
-  for (let chunkRow = 0; chunkRow < WORLD_TILES; chunkRow += CHUNK_SIZE) {
-    for (let chunkCol = 0; chunkCol < WORLD_TILES; chunkCol += CHUNK_SIZE) {
-      const chunkX = chunkCol * TILE_PX * SCALE;
-      const chunkY = chunkRow * TILE_PX * SCALE;
+  for (let chunkRow = 0; chunkRow < numChunks; chunkRow++) {
+    for (let chunkCol = 0; chunkCol < numChunks; chunkCol++) {
+      const chunkX = chunkCol * CHUNK_SIZE * TILE_PX * SCALE;
+      const chunkY = chunkRow * CHUNK_SIZE * TILE_PX * SCALE;
       const chunkW = CHUNK_SIZE * TILE_PX * SCALE;
       const chunkH = CHUNK_SIZE * TILE_PX * SCALE;
-
-      const startRow = chunkRow;
-      const startCol = chunkCol;
+      const startRow = chunkRow * CHUNK_SIZE;
+      const startCol = chunkCol * CHUNK_SIZE;
 
       chunks.push({
         x: chunkX,
@@ -355,9 +365,9 @@ function buildTerrainSprites(tileMap: TileInfo[][]): Sprite[] {
               const tileRow = startRow + r;
               const tileCol = startCol + c;
               if (tileRow >= WORLD_TILES || tileCol >= WORLD_TILES) continue;
-              const tile = tileMap[tileRow][tileCol];
-              const tx = (tileCol) * TILE_PX * SCALE;
-              const ty = (tileRow) * TILE_PX * SCALE;
+              const tile = getTileAt(tileRow, tileCol);
+              const tx = tileCol * TILE_PX * SCALE;
+              const ty = tileRow * TILE_PX * SCALE;
               drawTile(ctx, tx, ty, tile.type, tile.variant, frame, SCALE);
             }
           }
@@ -440,7 +450,7 @@ function buildLocationSprites(locations: Location[]): Sprite[] {
   return sprites;
 }
 
-// ==================== HOUSE SPRITES FOR CHARACTERS ====================
+// ==================== HOUSE SPRITES ====================
 
 interface HousePlot {
   worldX: number;
@@ -450,37 +460,46 @@ interface HousePlot {
 
 function generateHousePlots(rng: () => number, locations: Location[], count: number): HousePlot[] {
   const plots: HousePlot[] = [];
-  // Scatter houses in a residential area (between locations)
-  // Use bottom-left quadrant and right of center as residential
+  // Spread houses across multiple residential neighborhoods
+  const neighborhoods = [
+    { baseCol: 30, baseRow: 60, cols: 8 },   // South-west neighborhood
+    { baseCol: 80, baseRow: 110, cols: 8 },   // South neighborhood
+    { baseCol: 50, baseRow: 140, cols: 6 },   // Far south
+    { baseCol: 120, baseRow: 70, cols: 6 },   // East neighborhood
+    { baseCol: 30, baseRow: 30, cols: 6 },    // North-west
+  ];
 
-  for (let i = 0; i < count; i++) {
-    // Place houses in a grid-like pattern with some randomness
-    const gridRow = Math.floor(i / 6);
-    const gridCol = i % 6;
-    // Residential area: tiles 15-45 x 45-70
-    const baseCol = 15 + gridCol * 5 + Math.floor(rng() * 3) - 1;
-    const baseRow = 50 + gridRow * 5 + Math.floor(rng() * 3) - 1;
+  let placed = 0;
+  for (const hood of neighborhoods) {
+    const maxInHood = Math.ceil(count / neighborhoods.length) + 2;
+    for (let i = 0; i < maxInHood && placed < count; i++) {
+      const gridRow = Math.floor(i / hood.cols);
+      const gridCol = i % hood.cols;
+      const baseCol = hood.baseCol + gridCol * 5 + Math.floor(rng() * 3) - 1;
+      const baseRow = hood.baseRow + gridRow * 5 + Math.floor(rng() * 3) - 1;
 
-    const col = Math.max(5, Math.min(WORLD_TILES - 10, baseCol));
-    const row = Math.max(5, Math.min(WORLD_TILES - 10, baseRow));
+      const col = Math.max(5, Math.min(WORLD_TILES - 10, baseCol));
+      const row = Math.max(5, Math.min(WORLD_TILES - 10, baseRow));
 
-    const sizeRoll = rng();
-    let type: BuildingType = 'house_small';
-    if (sizeRoll > 0.7) type = 'house_large';
-    else if (sizeRoll > 0.4) type = 'house_medium';
+      const sizeRoll = rng();
+      let type: BuildingType = 'house_small';
+      if (sizeRoll > 0.7) type = 'house_large';
+      else if (sizeRoll > 0.4) type = 'house_medium';
 
-    plots.push({
-      worldX: col * TILE_PX * SCALE,
-      worldY: row * TILE_PX * SCALE,
-      type,
-    });
+      plots.push({
+        worldX: col * TILE_PX * SCALE,
+        worldY: row * TILE_PX * SCALE,
+        type,
+      });
+      placed++;
+    }
   }
 
   return plots;
 }
 
 function buildHouseSprites(plots: HousePlot[]): Sprite[] {
-  return plots.map((plot, i) => {
+  return plots.map((plot) => {
     const bSize = getBuildingSize(plot.type);
     return {
       x: plot.worldX,
@@ -515,30 +534,29 @@ export function generateWorld(locations: Location[], characterCount: number): Wo
     return cachedWorld;
   }
 
-  const rng = seededRandom(42);
-  const tileMap = generateTileMap(rng, locations);
-  const decorations = generateDecorations(seededRandom(123), tileMap, locations);
-  const housePlots = generateHousePlots(seededRandom(777), locations, Math.max(6, Math.ceil(characterCount * 1.2)));
+  // Initialize lookup sets (computed once)
+  roadTiles = buildRoadSet(locations);
+  const riverData = buildRiverSet();
+  riverTiles = riverData.river;
+  sandTiles = riverData.sand;
+  dirtTiles = buildDirtSet(locations);
 
-  // Add dirt around houses
+  const decorations = generateDecorations(seededRandom(123), locations);
+  const housePlots = generateHousePlots(seededRandom(777), locations, Math.max(8, Math.ceil(characterCount * 1.2)));
+
+  // Add dirt around houses to dirtTiles set
   for (const plot of housePlots) {
     const col = Math.floor(plot.worldX / (TILE_PX * SCALE));
     const row = Math.floor(plot.worldY / (TILE_PX * SCALE));
     for (let dr = -1; dr <= 2; dr++) {
       for (let dc = -1; dc <= 2; dc++) {
-        const r = row + dr;
-        const c = col + dc;
-        if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES) {
-          if (tileMap[r][c].type.startsWith('grass')) {
-            tileMap[r][c] = { type: 'dirt', variant: 0 };
-          }
-        }
+        dirtTiles.add(`${row + dr},${col + dc}`);
       }
     }
   }
 
   cachedWorld = {
-    terrainSprites: buildTerrainSprites(tileMap),
+    terrainSprites: buildTerrainSprites(),
     decorationSprites: buildDecorationSprites(decorations),
     locationSprites: buildLocationSprites(locations),
     houseSprites: buildHouseSprites(housePlots),

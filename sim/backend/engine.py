@@ -15,7 +15,11 @@ from db import SimulationDB
 from spatial import SpatialGrid
 from lod import LODManager, LODTier
 
+# World bounds
+WORLD_BOUND = 300  # sim coords go from -300 to 300
+
 HOUSE_PLOTS = [
+    # Town center residential area
     {"x": -30, "y": -30}, {"x": -15, "y": -35}, {"x": 0, "y": -40},
     {"x": 15, "y": -35}, {"x": 30, "y": -30}, {"x": -40, "y": -15},
     {"x": 40, "y": -15}, {"x": -40, "y": 15}, {"x": 40, "y": 15},
@@ -23,17 +27,33 @@ HOUSE_PLOTS = [
     {"x": 15, "y": 35}, {"x": 30, "y": 30}, {"x": -50, "y": 0},
     {"x": 50, "y": 0}, {"x": -20, "y": -50}, {"x": 20, "y": -50},
     {"x": -20, "y": 50}, {"x": 20, "y": 50},
+    # Inner ring
     {"x": -60, "y": -30}, {"x": 60, "y": -30}, {"x": -60, "y": 30}, {"x": 60, "y": 30},
     {"x": -45, "y": -45}, {"x": 45, "y": -45}, {"x": -45, "y": 45}, {"x": 45, "y": 45},
     {"x": -70, "y": 0}, {"x": 70, "y": 0}, {"x": 0, "y": -70}, {"x": 0, "y": 70},
+    # Suburbs (spread out for bigger map)
+    {"x": -100, "y": -40}, {"x": 100, "y": -40}, {"x": -100, "y": 40}, {"x": 100, "y": 40},
+    {"x": -80, "y": -80}, {"x": 80, "y": -80}, {"x": -80, "y": 80}, {"x": 80, "y": 80},
+    {"x": -120, "y": 0}, {"x": 120, "y": 0}, {"x": 0, "y": -120}, {"x": 0, "y": 120},
+    {"x": -140, "y": -60}, {"x": 140, "y": -60}, {"x": -140, "y": 60}, {"x": 140, "y": 60},
+    {"x": -110, "y": -110}, {"x": 110, "y": -110}, {"x": -110, "y": 110}, {"x": 110, "y": 110},
+    {"x": -160, "y": 0}, {"x": 160, "y": 0}, {"x": 0, "y": -160}, {"x": 0, "y": 160},
+    # Far suburbs
+    {"x": -180, "y": -80}, {"x": 180, "y": -80}, {"x": -180, "y": 80}, {"x": 180, "y": 80},
+    {"x": -200, "y": 0}, {"x": 200, "y": 0}, {"x": 0, "y": -200}, {"x": 0, "y": 200},
 ]
 
 
 def _generate_spiral_plot(index: int) -> dict[str, float]:
     """Generate house plot positions in a spiral pattern for overflow."""
     angle = index * 0.8
-    radius = 40 + index * 3
-    return {"x": round(math.cos(angle) * radius, 1), "y": round(math.sin(angle) * radius, 1)}
+    radius = 60 + index * 4
+    x = round(math.cos(angle) * radius, 1)
+    y = round(math.sin(angle) * radius, 1)
+    # Clamp to world bounds
+    x = max(-WORLD_BOUND + 20, min(WORLD_BOUND - 20, x))
+    y = max(-WORLD_BOUND + 20, min(WORLD_BOUND - 20, y))
+    return {"x": x, "y": y}
 
 
 class SimulationEngine:
@@ -79,7 +99,7 @@ class SimulationEngine:
             goals=char_create.goals,
             motivations=char_create.motivations,
             image_url=char_create.image_url,
-            position={"x": rng.uniform(-80, 80), "y": rng.uniform(-80, 80)},
+            position={"x": rng.uniform(-150, 150), "y": rng.uniform(-150, 150)},
             age=age,
             max_age=rng.randint(max(age + 15, 60), 100),
         )
@@ -197,7 +217,7 @@ class SimulationEngine:
                 traits=traits,
                 goals=goals,
                 motivations=motivations,
-                position={"x": rng.uniform(-80, 80), "y": rng.uniform(-80, 80)},
+                position={"x": rng.uniform(-150, 150), "y": rng.uniform(-150, 150)},
                 age=age,
                 max_age=rng.randint(max(age + 15, 60), 100),
                 trade_skill=round(rng.uniform(0.1, 0.9), 2),
@@ -631,30 +651,30 @@ class SimulationEngine:
 
     # Fallback coordinates if no matching location found
     _ACTION_LOCATION_MAP = {
-        "cooperate": (0, 100),       # Council Hall
-        "share": (-50, 30),          # Central Park
+        "cooperate": (0, 150),       # Council Hall
+        "share": (-60, 40),          # Central Park
         "negotiate": (0, 0),         # Market Square
         "trade": (0, 0),             # Market Square
-        "attack": (100, 0),          # Arena
-        "defend": (100, 0),          # Arena
-        "compete": (100, 0),         # Arena
-        "betray": (100, 0),          # Arena
-        "kill": (100, 0),            # Arena
-        "bully": (100, 0),           # Arena
-        "ally": (0, 100),            # Council Hall
-        "communicate": (30, -30),    # Cafe
-        "form_group": (0, 100),      # Council Hall
-        "join_group": (0, 100),      # Council Hall
-        "leave_group": (0, 100),     # Council Hall
-        "court": (-50, 30),          # Central Park
-        "explore": (-100, -100),     # Wilderness
-        "gather": (-60, -60),        # Farm
-        "build_home": (-100, -100),  # Wilderness
-        "observe": (-50, 30),        # Central Park
-        "rest": (30, -30),           # Cafe (fallback if no house)
-        "learn": (50, 50),           # Library
-        "teach": (50, 50),           # Library
-        "craft": (50, 50),           # Library
+        "attack": (150, 0),          # Arena
+        "defend": (150, 0),          # Arena
+        "compete": (150, 0),         # Arena
+        "betray": (150, 0),          # Arena
+        "kill": (150, 0),            # Arena
+        "bully": (150, 0),           # Arena
+        "ally": (0, 150),            # Council Hall
+        "communicate": (40, -40),    # Cafe
+        "form_group": (0, 150),      # Council Hall
+        "join_group": (0, 150),      # Council Hall
+        "leave_group": (0, 150),     # Council Hall
+        "court": (-60, 40),          # Central Park
+        "explore": (-200, -180),     # Wilderness
+        "gather": (-120, -100),      # Farm
+        "build_home": (-200, -180),  # Wilderness
+        "observe": (-60, 40),        # Central Park
+        "rest": (40, -40),           # Cafe (fallback if no house)
+        "learn": (60, 60),           # Library
+        "teach": (60, 60),           # Library
+        "craft": (60, 60),           # Library
     }
 
     _location_type_cache: dict[str, dict[str, Location]] = {}  # sim_id -> {type -> Location}
@@ -676,7 +696,8 @@ class SimulationEngine:
         return None
 
     # Base movement speed per tick (in simulation units)
-    _BASE_SPEED = 5.0  # ~5 units per tick for steady walking
+    _BASE_SPEED = 8.0  # ~8 units per tick for steady walking (bigger map)
+    _DRIVE_SPEED = 30.0  # speed when "driving" a car (far destinations)
 
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
         # Build O(1) lookup indexes once per tick
@@ -736,17 +757,25 @@ class SimulationEngine:
                 hour = sim.tick % 24
                 if (hour >= 21 or hour <= 4) and action.type.value == "rest" and char.house_id:
                     speed *= 1.5
+                # Drive if destination is far — agents use cars for long distances
+                if dist > 60:
+                    speed = self._DRIVE_SPEED
+                    # Mark as driving (frontend reads this for car sprite)
+                    char.resources["_driving"] = 1.0
+                else:
+                    char.resources.pop("_driving", None)
                 if dist > 0:
                     move = min(speed, dist)
                     char.position["x"] += (dx / dist) * move
                     char.position["y"] += (dy / dist) * move
-                # Small lateral sway for natural walking
-                char.position["x"] += rng.uniform(-0.5, 0.5)
-                char.position["y"] += rng.uniform(-0.5, 0.5)
+                # Small lateral sway for natural walking (not when driving)
+                if dist <= 60:
+                    char.position["x"] += rng.uniform(-0.5, 0.5)
+                    char.position["y"] += rng.uniform(-0.5, 0.5)
 
             # Clamp to world bounds
-            char.position["x"] = max(-120, min(120, char.position["x"]))
-            char.position["y"] = max(-120, min(120, char.position["y"]))
+            char.position["x"] = max(-WORLD_BOUND, min(WORLD_BOUND, char.position["x"]))
+            char.position["y"] = max(-WORLD_BOUND, min(WORLD_BOUND, char.position["y"]))
 
     # ── Lifecycle processing ──
 

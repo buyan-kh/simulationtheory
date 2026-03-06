@@ -187,23 +187,34 @@ class Location(BaseModel):
 
 def _default_locations() -> list[Location]:
     return [
+        # Town center
         Location(name="Market Square", x=0, y=0, type="trade", biome="plains", is_removable=False),
-        Location(name="The Arena", x=100, y=0, type="conflict", biome="plains", is_removable=False),
-        Location(name="Council Hall", x=0, y=100, type="diplomacy", biome="plains", is_removable=False),
-        Location(name="Wilderness", x=-100, y=-100, type="exploration", biome="forest", is_removable=False),
-        Location(name="Library", x=50, y=50, type="knowledge", biome="plains", is_removable=False),
-        Location(name="Central Park", x=-50, y=30, type="park", biome="plains", is_removable=False),
-        Location(name="The Cozy Cafe", x=30, y=-30, type="cafe", biome="plains", is_removable=False),
-        Location(name="Golden Plate", x=-30, y=-60, type="restaurant", biome="plains", is_removable=False),
-        Location(name="McBurger's", x=70, y=-50, type="fast_food", biome="plains", is_removable=False),
-        Location(name="The Farm", x=-60, y=-60, type="farm", biome="plains",
+        Location(name="The Cozy Cafe", x=40, y=-40, type="cafe", biome="plains", is_removable=False),
+        Location(name="Golden Plate", x=-40, y=-60, type="restaurant", biome="plains", is_removable=False),
+        Location(name="Central Park", x=-60, y=40, type="park", biome="plains", is_removable=False),
+        Location(name="Library", x=60, y=60, type="knowledge", biome="plains", is_removable=False),
+        # Mid-range
+        Location(name="The Arena", x=150, y=0, type="conflict", biome="plains", is_removable=False),
+        Location(name="Council Hall", x=0, y=150, type="diplomacy", biome="plains", is_removable=False),
+        Location(name="McBurger's", x=100, y=-80, type="fast_food", biome="plains", is_removable=False),
+        Location(name="The Farm", x=-120, y=-100, type="farm", biome="plains",
                  resources={"food": 50.0, "materials": 5.0},
                  resource_regen_rate={"food": 3.0, "materials": 0.2},
                  capacity=15, is_removable=False),
-        Location(name="Cemetery", x=90, y=80, type="cemetery", biome="plains",
+        # Outskirts
+        Location(name="Wilderness", x=-200, y=-180, type="exploration", biome="forest", is_removable=False),
+        Location(name="Cemetery", x=180, y=160, type="cemetery", biome="plains",
                  resources={"food": 0.0, "materials": 0.0},
                  resource_regen_rate={"food": 0.0, "materials": 0.0},
                  capacity=100, is_removable=False),
+        # New locations for bigger map
+        Location(name="Riverside Beach", x=-150, y=120, type="park", biome="coastal", is_removable=False),
+        Location(name="Mountain Lodge", x=200, y=180, type="cafe", biome="mountain", is_removable=False),
+        Location(name="South Farm", x=80, y=-180, type="farm", biome="plains",
+                 resources={"food": 40.0, "materials": 8.0},
+                 resource_regen_rate={"food": 2.5, "materials": 0.3},
+                 capacity=12, is_removable=False),
+        Location(name="Trading Post", x=-180, y=0, type="trade", biome="forest", is_removable=False),
     ]
 
 
