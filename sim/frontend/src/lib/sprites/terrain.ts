@@ -1,32 +1,35 @@
 // Pixel art terrain tiles and nature objects for Canvas rendering
 // Tiles: 16x16, Objects: various sizes
 
-export type TileType = 'grass' | 'grass2' | 'grass3' | 'grass_dark' | 'dirt' | 'cobblestone' | 'water' | 'water2' | 'sand' | 'flowers' | 'road' | 'road_line' | 'sidewalk';
+export type TileType = 'grass' | 'grass2' | 'grass3' | 'grass_dark' | 'dirt' | 'cobblestone' | 'water' | 'water2' | 'sand' | 'flowers' | 'road' | 'road_line' | 'sidewalk' | 'crops' | 'plowed';
 export type ObjectType = 'tree' | 'tree2' | 'tree3' | 'pine' | 'bush' | 'rock_small' | 'rock_large' | 'rock_mossy' | 'fence_h' | 'fence_post' | 'bridge_h' | 'bridge_v' | 'lamp_post' | 'sign_post' | 'flower_patch' | 'tall_grass' | 'car_red' | 'car_blue' | 'bench' | 'trash_can';
 
 // ==================== TILE DATA (16x16 each) ====================
 
-const G1 = '#1a4a1a'; // grass dark
-const G2 = '#2a5a2a'; // grass mid
-const G3 = '#2a6a2a'; // grass
-const G4 = '#3a7a3a'; // grass light
-const GD = '#143a14'; // dark grass base
-const GD2 = '#1a3a1a';
+// Stardew Valley-inspired warm greens
+const G1 = '#2d6b30'; // grass dark
+const G2 = '#3d8b3d'; // grass mid
+const G3 = '#4da84d'; // grass
+const G4 = '#5dc05d'; // grass light
+const GD = '#1a4a20'; // dark grass base (forest)
+const GD2 = '#245a2a';
 
-const D1 = '#4a3a20'; // dirt dark
-const D2 = '#5a4a30'; // dirt mid
-const D3 = '#6a5a40'; // dirt light
-const D4 = '#7a6a50'; // dirt highlight
+// Warm earthy browns
+const D1 = '#6b4c28'; // dirt dark
+const D2 = '#7d5e3a'; // dirt mid
+const D3 = '#8f704c'; // dirt light
+const D4 = '#a1825e'; // dirt highlight
 
 const S1 = '#4a4a5a'; // stone dark
 const S2 = '#5a5a6a'; // stone mid
 const S3 = '#6a6a7a'; // stone light
 const S4 = '#7a7a8a'; // stone highlight
 
-const W1 = '#0a2a5a'; // water dark
-const W2 = '#1a3a6a'; // water mid
-const W3 = '#2a4a7a'; // water light
-const W4 = '#3a5a8a'; // water highlight
+// Stardew-style vibrant water
+const W1 = '#1a4a8a'; // water dark
+const W2 = '#2a5aaa'; // water mid
+const W3 = '#3a6abb'; // water light
+const W4 = '#5a8add'; // water highlight
 
 function makeTile(base: string, details: [number, number, string][]): string[][] {
   const tile: string[][] = [];
@@ -118,6 +121,53 @@ const FLOWERS_TILE = makeTile(G2, [
   [1, 8, G4], [5, 3, G4], [8, 13, G4], [11, 1, G4], [13, 10, G4],
 ]);
 
+// ── Farm tiles (Stardew Valley style) ────────────────────────────────
+
+// Plowed soil
+const PW1 = '#5a3a1a'; // plowed dark
+const PW2 = '#6a4a2a'; // plowed mid
+const PW3 = '#7a5a3a'; // plowed light
+
+const PLOWED_TILE: string[][] = (() => {
+  const t: string[][] = [];
+  for (let r = 0; r < 16; r++) {
+    const row: string[] = [];
+    for (let c = 0; c < 16; c++) {
+      // Row furrows every 4 pixels
+      if (r % 4 === 0) row.push(PW1);
+      else if (r % 4 === 1) row.push(PW3);
+      else row.push(((r + c) % 3 === 0) ? PW1 : PW2);
+    }
+    t.push(row);
+  }
+  return t;
+})();
+
+// Crops growing (green sprouts on plowed soil)
+const CR1 = '#2a8a2a'; // crop green
+const CR2 = '#3aaa3a'; // crop light
+const CR3 = '#ffcc22'; // wheat golden
+
+const CROPS_TILE: string[][] = (() => {
+  const t: string[][] = [];
+  for (let r = 0; r < 16; r++) {
+    const row: string[] = [];
+    for (let c = 0; c < 16; c++) {
+      if (r % 4 === 0) {
+        row.push(PW1); // soil row
+      } else if (r % 4 === 2 && c % 3 === 1) {
+        row.push(CR3); // wheat heads
+      } else if (r % 4 >= 1 && c % 3 === 1) {
+        row.push(CR1); // stems
+      } else {
+        row.push(PW2);
+      }
+    }
+    t.push(row);
+  }
+  return t;
+})();
+
 // ── Road tiles ──────────────────────────────────────────────────────
 
 const R1 = '#3a3a3a'; // asphalt dark
@@ -178,6 +228,8 @@ const TILE_MAP: Record<string, string[][] | string[][][]> = {
   road: [ROAD_TILE],
   road_line: [ROAD_LINE_TILE],
   sidewalk: [SIDEWALK_TILE],
+  crops: [CROPS_TILE],
+  plowed: [PLOWED_TILE],
 };
 
 export function drawTile(

@@ -11,6 +11,7 @@ import {
   type Direction,
   type HatStyle,
 } from '@/lib/sprites/characters';
+import { drawObject } from '@/lib/sprites/terrain';
 import Minimap from './Minimap';
 
 interface PixelCanvasProps {
@@ -160,16 +161,27 @@ export default function PixelCanvas({
       const walking = isWalking(char, prevPositions);
       const selected = id === selectedCharacterId;
 
+      // Check if character is driving (backend sets _driving resource)
+      const isDriving = (char.resources as Record<string, number>)?.['_driving'] === 1;
+
       sprites.push({
         x: px,
         y: py,
-        width: CHAR_SPRITE_W,
-        height: CHAR_SPRITE_H,
+        width: isDriving ? 40 : CHAR_SPRITE_W,
+        height: isDriving ? 20 : CHAR_SPRITE_H,
         layer: 2,
         id,
         draw: (ctx: CanvasRenderingContext2D, _sx: number, _sy: number, frame: number) => {
-          drawCharacter(ctx, px, py, palette, dir, frame, walking, !char.alive, selected, hatStyle, SCALE);
-          drawCharacterName(ctx, px, py, char.name, selected, SCALE, !char.alive);
+          if (isDriving) {
+            // Draw a car with the character's color theme
+            const carType = charIndex % 2 === 0 ? 'car_red' : 'car_blue';
+            drawObject(ctx, px, py + 10, carType, 0, frame, SCALE);
+            // Small name above car
+            drawCharacterName(ctx, px + 10, py - 2, char.name, selected, SCALE, false);
+          } else {
+            drawCharacter(ctx, px, py, palette, dir, frame, walking, !char.alive, selected, hatStyle, SCALE);
+            drawCharacterName(ctx, px, py, char.name, selected, SCALE, !char.alive);
+          }
         },
       });
 
