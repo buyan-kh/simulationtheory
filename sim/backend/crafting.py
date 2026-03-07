@@ -589,6 +589,7 @@ def process_crafting(sim: SimulationState, actions: dict[str, "Action"]) -> list
 
         item = generate_item(char, sim)
         sim.world_items.append(item)
+        char.equipped_items.append(item.id)
 
         # Cap total items to prevent unbounded growth
         if len(sim.world_items) > 500:

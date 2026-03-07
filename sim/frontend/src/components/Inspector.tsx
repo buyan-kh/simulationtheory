@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Character, Memory } from '@/lib/types';
+import type { Character, Memory, WorldItem } from '@/lib/types';
 import { useSimStore } from '@/lib/store';
 import EmotionDisplay from './EmotionDisplay';
 import TraitSlider from './TraitSlider';
@@ -12,18 +12,19 @@ interface InspectorProps {
   character: Character;
   allCharacters: Record<string, Character>;
   simId: string;
+  worldItems?: WorldItem[];
 }
 
-type TabKey = 'stats' | 'memory' | 'relations' | 'mind';
+type TabKey = 'stats' | 'memory' | 'relations' | 'mind' | 'items';
 
-export default function Inspector({ character, allCharacters, simId }: InspectorProps) {
+export default function Inspector({ character, allCharacters, simId, worldItems = [] }: InspectorProps) {
   const { inspectorTab, setInspectorTab } = useSimStore();
   const [memory, setMemory] = useState<Memory | null>(null);
   const [reasoning, setReasoning] = useState<{ reasoning: string; action: { type: string; detail: string } } | null>(null);
   const [loadingMemory, setLoadingMemory] = useState(false);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
 
-  const tab = (['stats', 'memory', 'relations', 'mind'].includes(inspectorTab) ? inspectorTab : 'stats') as TabKey;
+  const tab = (['stats', 'memory', 'relations', 'mind', 'items'].includes(inspectorTab) ? inspectorTab : 'stats') as TabKey;
 
   useEffect(() => {
     if (tab === 'memory') {
@@ -47,6 +48,7 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
     { key: 'memory', label: 'Memory' },
     { key: 'relations', label: 'Relations' },
     { key: 'mind', label: 'Mind' },
+    { key: 'items', label: 'Items' },
   ];
 
   const relEntries = Object.entries(character.relationships);
@@ -316,7 +318,15 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
                     const isPositive = value >= 0;
                     return (
                       <div key={id} className="flex items-center gap-2">
-                        <span className="font-pixel text-pixel-text w-20 truncate" style={{ fontSize: '7px' }}>{name}</span>
+                        <span className="font-pixel text-pixel-text w-20 truncate" style={{ fontSize: '7px' }}>
+                          {name}
+                          {(() => {
+                            const relType = character.relationship_types?.[id];
+                            if (!relType) return null;
+                            const colors: Record<string, string> = { spouse: '#ff66aa', parent: '#ffaa44', child: '#44ccff', friend: '#44ff88', rival: '#ff4444' };
+                            return <span style={{ color: colors[relType] || '#aaa', marginLeft: '2px', fontSize: '6px' }}>[{relType}]</span>;
+                          })()}
+                        </span>
                         <div className="flex-1 relative" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
                           <div
                             style={{
@@ -468,6 +478,40 @@ export default function Inspector({ character, allCharacters, simId }: Inspector
                   <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>None</span>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'items' && (
+          <div className="space-y-4">
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Equipped Items</div>
+              {(!character.equipped_items || character.equipped_items.length === 0) ? (
+                <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>No items</span>
+              ) : (
+                <div className="space-y-1">
+                  {character.equipped_items.map((itemId) => {
+                    const item = worldItems.find((wi) => wi.id === itemId);
+                    return (
+                      <div
+                        key={itemId}
+                        className="flex items-center gap-2 p-2"
+                        style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                      >
+                        <span
+                          className="pixel-badge font-pixel"
+                          style={{ fontSize: '6px', borderColor: '#ffaa33', color: '#ffaa33' }}
+                        >
+                          {item?.item_type || '?'}
+                        </span>
+                        <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>
+                          {item?.name || itemId.slice(0, 8)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

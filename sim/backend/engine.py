@@ -616,6 +616,16 @@ class SimulationEngine:
                                     boosts["energy"] = max(boosts.get("energy", 15.0), 20.0)
                                 break
 
+                # Territory control bonus: 20% boost when group controls this location
+                if char.group_id:
+                    for loc in sim.environment.locations:
+                        if loc.owner_group_id == char.group_id:
+                            dx = char.position["x"] - loc.x
+                            dy = char.position["y"] - loc.y
+                            if dx * dx + dy * dy < 900:
+                                boosts = {k: v * 1.2 for k, v in boosts.items()}
+                                break
+
                 for need_name, amount in boosts.items():
                     current = getattr(needs, need_name, None)
                     if current is not None:

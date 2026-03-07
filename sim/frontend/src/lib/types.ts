@@ -78,11 +78,15 @@ export interface Character {
   cause_of_death?: string | null;
   death_tick?: number | null;
   parent_ids?: string[];
+  spouse_id?: string | null;
+  relationship_types?: Record<string, string>;
   // Social
   group_id?: string | null;
   group_role?: string | null;
   // Trade
   trade_skill?: number;
+  // Inventory
+  equipped_items?: string[];
 }
 
 export interface CharacterCreate {

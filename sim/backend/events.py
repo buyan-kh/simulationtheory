@@ -9,7 +9,43 @@ def _clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
+_WEAPON_TYPES = {"sword", "axe", "spear", "dagger"}
+_SHIELD_TYPES = {"shield"}
+
+
+def _combat_bonuses(char: Character, state: SimulationState) -> tuple[float, float]:
+    """Return (attack_bonus_multiplier, damage_reduction) from equipped items."""
+    atk_bonus = 1.0
+    dmg_reduction = 0.0
+    items_by_id = {it.id: it for it in state.world_items}
+    for item_id in char.equipped_items:
+        item = items_by_id.get(item_id)
+        if not item:
+            continue
+        name_lower = item.name.lower()
+        if any(w in name_lower for w in _WEAPON_TYPES):
+            atk_bonus = max(atk_bonus, 1.15)  # +15% attack
+        if any(s in name_lower for s in _SHIELD_TYPES):
+            dmg_reduction = max(dmg_reduction, 0.10)  # 10% damage reduction
+    return atk_bonus, dmg_reduction
+
+
 class EventGenerator:
+
+    @staticmethod
+    def _record_crime(criminal: Character, victim: Character, crime_type: str, tick: int, state: SimulationState):
+        """Record a crime, decrease reputation, and make nearby witnesses lose trust."""
+        criminal.crime_record.append({"type": crime_type, "target_id": victim.id, "tick": tick})
+        criminal.reputation = max(-1.0, criminal.reputation - 0.1)
+        for cid, char in state.characters.items():
+            if cid == criminal.id or not char.alive:
+                continue
+            dx = char.position["x"] - criminal.position["x"]
+            dy = char.position["y"] - criminal.position["y"]
+            if dx * dx + dy * dy < 10000:  # within ~100 units
+                char.relationships[criminal.id] = _clamp(
+                    char.relationships.get(criminal.id, 0) - 0.2, -1, 1
+                )
 
     def resolve_actions(
         self,
@@ -45,7 +81,7 @@ class EventGenerator:
                 if target_action.type == ActionType.COOPERATE:
                     events.append(self._mutual_cooperation(char, target, tick))
                 elif target_action.type == ActionType.BETRAY:
-                    events.append(self._betrayal(target, char, tick))
+                    events.append(self._betrayal(target, char, tick, state))
                 elif target_action.type == ActionType.ATTACK:
                     events.append(self._conflict(target, char, tick, state))
                 else:
@@ -66,7 +102,7 @@ class EventGenerator:
                     events.append(self._alliance_proposed(char, target, tick))
 
             elif action.type == ActionType.BETRAY:
-                events.append(self._betrayal(char, target, tick))
+                events.append(self._betrayal(char, target, tick, state))
 
             elif action.type == ActionType.NEGOTIATE:
                 if target_action and target_action.target_id == char_id and target_action.type == ActionType.NEGOTIATE:
@@ -100,13 +136,17 @@ class EventGenerator:
                 events.append(self._attempted_kill(char, target, tick, state))
 
             elif action.type == ActionType.BULLY:
-                events.append(self._bullying(char, target, tick))
+                events.append(self._bullying(char, target, tick, state))
 
             elif action.type == ActionType.TEACH:
                 events.append(self._teaching(char, target, tick))
 
             elif action.type == ActionType.COURT:
-                events.append(self._courting(char, target, tick))
+                if (target_action and target_action.target_id == char_id
+                        and target_action.type == ActionType.COURT):
+                    events.append(self._mutual_courting(char, target, tick))
+                else:
+                    events.append(self._courting(char, target, tick))
 
         return events
 
@@ -375,7 +415,7 @@ class EventGenerator:
             importance=0.3,
         )
 
-    def _betrayal(self, betrayer: Character, victim: Character, tick: int) -> Event:
+    def _betrayal(self, betrayer: Character, victim: Character, tick: int, state: SimulationState | None = None) -> Event:
         stolen = min(10, victim.resources.get("wealth", 0))
         betrayer.resources["wealth"] = betrayer.resources.get("wealth", 0) + stolen
         victim.resources["wealth"] = max(0, victim.resources.get("wealth", 0) - stolen)
@@ -383,6 +423,9 @@ class EventGenerator:
 
         betrayer.relationships[victim.id] = _clamp(betrayer.relationships.get(victim.id, 0) - 0.4, -1, 1)
         victim.relationships[betrayer.id] = _clamp(victim.relationships.get(betrayer.id, 0) - 0.6, -1, 1)
+
+        if state:
+            self._record_crime(betrayer, victim, "betray", tick, state)
 
         return Event(
             tick=tick, type=EventType.INTERACTION,
@@ -399,8 +442,10 @@ class EventGenerator:
 
     def _conflict(self, attacker: Character, defender: Character, tick: int, state: SimulationState) -> Event:
         rng = random.Random(hash(("conflict", attacker.id, defender.id, tick)))
-        atk_power = attacker.resources.get("energy", 50) * 0.6 + attacker.resources.get("influence", 0) * 0.2
-        def_power = defender.resources.get("energy", 50) * 0.4 + defender.resources.get("influence", 0) * 0.3
+        atk_bonus, atk_shield = _combat_bonuses(attacker, state)
+        def_bonus, def_shield = _combat_bonuses(defender, state)
+        atk_power = (attacker.resources.get("energy", 50) * 0.6 + attacker.resources.get("influence", 0) * 0.2) * atk_bonus
+        def_power = (defender.resources.get("energy", 50) * 0.4 + defender.resources.get("influence", 0) * 0.3) * def_bonus
         atk_power += rng.gauss(0, state.config.randomness * 10)
 
         if atk_power > def_power:
@@ -409,15 +454,17 @@ class EventGenerator:
             defender.resources["wealth"] = max(0, defender.resources.get("wealth", 0) - loot)
             attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 10)
             defender.resources["energy"] = max(0, defender.resources.get("energy", 0) - 15)
-            defender.health = max(0, defender.health - rng.uniform(5, 15))
-            attacker.health = max(0, attacker.health - rng.uniform(2, 5))
+            defender.health = max(0, defender.health - rng.uniform(5, 15) * (1 - def_shield))
+            attacker.health = max(0, attacker.health - rng.uniform(2, 5) * (1 - atk_shield))
             winner, loser = attacker, defender
         else:
             attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 15)
             defender.resources["energy"] = max(0, defender.resources.get("energy", 0) - 5)
-            attacker.health = max(0, attacker.health - rng.uniform(5, 15))
-            defender.health = max(0, defender.health - rng.uniform(2, 5))
+            attacker.health = max(0, attacker.health - rng.uniform(5, 15) * (1 - atk_shield))
+            defender.health = max(0, defender.health - rng.uniform(2, 5) * (1 - def_shield))
             winner, loser = defender, attacker
+
+        self._record_crime(attacker, defender, "attack", tick, state)
 
         return Event(
             tick=tick, type=EventType.CONFLICT,
@@ -433,13 +480,15 @@ class EventGenerator:
 
     def _mutual_conflict(self, a: Character, b: Character, tick: int, state: SimulationState) -> Event:
         rng = random.Random(hash(("mutual_conflict", a.id, b.id, tick)))
-        a_power = a.resources.get("energy", 50) + rng.gauss(0, 10)
-        b_power = b.resources.get("energy", 50) + rng.gauss(0, 10)
+        a_atk, a_shield = _combat_bonuses(a, state)
+        b_atk, b_shield = _combat_bonuses(b, state)
+        a_power = a.resources.get("energy", 50) * a_atk + rng.gauss(0, 10)
+        b_power = b.resources.get("energy", 50) * b_atk + rng.gauss(0, 10)
 
         a.resources["energy"] = max(0, a.resources.get("energy", 0) - 20)
         b.resources["energy"] = max(0, b.resources.get("energy", 0) - 20)
-        a.health = max(0, a.health - rng.uniform(8, 20))
-        b.health = max(0, b.health - rng.uniform(8, 20))
+        a.health = max(0, a.health - rng.uniform(8, 20) * (1 - a_shield))
+        b.health = max(0, b.health - rng.uniform(8, 20) * (1 - b_shield))
 
         if a_power > b_power:
             loot = min(10, b.resources.get("wealth", 0))
@@ -463,8 +512,10 @@ class EventGenerator:
 
     def _defended_attack(self, attacker: Character, defender: Character, tick: int, state: SimulationState) -> Event:
         rng = random.Random(hash(("defended", attacker.id, defender.id, tick)))
-        atk_power = attacker.resources.get("energy", 50) * 0.5 + rng.gauss(0, 5)
-        def_power = defender.resources.get("energy", 50) * 0.7 + defender.resources.get("influence", 0) * 0.2
+        atk_bonus, atk_shield = _combat_bonuses(attacker, state)
+        def_bonus, def_shield = _combat_bonuses(defender, state)
+        atk_power = attacker.resources.get("energy", 50) * 0.5 * atk_bonus + rng.gauss(0, 5)
+        def_power = defender.resources.get("energy", 50) * 0.7 * def_bonus + defender.resources.get("influence", 0) * 0.2
 
         attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 12)
         defender.resources["energy"] = max(0, defender.resources.get("energy", 0) - 5)
@@ -473,11 +524,11 @@ class EventGenerator:
             loot = min(5, defender.resources.get("wealth", 0))
             attacker.resources["wealth"] = attacker.resources.get("wealth", 0) + loot
             defender.resources["wealth"] = max(0, defender.resources.get("wealth", 0) - loot)
-            defender.health = max(0, defender.health - rng.uniform(3, 10))
+            defender.health = max(0, defender.health - rng.uniform(3, 10) * (1 - def_shield))
             desc = f"{attacker.name} breaks through {defender.name}'s defenses."
         else:
             defender.resources["influence"] = defender.resources.get("influence", 0) + 5
-            attacker.health = max(0, attacker.health - rng.uniform(3, 8))
+            attacker.health = max(0, attacker.health - rng.uniform(3, 8) * (1 - atk_shield))
             desc = f"{defender.name} successfully repels {attacker.name}'s attack, gaining respect."
 
         return Event(
@@ -588,13 +639,15 @@ class EventGenerator:
 
     def _competition(self, a: Character, b: Character, tick: int, state: SimulationState) -> Event:
         rng = random.Random(hash(("compete", a.id, b.id, tick)))
+        a_atk, _ = _combat_bonuses(a, state)
+        b_atk, _ = _combat_bonuses(b, state)
         a_score = (
-            a.resources.get("energy", 50) * 0.3
+            a.resources.get("energy", 50) * 0.3 * a_atk
             + a.traits.conscientiousness * 20
             + rng.gauss(0, state.config.randomness * 15)
         )
         b_score = (
-            b.resources.get("energy", 50) * 0.3
+            b.resources.get("energy", 50) * 0.3 * b_atk
             + b.traits.conscientiousness * 20
             + rng.gauss(0, state.config.randomness * 15)
         )
@@ -627,10 +680,14 @@ class EventGenerator:
     def _attempted_kill(self, attacker: Character, victim: Character, tick: int, state: SimulationState) -> Event:
         """Attempted murder — high risk, high consequence."""
         rng = random.Random(hash(("kill", attacker.id, victim.id, tick)))
-        atk_power = attacker.resources.get("energy", 50) * 0.7 + rng.gauss(0, 10)
-        def_power = victim.resources.get("energy", 50) * 0.5 + victim.health * 0.3
+        atk_bonus, atk_shield = _combat_bonuses(attacker, state)
+        def_bonus, def_shield = _combat_bonuses(victim, state)
+        atk_power = attacker.resources.get("energy", 50) * 0.7 * atk_bonus + rng.gauss(0, 10)
+        def_power = victim.resources.get("energy", 50) * 0.5 * def_bonus + victim.health * 0.3
 
         attacker.resources["energy"] = max(0, attacker.resources.get("energy", 0) - 25)
+
+        self._record_crime(attacker, victim, "kill", tick, state)
 
         if atk_power > def_power:
             # Victim dies
@@ -668,10 +725,10 @@ class EventGenerator:
             )
         else:
             # Failed attempt — attacker is injured and exposed
-            attacker.health = max(0, attacker.health - rng.uniform(10, 25))
+            attacker.health = max(0, attacker.health - rng.uniform(10, 25) * (1 - atk_shield))
             attacker.resources["influence"] = max(0, attacker.resources.get("influence", 0) - 15)
             victim.relationships[attacker.id] = -1.0  # Permanent enemy
-            victim.health = max(0, victim.health - rng.uniform(5, 15))
+            victim.health = max(0, victim.health - rng.uniform(5, 15) * (1 - def_shield))
 
             return Event(
                 tick=tick, type=EventType.CONFLICT,
@@ -686,7 +743,7 @@ class EventGenerator:
                 importance=0.9,
             )
 
-    def _bullying(self, bully: Character, victim: Character, tick: int) -> Event:
+    def _bullying(self, bully: Character, victim: Character, tick: int, state: SimulationState | None = None) -> Event:
         """Bullying — social aggression, damages victim's wellbeing."""
         bully_power = bully.traits.extraversion * 0.5 + (1 - bully.traits.agreeableness) * 0.5
         victim_resilience = victim.traits.conscientiousness * 0.3 + (1 - victim.traits.neuroticism) * 0.3
@@ -695,6 +752,9 @@ class EventGenerator:
         victim.emotional_state.anger = _clamp(victim.emotional_state.anger + 0.2, -1, 1)
         victim.emotional_state.trust = _clamp(victim.emotional_state.trust - 0.3, -1, 1)
         victim.relationships[bully.id] = _clamp(victim.relationships.get(bully.id, 0) - 0.4, -1, 1)
+
+        if state:
+            self._record_crime(bully, victim, "bully", tick, state)
 
         if victim_resilience > bully_power:
             # Victim stands up
@@ -776,6 +836,41 @@ class EventGenerator:
             participants=[suitor.id, target.id],
             outcomes=[desc],
             importance=importance,
+        )
+
+    def _mutual_courting(self, a: Character, b: Character, tick: int) -> Event:
+        """Both characters court each other — check if they should marry."""
+        rel_a = a.relationships.get(b.id, 0)
+        rel_b = b.relationships.get(a.id, 0)
+
+        # Boost relationship from mutual interest
+        a.relationships[b.id] = _clamp(rel_a + 0.25, -1, 1)
+        b.relationships[a.id] = _clamp(rel_b + 0.25, -1, 1)
+
+        # Marriage if both have relationship > 0.6 and neither is already married
+        if rel_a > 0.6 and rel_b > 0.6 and a.spouse_id is None and b.spouse_id is None:
+            a.spouse_id = b.id
+            b.spouse_id = a.id
+            a.relationship_types[b.id] = "spouse"
+            b.relationship_types[a.id] = "spouse"
+            a.emotional_state.happiness = _clamp(a.emotional_state.happiness + 0.4, -1, 1)
+            b.emotional_state.happiness = _clamp(b.emotional_state.happiness + 0.4, -1, 1)
+            return Event(
+                tick=tick, type=EventType.INTERACTION,
+                title=f"{a.name} and {b.name} get married",
+                description=f"{a.name} and {b.name} declare their love and become spouses.",
+                participants=[a.id, b.id],
+                outcomes=[f"{a.name} and {b.name} are now married"],
+                importance=0.85,
+            )
+
+        return Event(
+            tick=tick, type=EventType.INTERACTION,
+            title=f"{a.name} and {b.name} court each other",
+            description=f"{a.name} and {b.name} share mutual romantic interest, growing closer.",
+            participants=[a.id, b.id],
+            outcomes=["Mutual attraction deepens"],
+            importance=0.5,
         )
 
     def _one_sided_competition(self, competitor: Character, target: Character, tick: int, state: SimulationState) -> Event:

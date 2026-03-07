@@ -258,6 +258,7 @@ export default function SimulationPage() {
                   character={selectedCharacter}
                   allCharacters={simulation.characters}
                   simId={simId}
+                  worldItems={simulation.world_items || []}
                 />
               </div>
               <div className="w-[200px] border-l-2 border-[#4a4a8a] shrink-0 overflow-y-auto pixel-scrollbar">
