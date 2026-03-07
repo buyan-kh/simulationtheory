@@ -245,6 +245,7 @@ export default function SimulationPage() {
               selectedCharacterId={selectedCharacterId}
               onSelectCharacter={(id) => selectCharacter(id === selectedCharacterId ? null : id)}
               onClickBuilding={(name) => setSelectedBuilding(name)}
+              autoPlaySpeed={autoPlaySpeed}
               chatMessages={chatMessages}
               currentTick={simulation.tick}
               worldItems={simulation.world_items || []}

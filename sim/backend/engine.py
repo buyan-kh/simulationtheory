@@ -725,7 +725,7 @@ class SimulationEngine:
 
     # Base movement speed per tick (in simulation units)
     _BASE_SPEED = 8.0  # ~8 units per tick for steady walking (bigger map)
-    _DRIVE_SPEED = 30.0  # speed when "driving" a car (far destinations)
+    _DRIVE_SPEED = 16.0  # speed when driving (2x walking, was 30)
 
     def _move_characters(self, sim: SimulationState, actions: dict[str, Action]):
         # Build O(1) lookup indexes once per tick
@@ -774,32 +774,67 @@ class SimulationEngine:
             dist = (dx * dx + dy * dy) ** 0.5
 
             if dist < 5:
-                # At destination — wander around the location naturally
-                wander_r = 10.0
-                char.position["x"] += rng.uniform(-wander_r, wander_r)
-                char.position["y"] += rng.uniform(-wander_r, wander_r)
+                # At destination — small wander
+                char.position["x"] += rng.uniform(-3.0, 3.0)
+                char.position["y"] += rng.uniform(-3.0, 3.0)
+                char.resources.pop("_move_phase", None)
+                char.resources.pop("_driving", None)
+            elif dist > 80:
+                # Long distance — phased car movement
+                phase = int(char.resources.get("_move_phase", 0))
+                walk_speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
+
+                if phase == 0:
+                    # Start: walk first ~15 units toward destination (walking to car)
+                    char.resources["_move_phase"] = 1.0
+                    char.resources.pop("_driving", None)
+                    move = min(walk_speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                elif phase == 1:
+                    # Walking to car — walk until 15 units covered, then switch to driving
+                    char.resources.pop("_driving", None)
+                    move = min(walk_speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                    # After walking one tick, get in the car
+                    char.resources["_move_phase"] = 2.0
+                elif phase == 2:
+                    # Driving — stop 20 units before destination
+                    char.resources["_driving"] = 1.0
+                    if dist < 25:
+                        # Park the car, walk the rest
+                        char.resources["_move_phase"] = 3.0
+                        char.resources.pop("_driving", None)
+                    else:
+                        move = min(self._DRIVE_SPEED, dist - 20)
+                        if move > 0:
+                            char.position["x"] += (dx / dist) * move
+                            char.position["y"] += (dy / dist) * move
+                elif phase == 3:
+                    # Walking from parked car to destination
+                    char.resources.pop("_driving", None)
+                    move = min(walk_speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                    if dist < 8:
+                        char.resources.pop("_move_phase", None)
             else:
-                # Walk toward target at constant speed (personality-affected)
+                # Normal walking
+                char.resources.pop("_move_phase", None)
+                char.resources.pop("_driving", None)
                 speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
                 # Rush home at night
                 hour = sim.tick % 24
                 if (hour >= 21 or hour <= 4) and action.type.value == "rest" and char.house_id:
                     speed *= 1.5
-                # Drive if destination is far — agents use cars for long distances
-                if dist > 60:
-                    speed = self._DRIVE_SPEED
-                    # Mark as driving (frontend reads this for car sprite)
-                    char.resources["_driving"] = 1.0
-                else:
-                    char.resources.pop("_driving", None)
                 if dist > 0:
                     move = min(speed, dist)
                     char.position["x"] += (dx / dist) * move
                     char.position["y"] += (dy / dist) * move
-                # Small lateral sway for natural walking (not when driving)
-                if dist <= 60:
-                    char.position["x"] += rng.uniform(-0.5, 0.5)
-                    char.position["y"] += rng.uniform(-0.5, 0.5)
+                # Small lateral sway for natural walking
+                char.position["x"] += rng.uniform(-0.5, 0.5)
+                char.position["y"] += rng.uniform(-0.5, 0.5)
 
             # Clamp to world bounds
             char.position["x"] = max(-WORLD_BOUND, min(WORLD_BOUND, char.position["x"]))

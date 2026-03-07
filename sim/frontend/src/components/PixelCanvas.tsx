@@ -12,6 +12,7 @@ import {
   type HatStyle,
 } from '@/lib/sprites/characters';
 import { drawObject } from '@/lib/sprites/terrain';
+import { InterpolationManager } from '@/lib/interpolation';
 import Minimap from './Minimap';
 
 interface PixelCanvasProps {
@@ -23,6 +24,7 @@ interface PixelCanvasProps {
   chatMessages: ChatMessage[];
   currentTick: number;
   worldItems?: WorldItem[];
+  autoPlaySpeed?: number;
 }
 
 const CHAR_SPRITE_W = 16 * SCALE;
@@ -30,32 +32,12 @@ const CHAR_SPRITE_H = 16 * SCALE;
 
 const HAT_STYLES: HatStyle[] = ['none', 'wizard', 'warrior', 'hood', 'crown'];
 
-// Track last known direction per character so they face the right way when idle
-const lastDirections = new Map<string, Direction>();
-
-function getDirection(char: Character, prevPositions: Map<string, { x: number; y: number }>): Direction {
-  const prev = prevPositions.get(char.id);
-  if (!prev) return lastDirections.get(char.id) || 'down';
-  const dx = char.position.x - prev.x;
-  const dy = char.position.y - prev.y;
-  if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3) {
-    // Not moving enough — keep last direction
-    return lastDirections.get(char.id) || 'down';
-  }
-  let dir: Direction;
+function dirFromDelta(dx: number, dy: number, lastDir: Direction): Direction {
+  if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3) return lastDir;
   if (Math.abs(dx) > Math.abs(dy)) {
-    dir = dx > 0 ? 'right' : 'left';
-  } else {
-    dir = dy > 0 ? 'down' : 'up';
+    return dx > 0 ? 'right' : 'left';
   }
-  lastDirections.set(char.id, dir);
-  return dir;
-}
-
-function isWalking(char: Character, prevPositions: Map<string, { x: number; y: number }>): boolean {
-  const prev = prevPositions.get(char.id);
-  if (!prev) return false;
-  return Math.abs(char.position.x - prev.x) > 0.3 || Math.abs(char.position.y - prev.y) > 0.3;
+  return dy > 0 ? 'down' : 'up';
 }
 
 export default function PixelCanvas({
@@ -67,12 +49,24 @@ export default function PixelCanvas({
   chatMessages,
   currentTick,
   worldItems = [],
+  autoPlaySpeed = 300,
 }: PixelCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<PixelRenderer | null>(null);
   const hasCenteredRef = useRef(false);
-  const prevPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const interpRef = useRef(new InterpolationManager());
+  const lastDirectionsRef = useRef(new Map<string, Direction>());
+
+  // Update interpolation tick duration when speed changes
+  useEffect(() => {
+    interpRef.current.setTickDuration(autoPlaySpeed);
+  }, [autoPlaySpeed]);
+
+  // Feed new positions to interpolation manager
+  useEffect(() => {
+    interpRef.current.updateTargets(characters);
+  }, [characters]);
 
   // Initialize renderer
   useEffect(() => {
@@ -129,11 +123,14 @@ export default function PixelCanvas({
     }
   }, [characters]);
 
-  // Center on selected character
+  // Center on selected character (using interpolated position)
   useEffect(() => {
     if (selectedCharacterId && characters[selectedCharacterId]) {
+      const pos = interpRef.current.getPosition(selectedCharacterId);
       const char = characters[selectedCharacterId];
-      const { wx, wy } = simToWorld(char.position.x, char.position.y);
+      const sx = pos ? pos.x : char.position.x;
+      const sy = pos ? pos.y : char.position.y;
+      const { wx, wy } = simToWorld(sx, sy);
       rendererRef.current?.centerOn(wx * SCALE, wy * SCALE);
     }
   }, [selectedCharacterId, characters]);
@@ -143,40 +140,54 @@ export default function PixelCanvas({
     rendererRef.current?.setDayNight(currentTick);
   }, [currentTick]);
 
-  // Build character sprites
+  // Build character sprites — draw functions read interpolated positions at draw time
   const buildCharacterSprites = useCallback((): Sprite[] => {
     const sprites: Sprite[] = [];
     const charIds = Object.keys(characters);
     const recentMessages = chatMessages.filter((m) => currentTick - m.tick <= 2);
-    const prevPositions = prevPositionsRef.current;
+    const interp = interpRef.current;
+    const lastDirs = lastDirectionsRef.current;
 
     for (const [id, char] of Object.entries(characters)) {
+      // Use target position for sorting/culling (close enough)
       const { wx, wy } = simToWorld(char.position.x, char.position.y);
-      const px = wx * SCALE - CHAR_SPRITE_W / 2;
-      const py = wy * SCALE - CHAR_SPRITE_H;
+      const sortPx = wx * SCALE - CHAR_SPRITE_W / 2;
+      const sortPy = wy * SCALE - CHAR_SPRITE_H;
       const charIndex = charIds.indexOf(id);
       const palette = CHARACTER_PALETTES[charIndex % CHARACTER_PALETTES.length];
       const hatStyle = HAT_STYLES[charIndex % HAT_STYLES.length];
-      const dir = getDirection(char, prevPositions);
-      const walking = isWalking(char, prevPositions);
       const selected = id === selectedCharacterId;
 
-      // Check if character is driving (backend sets _driving resource)
-      const isDriving = (char.resources as Record<string, number>)?.['_driving'] === 1;
+      // Check movement phase for car rendering
+      const movePhase = (char.resources as Record<string, number>)?.['_move_phase'] ?? 0;
+      const isDriving = movePhase === 2;
 
       sprites.push({
-        x: px,
-        y: py,
+        x: sortPx,
+        y: sortPy,
         width: isDriving ? 40 : CHAR_SPRITE_W,
         height: isDriving ? 20 : CHAR_SPRITE_H,
         layer: 2,
         id,
         draw: (ctx: CanvasRenderingContext2D, _sx: number, _sy: number, frame: number) => {
+          // Read interpolated position at draw time (called every render frame)
+          const pos = interp.getPosition(id);
+          const simX = pos ? pos.x : char.position.x;
+          const simY = pos ? pos.y : char.position.y;
+          const { wx: iwx, wy: iwy } = simToWorld(simX, simY);
+          const px = iwx * SCALE - CHAR_SPRITE_W / 2;
+          const py = iwy * SCALE - CHAR_SPRITE_H;
+
+          // Direction from interpolation target delta
+          const delta = interp.getDirection(id);
+          const lastDir = lastDirs.get(id) || 'down';
+          const dir = dirFromDelta(delta.dx, delta.dy, lastDir);
+          lastDirs.set(id, dir);
+          const walking = interp.isMoving(id);
+
           if (isDriving) {
-            // Draw a car with the character's color theme
             const carType = charIndex % 2 === 0 ? 'car_red' : 'car_blue';
             drawObject(ctx, px, py + 10, carType, 0, frame, SCALE);
-            // Small name above car
             drawCharacterName(ctx, px + 10, py - 2, char.name, selected, SCALE, false);
           } else {
             drawCharacter(ctx, px, py, palette, dir, frame, walking, !char.alive, selected, hatStyle, SCALE);
@@ -185,22 +196,29 @@ export default function PixelCanvas({
         },
       });
 
-      // Speech bubble
+      // Speech bubble — also uses interpolated position
       const charMessages = recentMessages.filter((m) => m.speaker_id === id);
       const latestMessage = charMessages[charMessages.length - 1];
       if (latestMessage) {
         const bubbleWidth = Math.min(latestMessage.content.length * 5 + 16, 140);
         const bubbleHeight = 20;
-        const bubbleX = px + CHAR_SPRITE_W / 2 - bubbleWidth / 2;
-        const bubbleY = py - bubbleHeight - 16;
 
         sprites.push({
-          x: bubbleX,
-          y: bubbleY,
+          x: sortPx + CHAR_SPRITE_W / 2 - bubbleWidth / 2,
+          y: sortPy - bubbleHeight - 16,
           width: bubbleWidth,
           height: bubbleHeight + 6,
           layer: 3,
           draw: (ctx: CanvasRenderingContext2D) => {
+            const pos = interp.getPosition(id);
+            const simX = pos ? pos.x : char.position.x;
+            const simY = pos ? pos.y : char.position.y;
+            const { wx: iwx, wy: iwy } = simToWorld(simX, simY);
+            const cpx = iwx * SCALE - CHAR_SPRITE_W / 2;
+            const cpy = iwy * SCALE - CHAR_SPRITE_H;
+            const bubbleX = cpx + CHAR_SPRITE_W / 2 - bubbleWidth / 2;
+            const bubbleY = cpy - bubbleHeight - 16;
+
             const isThought = latestMessage.is_thought;
             ctx.fillStyle = isThought ? 'rgba(80,80,160,0.85)' : 'rgba(255,255,255,0.92)';
             ctx.beginPath();
@@ -242,7 +260,6 @@ export default function PixelCanvas({
 
     for (const item of worldItems) {
       if (!item.pixels || item.pixels.length === 0) continue;
-      // Only render items placed in the world (not inside houses for now)
       if (item.placed_in_house) continue;
 
       const { wx, wy } = simToWorld(item.position.x, item.position.y);
@@ -272,7 +289,6 @@ export default function PixelCanvas({
             }
           }
 
-          // Item name label on hover (always show small label)
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
           const labelW = item.name.length * 3.5 + 6;
           const labelX = px + (item.width * itemScale) / 2 - labelW / 2;
@@ -293,11 +309,12 @@ export default function PixelCanvas({
     return sprites;
   }, [worldItems]);
 
-  // Build relationship lines
+  // Build relationship lines (use interpolated positions)
   const buildRelationshipSprites = useCallback((): Sprite[] => {
     if (!selectedCharacterId || !characters[selectedCharacterId]) return [];
     const selected = characters[selectedCharacterId];
     const sprites: Sprite[] = [];
+    const interp = interpRef.current;
 
     for (const [id, char] of Object.entries(characters)) {
       if (id === selectedCharacterId) continue;
@@ -321,13 +338,23 @@ export default function PixelCanvas({
         height: (maxY - minY) || 1,
         layer: 1,
         draw: (ctx: CanvasRenderingContext2D) => {
+          // Use interpolated positions for smooth line following
+          const fromPos = interp.getPosition(selectedCharacterId!);
+          const toPos = interp.getPosition(id);
+          const fsx = fromPos ? fromPos.x : selected.position.x;
+          const fsy = fromPos ? fromPos.y : selected.position.y;
+          const tsx = toPos ? toPos.x : char.position.x;
+          const tsy = toPos ? toPos.y : char.position.y;
+          const f = simToWorld(fsx, fsy);
+          const t = simToWorld(tsx, tsy);
+
           ctx.strokeStyle = isPositive ? '#00ff88' : '#ff3366';
           ctx.lineWidth = 1 + strength * 2;
           ctx.globalAlpha = 0.3 + strength * 0.4;
           if (!isPositive) ctx.setLineDash([6, 4]);
           ctx.beginPath();
-          ctx.moveTo(from.wx * SCALE, from.wy * SCALE);
-          ctx.lineTo(to.wx * SCALE, to.wy * SCALE);
+          ctx.moveTo(f.wx * SCALE, f.wy * SCALE);
+          ctx.lineTo(t.wx * SCALE, t.wy * SCALE);
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.globalAlpha = 1;
@@ -354,12 +381,6 @@ export default function PixelCanvas({
     ];
 
     rendererRef.current?.setSprites(allSprites);
-
-    // Track previous positions for direction detection
-    const prev = prevPositionsRef.current;
-    for (const [id, char] of Object.entries(characters)) {
-      prev.set(id, { x: char.position.x, y: char.position.y });
-    }
   }, [characters, locations, selectedCharacterId, chatMessages, currentTick, worldItems, buildCharacterSprites, buildRelationshipSprites, buildWorldItemSprites]);
 
   return (
