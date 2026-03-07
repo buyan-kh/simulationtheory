@@ -152,6 +152,84 @@ def get_character_reasoning(sim_id: str, char_id: str):
     }
 
 
+# ── God Mode ──
+
+class ForceActionRequest(BaseModel):
+    action_type: str
+
+
+class GiftRequest(BaseModel):
+    resource: str = "wealth"
+    amount: float = 50
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/force-action")
+def force_action(sim_id: str, char_id: str, req: ForceActionRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    if not char.alive:
+        raise HTTPException(status_code=400, detail="Character is dead")
+    from models import Action
+    char.last_action = Action(
+        type=req.action_type,
+        target_id=None,
+        detail=f"[God Mode] Forced to {req.action_type}",
+        reasoning="Divine intervention",
+    )
+    engine.db.save(sim)
+    return {"status": "ok", "action": req.action_type}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/gift")
+def gift_resource(sim_id: str, char_id: str, req: GiftRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    char.resources[req.resource] = char.resources.get(req.resource, 0) + req.amount
+    engine.db.save(sim)
+    return {"status": "ok", "resource": req.resource, "new_amount": char.resources[req.resource]}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/smite")
+def smite_character(sim_id: str, char_id: str):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    if not char.alive:
+        raise HTTPException(status_code=400, detail="Character is already dead")
+    char.alive = False
+    char.cause_of_death = "divine_smite"
+    char.death_tick = sim.tick
+    char.health = 0
+    engine.db.save(sim)
+    return {"status": "ok", "message": f"{char.name} has been smitten"}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/heal")
+def heal_character(sim_id: str, char_id: str):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    char.health = 100
+    if hasattr(char, 'needs') and char.needs:
+        char.needs.hunger = 100
+        char.needs.energy = 100
+        char.needs.social = 100
+        char.needs.fun = 100
+        char.needs.hygiene = 100
+    if not char.alive:
+        char.alive = True
+        char.cause_of_death = None
+        char.death_tick = None
+    engine.db.save(sim)
+    return {"status": "ok", "message": f"{char.name} has been fully healed"}
+
+
 @app.get("/api/simulations/{sim_id}/events", response_model=list[Event])
 def get_events(sim_id: str, since_tick: int = Query(default=0, ge=0)):
     sim = _get_sim(sim_id)

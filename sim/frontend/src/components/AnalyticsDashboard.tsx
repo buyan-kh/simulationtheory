@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { AnalyticsSummary, RelationshipGraph } from '@/lib/types';
+import type { AnalyticsSummary, RelationshipGraph as RelGraphType, Character } from '@/lib/types';
 import {
   getAnalyticsSummary,
   getRelationshipGraph,
   getEventFrequency,
   getExportJsonUrl,
   getExportCsvUrl,
+  getSimulation,
 } from '@/lib/api';
 
 interface AnalyticsDashboardProps {
@@ -17,8 +18,9 @@ interface AnalyticsDashboardProps {
 
 export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboardProps) {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [graph, setGraph] = useState<RelationshipGraph | null>(null);
+  const [graph, setGraph] = useState<RelGraphType | null>(null);
   const [eventFreq, setEventFreq] = useState<Record<string, number> | null>(null);
+  const [characters, setCharacters] = useState<Record<string, Character>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,10 +29,12 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
       getAnalyticsSummary(simId).catch(() => null),
       getRelationshipGraph(simId).catch(() => null),
       getEventFrequency(simId).catch(() => null),
-    ]).then(([s, g, ef]) => {
+      getSimulation(simId).catch(() => null),
+    ]).then(([s, g, ef, sim]) => {
       setSummary(s);
       setGraph(g);
       setEventFreq(ef);
+      if (sim) setCharacters(sim.characters);
       setLoading(false);
     });
   }, [simId]);
@@ -50,6 +54,24 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
     : [];
 
   const maxEventCount = eventEntries.length > 0 ? Math.max(...eventEntries.map(e => e[1])) : 1;
+
+  // Wealth distribution: top 10 wealthiest
+  const charList = Object.values(characters);
+  const wealthiestChars = [...charList]
+    .filter(c => c.alive)
+    .sort((a, b) => (b.resources?.wealth ?? 0) - (a.resources?.wealth ?? 0))
+    .slice(0, 10);
+  const maxWealth = wealthiestChars.length > 0 ? Math.max(...wealthiestChars.map(c => c.resources?.wealth ?? 0), 1) : 1;
+
+  // Death causes
+  const deadChars = charList.filter(c => !c.alive && c.cause_of_death);
+  const deathCauses: Record<string, number> = {};
+  for (const c of deadChars) {
+    const cause = c.cause_of_death || 'unknown';
+    deathCauses[cause] = (deathCauses[cause] || 0) + 1;
+  }
+  const deathEntries = Object.entries(deathCauses).sort((a, b) => b[1] - a[1]);
+  const maxDeathCount = deathEntries.length > 0 ? Math.max(...deathEntries.map(e => e[1])) : 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.85)' }}>
@@ -82,6 +104,60 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
             </div>
           )}
 
+          {/* Population Chart */}
+          {summary && (
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-3" style={{ fontSize: '9px' }}>Population</div>
+              <div className="flex items-end gap-1 p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a', height: '60px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <div style={{ width: 8, height: 8, background: '#00ff88' }} />
+                    <span className="font-pixel" style={{ fontSize: '7px', color: '#00ff88' }}>Alive: {summary.alive_characters}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div style={{ width: 8, height: 8, background: '#ff3366' }} />
+                    <span className="font-pixel" style={{ fontSize: '7px', color: '#ff3366' }}>Dead: {summary.dead_characters}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div style={{ width: 8, height: 8, background: '#ffd700' }} />
+                    <span className="font-pixel" style={{ fontSize: '7px', color: '#ffd700' }}>Total: {summary.total_characters}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Wealth Distribution */}
+          {wealthiestChars.length > 0 && (
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-3" style={{ fontSize: '9px' }}>Top 10 Wealthiest</div>
+              <div className="space-y-1">
+                {wealthiestChars.map((c) => {
+                  const w = c.resources?.wealth ?? 0;
+                  return (
+                    <div key={c.id} className="flex items-center gap-2">
+                      <span className="font-pixel w-24 truncate text-pixel-text" style={{ fontSize: '7px' }}>
+                        {c.name}
+                      </span>
+                      <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                        <div
+                          style={{
+                            width: `${(w / maxWealth) * 100}%`,
+                            height: '100%',
+                            background: '#ffd700',
+                          }}
+                        />
+                      </div>
+                      <span className="font-pixel w-12 text-right text-neon-gold" style={{ fontSize: '7px' }}>
+                        {Math.round(w)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Event Breakdown */}
           {eventEntries.length > 0 && (
             <div>
@@ -102,6 +178,34 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                       />
                     </div>
                     <span className="font-pixel w-8 text-right text-neon-gold" style={{ fontSize: '7px' }}>
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Death Causes */}
+          {deathEntries.length > 0 && (
+            <div>
+              <div className="font-pixel text-neon-cyan uppercase mb-3" style={{ fontSize: '9px' }}>Death Causes</div>
+              <div className="space-y-1">
+                {deathEntries.map(([cause, count]) => (
+                  <div key={cause} className="flex items-center gap-2">
+                    <span className="font-pixel w-28 truncate text-pixel-text" style={{ fontSize: '7px' }}>
+                      {cause}
+                    </span>
+                    <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                      <div
+                        style={{
+                          width: `${(count / maxDeathCount) * 100}%`,
+                          height: '100%',
+                          background: '#ff3366',
+                        }}
+                      />
+                    </div>
+                    <span className="font-pixel w-8 text-right" style={{ fontSize: '7px', color: '#ff3366' }}>
                       {count}
                     </span>
                   </div>

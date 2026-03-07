@@ -16,6 +16,8 @@ import GroupPanel from '@/components/GroupPanel';
 import MarketPanel from '@/components/MarketPanel';
 import ReplayControls from '@/components/ReplayControls';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import RelationshipGraph from '@/components/RelationshipGraph';
+import GodMode from '@/components/GodMode';
 
 export default function SimulationPage() {
   const params = useParams();
@@ -250,12 +252,25 @@ export default function SimulationPage() {
           </div>
 
           {selectedCharacter && (
-            <div className="h-[250px] border-t-2 border-[#4a4a8a] shrink-0">
-              <Inspector
-                character={selectedCharacter}
-                allCharacters={simulation.characters}
-                simId={simId}
-              />
+            <div className="h-[250px] border-t-2 border-[#4a4a8a] shrink-0 flex">
+              <div className="flex-1 min-w-0">
+                <Inspector
+                  character={selectedCharacter}
+                  allCharacters={simulation.characters}
+                  simId={simId}
+                />
+              </div>
+              <div className="w-[200px] border-l-2 border-[#4a4a8a] shrink-0 overflow-y-auto pixel-scrollbar">
+                <GodMode
+                  simId={simId}
+                  characterId={selectedCharacter.id}
+                  characterName={selectedCharacter.name}
+                  onRefresh={async () => {
+                    const sim = await getSimulation(simId);
+                    setSimulation(sim);
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -267,6 +282,7 @@ export default function SimulationPage() {
               { key: 'chat' as const, label: 'CHAT', color: 'neon-magenta' },
               { key: 'groups' as const, label: 'GROUPS', color: '#44ccff' },
               { key: 'market' as const, label: 'MARKET', color: '#ffcc00' },
+              { key: 'graph' as const, label: 'GRAPH', color: '#aa44ff' },
             ] as const).map(tab => (
               <button
                 key={tab.key}
@@ -287,6 +303,7 @@ export default function SimulationPage() {
             {activePanel === 'chat' && <ChatLog messages={chatMessages} characters={simulation.characters} />}
             {activePanel === 'groups' && <GroupPanel groups={simulation.groups || {}} characters={simulation.characters} />}
             {activePanel === 'market' && <MarketPanel market={simulation.market || { offers: [], history: [], price_index: {} }} characters={simulation.characters} />}
+            {activePanel === 'graph' && <RelationshipGraph simId={simId} selectedCharacterId={selectedCharacterId} onSelectCharacter={(id) => selectCharacter(id === selectedCharacterId ? null : id)} />}
           </div>
         </div>
       </div>
