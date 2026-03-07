@@ -266,6 +266,7 @@ export default function SimulationPage() {
                   simId={simId}
                   characterId={selectedCharacter.id}
                   characterName={selectedCharacter.name}
+                  allCharacters={simulation.characters}
                   onRefresh={async () => {
                     const sim = await getSimulation(simId);
                     setSimulation(sim);
