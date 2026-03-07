@@ -3,7 +3,7 @@ import random
 from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
     BatchCharacterCreate,
-    Action, Event, EventType, Environment, ChatMessage, House, Location,
+    Action, ActionType, Event, EventType, Environment, ChatMessage, House, Location,
     MemoryEntry, EmotionalState, PersonalityTraits, Needs,
 )
 from agents import AgentBrain, DialogueGenerator
