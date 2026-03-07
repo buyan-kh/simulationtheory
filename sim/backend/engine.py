@@ -327,6 +327,14 @@ class SimulationEngine:
         # ── 7. Needs (all agents, cheap) ──
         self._update_needs(sim, actions)
 
+        # ── 7b. Disease / contagion ──
+        disease_events = self._process_disease(sim)
+        all_events.extend(disease_events)
+
+        # ── 7c. Property income ──
+        property_events = self._process_property(sim, actions)
+        all_events.extend(property_events)
+
         # ── 8. Lifecycle: aging, death, offspring ──
         lifecycle_events = self._process_lifecycle(sim)
         all_events.extend(lifecycle_events)
@@ -342,6 +350,9 @@ class SimulationEngine:
         # ── 10b. Crafting ──
         craft_events = process_crafting(sim, actions)
         all_events.extend(craft_events)
+
+        # ── 10c. Gossip ──
+        self._process_gossip(sim, actions)
 
         # ── 11. Location resource regeneration ──
         self._regen_location_resources(sim)
@@ -540,6 +551,13 @@ class SimulationEngine:
                         if dx * dx + dy * dy < 400:  # within ~20 units of home
                             boosts["energy"] = 30.0
                             boosts["hygiene"] = 10.0
+                            # Bed bonus: extra energy if character owns a bed
+                            items_by_id = {it.id: it for it in sim.world_items}
+                            for item_id in char.equipped_items:
+                                item = items_by_id.get(item_id)
+                                if item and "bed" in item.name.lower():
+                                    boosts["energy"] += 5.0
+                                    break
                         else:
                             boosts["energy"] = 15.0  # resting but not home yet
                     else:
@@ -820,7 +838,7 @@ class SimulationEngine:
         if char.age >= char.max_age:
             return "old age"
         if char.health <= 0:
-            return "injuries"
+            return "illness" if char.disease else "injuries"
         if char.needs.hunger <= 0 and char.needs.energy <= 0:
             return "starvation"
         return None
@@ -862,17 +880,41 @@ class SimulationEngine:
                     related_characters=[char.id],
                 ))
 
-        # Redistribute wealth to housemates only (not all alive chars)
+        # Clear spouse reference on partner
+        if char.spouse_id:
+            spouse = sim.characters.get(char.spouse_id)
+            if spouse and spouse.spouse_id == char.id:
+                spouse.spouse_id = None
+
+        # Inherit wealth: spouse first, then children, then housemates
         remaining_wealth = char.resources.get("wealth", 0) * 0.5
-        if remaining_wealth > 0 and char.house_id:
-            house = next((h for h in sim.environment.houses if h.id == char.house_id), None)
-            if house:
-                housemates = [sim.characters[rid] for rid in house.residents
-                              if rid in sim.characters and rid != char.id and sim.characters[rid].alive]
-                if housemates:
-                    share = remaining_wealth / len(housemates)
-                    for c in housemates:
+        if remaining_wealth > 0:
+            inherited = False
+            # Try spouse
+            if char.spouse_id:
+                spouse = sim.characters.get(char.spouse_id)
+                if spouse and spouse.alive:
+                    spouse.resources["wealth"] = spouse.resources.get("wealth", 0) + remaining_wealth
+                    inherited = True
+            # Try children
+            if not inherited:
+                children = [sim.characters[cid] for cid in sim.characters
+                            if sim.characters[cid].alive and char.id in sim.characters[cid].parent_ids]
+                if children:
+                    share = remaining_wealth / len(children)
+                    for c in children:
                         c.resources["wealth"] = c.resources.get("wealth", 0) + share
+                    inherited = True
+            # Fall back to housemates
+            if not inherited and char.house_id:
+                house = next((h for h in sim.environment.houses if h.id == char.house_id), None)
+                if house:
+                    housemates = [sim.characters[rid] for rid in house.residents
+                                  if rid in sim.characters and rid != char.id and sim.characters[rid].alive]
+                    if housemates:
+                        share = remaining_wealth / len(housemates)
+                        for c in housemates:
+                            c.resources["wealth"] = c.resources.get("wealth", 0) + share
 
         return Event(
             tick=sim.tick, type=EventType.DEATH,
@@ -889,41 +931,34 @@ class SimulationEngine:
             return events
 
         rng = random.Random(hash(("offspring", sim.tick)))
-        checked: set[tuple[str, str]] = set()
+        checked: set[str] = set()
 
-        # Instead of O(n²) all-pairs, iterate each alive character's relationships.
-        # Only pairs with mutual rel > 0.7 can produce offspring, so use relationships as the index.
-        alive_ids = {c.id for c in sim.characters.values() if c.alive}
-
+        # Only spouses can produce offspring
         for c1 in list(sim.characters.values()):
-            if not c1.alive:
+            if not c1.alive or c1.spouse_id is None:
                 continue
-            for c2_id, rel1 in list(c1.relationships.items()):
-                if rel1 <= 0.7 or c2_id not in alive_ids:
-                    continue
-                if c1.id >= c2_id:
-                    continue
-                pair = (c1.id, c2_id)
-                if pair in checked:
-                    continue
-                checked.add(pair)
+            if c1.id in checked:
+                continue
+            c2 = sim.characters.get(c1.spouse_id)
+            if not c2 or not c2.alive:
+                continue
+            checked.add(c1.id)
+            checked.add(c2.id)
 
-                c2 = sim.characters[c2_id]
-                rel2 = c2.relationships.get(c1.id, 0)
-                if rel2 > 0.7 and rng.random() < 0.05:
-                    child = self._create_offspring(c1, c2, sim, rng)
-                    sim.characters[child.id] = child
-                    self._assign_house(sim, child)
-                    events.append(Event(
-                        tick=sim.tick, type=EventType.BIRTH,
-                        title=f"{child.name} is born",
-                        description=f"{child.name} is born to {c1.name} and {c2.name}, inheriting traits from both parents.",
-                        participants=[c1.id, c2.id, child.id],
-                        outcomes=[f"A new character joins the simulation"],
-                        importance=0.8,
-                    ))
-                    if len(sim.characters) >= sim.config.max_population:
-                        return events
+            if rng.random() < 0.05:
+                child = self._create_offspring(c1, c2, sim, rng)
+                sim.characters[child.id] = child
+                self._assign_house(sim, child)
+                events.append(Event(
+                    tick=sim.tick, type=EventType.BIRTH,
+                    title=f"{child.name} is born",
+                    description=f"{child.name} is born to {c1.name} and {c2.name}, inheriting traits from both parents.",
+                    participants=[c1.id, c2.id, child.id],
+                    outcomes=[f"A new character joins the simulation"],
+                    importance=0.8,
+                ))
+                if len(sim.characters) >= sim.config.max_population:
+                    return events
         return events
 
     def _create_offspring(self, p1: Character, p2: Character, sim: SimulationState, rng: random.Random) -> Character:
@@ -967,6 +1002,12 @@ class SimulationEngine:
         child.relationships[p1.id] = 0.6
         child.relationships[p2.id] = 0.6
 
+        # Set relationship types
+        p1.relationship_types[child.id] = "parent"
+        p2.relationship_types[child.id] = "parent"
+        child.relationship_types[p1.id] = "child"
+        child.relationship_types[p2.id] = "child"
+
         return child
 
     # ── Location resource regeneration ──
@@ -975,3 +1016,209 @@ class SimulationEngine:
         for loc in sim.environment.locations:
             for res, rate in loc.resource_regen_rate.items():
                 loc.resources[res] = loc.resources.get(res, 0) + rate
+
+    # ── Gossip ──
+
+    def _process_gossip(self, sim: SimulationState, actions: dict[str, Action]):
+        """When communicating, agents may gossip about a third party."""
+        rng = random.Random(hash(("gossip", sim.tick)))
+        NEGATIVE_KEYWORDS = {"attack", "betray", "steal", "kill", "bully", "fight", "hurt", "murder"}
+        POSITIVE_KEYWORDS = {"helped", "shared", "cooperated", "taught", "healed", "gave", "saved"}
+
+        for char_id, action in actions.items():
+            if action.type != ActionType.COMMUNICATE or action.target_id is None:
+                continue
+            speaker = sim.characters.get(char_id)
+            listener = sim.characters.get(action.target_id)
+            if not speaker or not listener or not speaker.alive or not listener.alive:
+                continue
+
+            # Base 30% gossip chance, +20% for high extraversion
+            gossip_chance = 0.3 + (speaker.traits.extraversion * 0.2)
+            if rng.random() > gossip_chance:
+                continue
+
+            # Pick a random memory about a third party
+            all_memories = speaker.memory.short_term + speaker.memory.long_term
+            third_party_memories = [
+                m for m in all_memories
+                if m.related_characters and any(
+                    rc != listener.id and rc != char_id and rc in sim.characters
+                    for rc in m.related_characters
+                )
+            ]
+            if not third_party_memories:
+                continue
+
+            memory = rng.choice(third_party_memories)
+            subject_id = next(
+                rc for rc in memory.related_characters
+                if rc != listener.id and rc != char_id and rc in sim.characters
+            )
+            subject = sim.characters[subject_id]
+
+            # Create gossip memory for listener
+            gossip_content = f"{speaker.name} told me that {memory.content}"
+            listener.memory.short_term.append(MemoryEntry(
+                tick=sim.tick,
+                content=gossip_content,
+                importance=memory.importance * 0.7,
+                related_characters=[subject_id, char_id],
+            ))
+
+            # Adjust listener's relationship with the gossip subject
+            content_lower = memory.content.lower()
+            if any(kw in content_lower for kw in NEGATIVE_KEYWORDS):
+                listener.relationships[subject_id] = max(
+                    -1.0, listener.relationships.get(subject_id, 0) - 0.1
+                )
+            elif any(kw in content_lower for kw in POSITIVE_KEYWORDS):
+                listener.relationships[subject_id] = min(
+                    1.0, listener.relationships.get(subject_id, 0) + 0.05
+                )
+
+    # ── Disease / Contagion ──
+
+    _DISEASE_TYPES = ["plague", "flu", "infection"]
+
+    def _process_disease(self, sim: SimulationState) -> list[Event]:
+        events: list[Event] = []
+        rng = random.Random(hash(("disease", sim.tick)))
+        alive_chars = [c for c in sim.characters.values() if c.alive]
+        if not alive_chars:
+            return events
+
+        # --- Random outbreak ---
+        outbreak_chance = 0.005  # 0.5% per tick
+        # Crowding check: if 10+ agents in any 30-unit cluster, double chance
+        for char in alive_chars:
+            nearby = self.grid.get_nearby_for_char(char.id, 30.0, sim.characters)
+            if len(nearby) >= 10:
+                outbreak_chance = 0.01
+                break
+
+        if rng.random() < outbreak_chance:
+            victim = rng.choice(alive_chars)
+            if victim.disease is None:
+                dtype = rng.choice(self._DISEASE_TYPES)
+                victim.disease = {
+                    "type": dtype,
+                    "severity": round(rng.uniform(0.2, 0.6), 2),
+                    "duration": rng.randint(20, 50),
+                    "contagion_rate": round(rng.uniform(0.1, 0.3), 2),
+                }
+                events.append(Event(
+                    tick=sim.tick, type=EventType.DISEASE_OUTBREAK,
+                    title=f"{victim.name} contracted {dtype}",
+                    description=f"{victim.name} has fallen ill with {dtype} (severity {victim.disease['severity']}).",
+                    participants=[victim.id],
+                    importance=0.6,
+                ))
+
+        # --- Spread, effects, recovery ---
+        for char in alive_chars:
+            if char.disease is None:
+                continue
+
+            disease = char.disease
+
+            # Spread to nearby characters (within 15 units)
+            nearby_ids = self.grid.get_nearby_for_char(char.id, 15.0, sim.characters)
+            for nid in nearby_ids:
+                target = sim.characters[nid]
+                if not target.alive or target.disease is not None:
+                    continue
+                hygiene = target.needs.hygiene
+                susceptibility = 1.0 - hygiene / 100.0
+                if hygiene < 30:
+                    susceptibility *= 2.0
+                spread_prob = disease["contagion_rate"] * susceptibility
+                if rng.random() < spread_prob:
+                    target.disease = {
+                        "type": disease["type"],
+                        "severity": round(rng.uniform(0.1, disease["severity"]), 2),
+                        "duration": rng.randint(15, disease["duration"]),
+                        "contagion_rate": disease["contagion_rate"],
+                    }
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.DISEASE_SPREAD,
+                        title=f"{target.name} caught {disease['type']} from {char.name}",
+                        description=f"{target.name} was infected with {disease['type']} by {char.name}.",
+                        participants=[char.id, target.id],
+                        importance=0.4,
+                    ))
+
+            # Effects: extra need drain and health damage
+            char.needs.energy = max(0.0, char.needs.energy - 5.0)
+            char.needs.hunger = max(0.0, char.needs.hunger - 3.0)
+            if disease["severity"] > 0.7:
+                char.health = max(0.0, char.health - 2.0)
+
+            # Recovery: decrement duration
+            is_resting = char.last_action and char.last_action.type.value == "rest"
+            decrement = 2 if is_resting else 1
+            disease["duration"] -= decrement
+            if disease["duration"] <= 0:
+                char.disease = None
+
+        return events
+
+    # ── Property Ownership ──
+
+    def _process_property(self, sim: SimulationState, actions: dict[str, "Action"]) -> list[Event]:
+        events: list[Event] = []
+
+        # Passive income: owners earn wealth when agents visit their location
+        location_visitor_count: dict[str, int] = {}
+        for char in sim.characters.values():
+            if not char.alive:
+                continue
+            for loc in sim.environment.locations:
+                if loc.owner_id is None:
+                    continue
+                dx = char.position["x"] - loc.x
+                dy = char.position["y"] - loc.y
+                if dx * dx + dy * dy < 900 and char.id != loc.owner_id:  # within 30 units
+                    loc_id = loc.id
+                    location_visitor_count[loc_id] = location_visitor_count.get(loc_id, 0) + 1
+
+        for loc in sim.environment.locations:
+            if loc.owner_id is None:
+                continue
+            owner = sim.characters.get(loc.owner_id)
+            if not owner or not owner.alive:
+                loc.owner_id = None  # clear dead owner
+                continue
+            visitors = location_visitor_count.get(loc.id, 0)
+            income = min(visitors, 5)  # max 5 wealth/tick per location
+            if income > 0:
+                owner.resources["wealth"] = owner.resources.get("wealth", 0) + income
+
+        # Property claiming: wealthy agents with no property can claim unowned locations
+        for char in sim.characters.values():
+            if not char.alive:
+                continue
+            wealth = char.resources.get("wealth", 0)
+            if wealth < 50:
+                continue
+            already_owns = any(loc.owner_id == char.id for loc in sim.environment.locations)
+            if already_owns:
+                continue
+            has_goal = any(g.lower() in ("wealth", "trade") for g in char.goals)
+            if not has_goal:
+                continue
+            for loc in sim.environment.locations:
+                if loc.owner_id is not None or not loc.is_removable:
+                    continue
+                char.resources["wealth"] -= 40.0
+                loc.owner_id = char.id
+                events.append(Event(
+                    tick=sim.tick, type=EventType.PROPERTY_CLAIMED,
+                    title=f"{char.name} claimed {loc.name}",
+                    description=f"{char.name} purchased ownership of {loc.name} for 40 wealth.",
+                    participants=[char.id],
+                    importance=0.6,
+                ))
+                break
+
+        return events

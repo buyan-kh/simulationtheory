@@ -356,6 +356,23 @@ class AgentBrain:
             urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.3
             urgency[ActionType.ALLY] = urgency.get(ActionType.ALLY, 0) + 0.3
 
+        # Disease: sick agents want to rest, avoid social actions
+        if character.disease:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.5
+            urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) - 1.0
+            urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) - 1.0
+            urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) - 1.0
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 1.0
+
+        # Property owners: defend property, reduced gather urgency (passive income)
+        if state:
+            owns_property = any(
+                loc.owner_id == character.id for loc in state.environment.locations
+            )
+            if owns_property:
+                urgency[ActionType.DEFEND] = urgency.get(ActionType.DEFEND, 0) + 0.5
+                urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) - 0.3
+
         return urgency
 
     def _compute_environmental_modifiers(self, perception: dict) -> dict[ActionType, float]:
