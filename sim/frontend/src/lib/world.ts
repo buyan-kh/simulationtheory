@@ -325,13 +325,24 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
     decorations.push({ type: 'fence_h', col: cc + 1, row: cr + 3 });
   }
 
-  // Cars parked along roads
-  for (let i = 0; i < 20; i++) {
-    const row = Math.floor(rng() * WORLD_TILES);
-    const col = Math.floor(rng() * WORLD_TILES);
-    const tile = getTileAt(row, col);
-    if (tile.type === 'sidewalk' || tile.type === 'road_line') {
-      decorations.push({ type: (rng() < 0.5 ? 'car_red' : 'car_blue') as ObjectType, col, row: row - 1 });
+  // Cars parked along roads — place near locations (guaranteed road proximity)
+  for (const loc of locations) {
+    const { wx, wy } = simToWorld(loc.x, loc.y);
+    const cr = Math.floor(wy / TILE_PX);
+    const cc = Math.floor(wx / TILE_PX);
+    // Try to place 1-2 cars on road tiles near each location
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const dr = Math.floor(rng() * 12) - 6;
+      const dc = Math.floor(rng() * 12) - 6;
+      const r = cr + dr;
+      const c = cc + dc;
+      if (r >= 0 && r < WORLD_TILES && c >= 0 && c < WORLD_TILES) {
+        const tile = getTileAt(r, c);
+        if (tile.type === 'sidewalk' || tile.type === 'road_line') {
+          decorations.push({ type: (rng() < 0.5 ? 'car_red' : 'car_blue') as ObjectType, col: c, row: r - 1 });
+          break; // one car per location
+        }
+      }
     }
   }
 

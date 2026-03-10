@@ -167,17 +167,18 @@ export default function PixelCanvas({
       sprites.push({
         x: px,
         y: py,
-        width: isDriving ? 40 : CHAR_SPRITE_W,
-        height: isDriving ? 20 : CHAR_SPRITE_H,
+        width: isDriving ? 44 : CHAR_SPRITE_W,
+        height: isDriving ? CHAR_SPRITE_H + 10 : CHAR_SPRITE_H,
         layer: 2,
         id,
         draw: (ctx: CanvasRenderingContext2D, _sx: number, _sy: number, frame: number) => {
           if (isDriving) {
-            // Draw a car with the character's color theme
+            // Draw car underneath the character (they're riding in it)
             const carType = charIndex % 2 === 0 ? 'car_red' : 'car_blue';
-            drawObject(ctx, px, py + 10, carType, 0, frame, SCALE);
-            // Small name above car
-            drawCharacterName(ctx, px + 10, py - 2, char.name, selected, SCALE, false);
+            drawObject(ctx, px - 6, py + CHAR_SPRITE_H - 16, carType, 0, frame, SCALE);
+            // Draw the character sitting in/on the car (slightly raised)
+            drawCharacter(ctx, px, py - 4, palette, dir, frame, false, false, selected, hatStyle, SCALE);
+            drawCharacterName(ctx, px, py - 4, char.name, selected, SCALE, false);
           } else {
             drawCharacter(ctx, px, py, palette, dir, frame, walking, !char.alive, selected, hatStyle, SCALE);
             drawCharacterName(ctx, px, py, char.name, selected, SCALE, !char.alive);
