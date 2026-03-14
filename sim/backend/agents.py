@@ -104,6 +104,23 @@ RECIPROCITY_MAP: dict[str, dict[ActionType, float]] = {
     "negotiate": {ActionType.NEGOTIATE: 0.3, ActionType.COOPERATE: 0.2},
     "ally": {ActionType.ALLY: 0.4, ActionType.COOPERATE: 0.3},
     "compete": {ActionType.COMPETE: 0.3, ActionType.DEFEND: 0.2, ActionType.ATTACK: 0.1},
+    "defend": {ActionType.COOPERATE: 0.2, ActionType.ALLY: 0.2},
+    "explore": {ActionType.EXPLORE: 0.2, ActionType.COOPERATE: 0.1},
+    "rest": {},
+    "gather": {ActionType.GATHER: 0.1, ActionType.COMPETE: 0.1},
+    "observe": {ActionType.OBSERVE: 0.2, ActionType.COMMUNICATE: 0.1},
+    "communicate": {ActionType.COMMUNICATE: 0.3, ActionType.COOPERATE: 0.2, ActionType.NEGOTIATE: 0.1},
+    "trade": {ActionType.NEGOTIATE: 0.3, ActionType.COOPERATE: 0.2, ActionType.SHARE: 0.1},
+    "teach": {ActionType.COOPERATE: 0.3, ActionType.ALLY: 0.2, ActionType.SHARE: 0.1},
+    "learn": {ActionType.TEACH: 0.2, ActionType.COOPERATE: 0.1},
+    "court": {ActionType.COURT: 0.3, ActionType.COOPERATE: 0.2, ActionType.SHARE: 0.2},
+    "craft": {ActionType.CRAFT: 0.1, ActionType.COOPERATE: 0.1},
+    "build_home": {ActionType.COOPERATE: 0.1, ActionType.ALLY: 0.1},
+    "kill": {ActionType.DEFEND: 0.6, ActionType.ATTACK: 0.5, ActionType.COOPERATE: -0.7},
+    "bully": {ActionType.DEFEND: 0.4, ActionType.ATTACK: 0.3, ActionType.COOPERATE: -0.4},
+    "form_group": {ActionType.ALLY: 0.3, ActionType.COOPERATE: 0.2},
+    "join_group": {ActionType.ALLY: 0.2, ActionType.COOPERATE: 0.2},
+    "leave_group": {ActionType.COMPETE: 0.1},
 }
 
 EMOTION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
@@ -337,11 +354,15 @@ class AgentBrain:
         elif energy < 40:
             urgency[ActionType.REST] = 0.3
 
-        # Low wealth: favor gathering and competing
+        # Low wealth: favor gathering and competing; penalize expensive actions
         if wealth < 15:
             urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.8
             urgency[ActionType.COMPETE] = urgency.get(ActionType.COMPETE, 0) + 0.3
             urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.6
+            urgency[ActionType.BUILD_HOME] = urgency.get(ActionType.BUILD_HOME, 0) - 1.5
+            urgency[ActionType.CRAFT] = urgency.get(ActionType.CRAFT, 0) - 0.8
+        elif wealth < 20:
+            urgency[ActionType.BUILD_HOME] = urgency.get(ActionType.BUILD_HOME, 0) - 1.0
         elif wealth < 30:
             urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.4
             urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.3
@@ -736,12 +757,14 @@ class AgentBrain:
     _SOLO_ACTIONS = [
         ActionType.REST, ActionType.GATHER, ActionType.EXPLORE,
         ActionType.OBSERVE, ActionType.BUILD_HOME, ActionType.LEARN,
-        ActionType.CRAFT,
+        ActionType.CRAFT, ActionType.DEFEND, ActionType.FORM_GROUP,
     ]
     _TARGETED_ACTIONS = [
         ActionType.COOPERATE, ActionType.ATTACK, ActionType.SHARE,
         ActionType.COMMUNICATE, ActionType.COMPETE, ActionType.COURT,
-        ActionType.TEACH, ActionType.BULLY,
+        ActionType.TEACH, ActionType.BULLY, ActionType.NEGOTIATE,
+        ActionType.ALLY, ActionType.BETRAY, ActionType.TRADE,
+        ActionType.KILL,
     ]
 
     def decide_simple(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> Action:
@@ -776,9 +799,9 @@ class AgentBrain:
                 for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
                     score += getattr(traits, trait_name) * action_weights.get(action_type, 0.0)
                 # Simple relationship modifier
-                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT}:
+                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT, ActionType.ALLY, ActionType.NEGOTIATE, ActionType.TRADE}:
                     score += rel * 0.5
-                elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY}:
+                elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY, ActionType.BETRAY, ActionType.KILL}:
                     score -= rel * 0.5
                 score += rng.gauss(0, 0.3)
                 scores.append((action_type, score))
@@ -794,6 +817,14 @@ class AgentBrain:
         energy = character.resources.get("energy", 50)
         if energy < 20:
             scores.append((ActionType.REST, 2.0))
+
+        # Wealth awareness: don't try to build/craft if broke
+        wealth = character.resources.get("wealth", 0)
+        if wealth < 20:
+            scores = [(at, s - 1.5 if at == ActionType.BUILD_HOME else s) for at, s in scores]
+        if wealth < 5:
+            scores = [(at, s - 0.8 if at == ActionType.CRAFT else s) for at, s in scores]
+            scores.append((ActionType.GATHER, 1.5))
 
         # Night cycle: override — go to sleep
         hour = state.tick % 24

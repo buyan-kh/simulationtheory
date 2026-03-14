@@ -176,3 +176,37 @@ export function getExportJsonUrl(simId: string): string {
 export function getExportCsvUrl(simId: string): string {
   return `${BASE}/simulations/${simId}/export/csv`;
 }
+
+// LLM Brain
+export async function configureLLM(apiKey: string): Promise<{ status: string; available: boolean }> {
+  return request('/llm/configure', {
+    method: 'POST',
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+}
+
+export async function getLLMStatus(): Promise<{
+  available: boolean;
+  call_count: number;
+  last_error: string | null;
+  has_anthropic_sdk: boolean;
+  has_api_key: boolean;
+}> {
+  return request('/llm/status');
+}
+
+// Spotlight
+export async function setSpotlight(simId: string, characterIds: string[]): Promise<{ spotlight: string[] }> {
+  return request(`/simulations/${simId}/spotlight`, {
+    method: 'PUT',
+    body: JSON.stringify({ character_ids: characterIds }),
+  });
+}
+
+export async function addToSpotlight(simId: string, charId: string): Promise<{ status: string; spotlight: string[] }> {
+  return request(`/simulations/${simId}/spotlight/${charId}`, { method: 'POST' });
+}
+
+export async function removeFromSpotlight(simId: string, charId: string): Promise<{ status: string; spotlight: string[] }> {
+  return request(`/simulations/${simId}/spotlight/${charId}`, { method: 'DELETE' });
+}

@@ -1040,5 +1040,100 @@ class EventGenerator:
                     importance=0.3,
                 )
 
+            case ActionType.CRAFT:
+                # Crafting is handled separately in process_crafting; just emit a placeholder event
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} crafts",
+                    description=f"{char.name} works on crafting something.",
+                    participants=[char_id],
+                    outcomes=["Crafting in progress"],
+                    importance=0.2,
+                )
+
+            case ActionType.DEFEND:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
+                char.resources["influence"] = char.resources.get("influence", 0) + 1
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} stands guard",
+                    description=f"{char.name} takes a defensive posture, watching for threats.",
+                    participants=[char_id],
+                    outcomes=[f"{char.name} remains vigilant"],
+                    importance=0.15,
+                )
+
+            case ActionType.COMMUNICATE:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 2)
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} speaks up",
+                    description=f"{char.name} shares thoughts with anyone nearby.",
+                    participants=[char_id],
+                    outcomes=["Words spoken to the air"],
+                    importance=0.1,
+                )
+
+            case ActionType.NEGOTIATE:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 3)
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} seeks a deal",
+                    description=f"{char.name} looks around for someone to negotiate with.",
+                    participants=[char_id],
+                    outcomes=["No one available to negotiate with"],
+                    importance=0.1,
+                )
+
+            case ActionType.COOPERATE | ActionType.ALLY | ActionType.SHARE | ActionType.TRADE | ActionType.TEACH | ActionType.COURT:
+                # Targeted actions performed solo — no partner found
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 2)
+                action_name = action.type.value.replace("_", " ")
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} looks for company",
+                    description=f"{char.name} wanted to {action_name} but couldn't find anyone nearby.",
+                    participants=[char_id],
+                    outcomes=[f"No partner found for {action_name}"],
+                    importance=0.1,
+                )
+
+            case ActionType.ATTACK | ActionType.COMPETE | ActionType.BETRAY | ActionType.KILL | ActionType.BULLY:
+                # Aggressive actions with no target — restless energy
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
+                action_name = action.type.value.replace("_", " ")
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} seethes",
+                    description=f"{char.name} wanted to {action_name} but found no target. Frustration builds.",
+                    participants=[char_id],
+                    outcomes=["Pent-up aggression"],
+                    importance=0.15,
+                )
+
+            case ActionType.FORM_GROUP:
+                char.resources["energy"] = max(0, char.resources.get("energy", 0) - 5)
+                char.resources["influence"] = char.resources.get("influence", 0) + 2
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} rallies support",
+                    description=f"{char.name} tries to gather followers for a new group.",
+                    participants=[char_id],
+                    outcomes=["Seeking members"],
+                    importance=0.25,
+                )
+
+            case ActionType.JOIN_GROUP | ActionType.LEAVE_GROUP:
+                action_name = action.type.value.replace("_", " ")
+                return Event(
+                    tick=tick, type=EventType.DECISION,
+                    title=f"{char.name} considers group membership",
+                    description=f"{char.name} contemplates whether to {action_name}.",
+                    participants=[char_id],
+                    outcomes=[f"Considering {action_name}"],
+                    importance=0.15,
+                )
+
             case _:
                 return None

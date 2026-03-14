@@ -14,6 +14,7 @@ from crafting import process_crafting
 from db import SimulationDB
 from spatial import SpatialGrid
 from lod import LODManager, LODTier
+from llm_brain import LLMBrain
 
 # World bounds
 WORLD_BOUND = 300  # sim coords go from -300 to 300
@@ -68,6 +69,7 @@ class SimulationEngine:
         self.trade_mgr = TradeManager()
         self.grid = SpatialGrid(cell_size=30.0)
         self.lod_managers: dict[str, LODManager] = {}  # sim_id -> LODManager
+        self.llm_brain = LLMBrain()
 
     def get_lod(self, sim_id: str) -> LODManager:
         if sim_id not in self.lod_managers:
@@ -252,10 +254,15 @@ class SimulationEngine:
         # ── 3. Decision phase (tier-aware) ──
         actions: dict[str, Action] = {}
 
-        # Spotlight: always full decision
+        # Spotlight: LLM-powered if available, otherwise full rule-based decision
+        llm_available = self.llm_brain.is_available()
         for char_id in tiers[LODTier.SPOTLIGHT]:
             char = sim.characters[char_id]
-            action = self.brain.decide(char, sim, self.grid)
+            if llm_available:
+                action, llm_msgs = self.llm_brain.decide(char, sim)
+                chat_messages.extend(llm_msgs)
+            else:
+                action = self.brain.decide(char, sim, self.grid)
             actions[char_id] = action
 
         # Active: full decision if population is small enough, else simplified
@@ -735,6 +742,8 @@ class SimulationEngine:
 
         for char_id, action in actions.items():
             char = sim.characters[char_id]
+            if not char.alive:
+                continue
 
             # Determine target position based on action
             if action.type.value == "rest" and char.house_id:
