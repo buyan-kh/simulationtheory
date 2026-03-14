@@ -707,6 +707,8 @@ class SimulationEngine:
 
         for char_id, action in actions.items():
             char = sim.characters[char_id]
+            if not char.alive:
+                continue
 
             # Determine target position based on action
             if action.type.value == "rest" and char.house_id:

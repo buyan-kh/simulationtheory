@@ -104,6 +104,23 @@ RECIPROCITY_MAP: dict[str, dict[ActionType, float]] = {
     "negotiate": {ActionType.NEGOTIATE: 0.3, ActionType.COOPERATE: 0.2},
     "ally": {ActionType.ALLY: 0.4, ActionType.COOPERATE: 0.3},
     "compete": {ActionType.COMPETE: 0.3, ActionType.DEFEND: 0.2, ActionType.ATTACK: 0.1},
+    "defend": {ActionType.COOPERATE: 0.2, ActionType.ALLY: 0.2},
+    "explore": {ActionType.EXPLORE: 0.2, ActionType.COOPERATE: 0.1},
+    "rest": {},
+    "gather": {ActionType.GATHER: 0.1, ActionType.COMPETE: 0.1},
+    "observe": {ActionType.OBSERVE: 0.2, ActionType.COMMUNICATE: 0.1},
+    "communicate": {ActionType.COMMUNICATE: 0.3, ActionType.COOPERATE: 0.2, ActionType.NEGOTIATE: 0.1},
+    "trade": {ActionType.NEGOTIATE: 0.3, ActionType.COOPERATE: 0.2, ActionType.SHARE: 0.1},
+    "teach": {ActionType.COOPERATE: 0.3, ActionType.ALLY: 0.2, ActionType.SHARE: 0.1},
+    "learn": {ActionType.TEACH: 0.2, ActionType.COOPERATE: 0.1},
+    "court": {ActionType.COURT: 0.3, ActionType.COOPERATE: 0.2, ActionType.SHARE: 0.2},
+    "craft": {ActionType.CRAFT: 0.1, ActionType.COOPERATE: 0.1},
+    "build_home": {ActionType.COOPERATE: 0.1, ActionType.ALLY: 0.1},
+    "kill": {ActionType.DEFEND: 0.6, ActionType.ATTACK: 0.5, ActionType.COOPERATE: -0.7},
+    "bully": {ActionType.DEFEND: 0.4, ActionType.ATTACK: 0.3, ActionType.COOPERATE: -0.4},
+    "form_group": {ActionType.ALLY: 0.3, ActionType.COOPERATE: 0.2},
+    "join_group": {ActionType.ALLY: 0.2, ActionType.COOPERATE: 0.2},
+    "leave_group": {ActionType.COMPETE: 0.1},
 }
 
 EMOTION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
@@ -692,12 +709,14 @@ class AgentBrain:
     _SOLO_ACTIONS = [
         ActionType.REST, ActionType.GATHER, ActionType.EXPLORE,
         ActionType.OBSERVE, ActionType.BUILD_HOME, ActionType.LEARN,
-        ActionType.CRAFT,
+        ActionType.CRAFT, ActionType.DEFEND, ActionType.FORM_GROUP,
     ]
     _TARGETED_ACTIONS = [
         ActionType.COOPERATE, ActionType.ATTACK, ActionType.SHARE,
         ActionType.COMMUNICATE, ActionType.COMPETE, ActionType.COURT,
-        ActionType.TEACH, ActionType.BULLY,
+        ActionType.TEACH, ActionType.BULLY, ActionType.NEGOTIATE,
+        ActionType.ALLY, ActionType.BETRAY, ActionType.TRADE,
+        ActionType.KILL,
     ]
 
     def decide_simple(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> Action:
@@ -732,9 +751,9 @@ class AgentBrain:
                 for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
                     score += getattr(traits, trait_name) * action_weights.get(action_type, 0.0)
                 # Simple relationship modifier
-                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT}:
+                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT, ActionType.ALLY, ActionType.NEGOTIATE, ActionType.TRADE}:
                     score += rel * 0.5
-                elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY}:
+                elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY, ActionType.BETRAY, ActionType.KILL}:
                     score -= rel * 0.5
                 score += rng.gauss(0, 0.3)
                 scores.append((action_type, score))
