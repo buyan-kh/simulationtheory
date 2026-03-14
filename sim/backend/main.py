@@ -152,6 +152,190 @@ def get_character_reasoning(sim_id: str, char_id: str):
     }
 
 
+# ── God Mode ──
+
+class ForceActionRequest(BaseModel):
+    action_type: str
+
+
+class GiftRequest(BaseModel):
+    resource: str = "wealth"
+    amount: float = 50
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/force-action")
+def force_action(sim_id: str, char_id: str, req: ForceActionRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    if not char.alive:
+        raise HTTPException(status_code=400, detail="Character is dead")
+    from models import Action
+    char.last_action = Action(
+        type=req.action_type,
+        target_id=None,
+        detail=f"[God Mode] Forced to {req.action_type}",
+        reasoning="Divine intervention",
+    )
+    engine.db.save(sim)
+    return {"status": "ok", "action": req.action_type}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/gift")
+def gift_resource(sim_id: str, char_id: str, req: GiftRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    char.resources[req.resource] = char.resources.get(req.resource, 0) + req.amount
+    engine.db.save(sim)
+    return {"status": "ok", "resource": req.resource, "new_amount": char.resources[req.resource]}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/smite")
+def smite_character(sim_id: str, char_id: str):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    if not char.alive:
+        raise HTTPException(status_code=400, detail="Character is already dead")
+    char.alive = False
+    char.cause_of_death = "divine_smite"
+    char.death_tick = sim.tick
+    char.health = 0
+    engine.db.save(sim)
+    return {"status": "ok", "message": f"{char.name} has been smitten"}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/heal")
+def heal_character(sim_id: str, char_id: str):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    char.health = 100
+    if hasattr(char, 'needs') and char.needs:
+        char.needs.hunger = 100
+        char.needs.energy = 100
+        char.needs.social = 100
+        char.needs.fun = 100
+        char.needs.hygiene = 100
+    if not char.alive:
+        char.alive = True
+        char.cause_of_death = None
+        char.death_tick = None
+    engine.db.save(sim)
+    return {"status": "ok", "message": f"{char.name} has been fully healed"}
+
+
+class IntroduceRequest(BaseModel):
+    target_id: str
+    boost: float = 0.3
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/introduce")
+def introduce_characters(sim_id: str, char_id: str, req: IntroduceRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if req.target_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Target character not found")
+    if char_id == req.target_id:
+        raise HTTPException(status_code=400, detail="Cannot introduce a character to themselves")
+    char_a = sim.characters[char_id]
+    char_b = sim.characters[req.target_id]
+    # Boost relationship in both directions
+    boost = max(0.0, min(1.0, req.boost))
+    char_a.relationships[req.target_id] = min(1.0, char_a.relationships.get(req.target_id, 0) + boost)
+    char_b.relationships[char_id] = min(1.0, char_b.relationships.get(char_id, 0) + boost)
+    engine.db.save(sim)
+    return {
+        "status": "ok",
+        "message": f"{char_a.name} and {char_b.name} have been introduced",
+        "relationship_a_to_b": char_a.relationships[req.target_id],
+        "relationship_b_to_a": char_b.relationships[char_id],
+    }
+
+
+class SpawnEventRequest(BaseModel):
+    event_type: str  # "weather", "resource_boom", "resource_bust", "disaster"
+    description: str = ""
+
+
+@app.post("/api/simulations/{sim_id}/spawn-event")
+def spawn_event(sim_id: str, req: SpawnEventRequest):
+    sim = _get_sim(sim_id)
+    import uuid
+
+    event_configs = {
+        "weather": {
+            "title": "Divine Weather Change",
+            "type": EventType.ENVIRONMENTAL if hasattr(EventType, 'ENVIRONMENTAL') else "environmental",
+            "description": req.description or "The skies shift as a divine hand alters the weather.",
+            "importance": 0.6,
+        },
+        "resource_boom": {
+            "title": "Resource Boom",
+            "type": EventType.RESOURCE_CHANGE if hasattr(EventType, 'RESOURCE_CHANGE') else "resource_change",
+            "description": req.description or "Resources suddenly multiply across the land.",
+            "importance": 0.8,
+        },
+        "resource_bust": {
+            "title": "Resource Bust",
+            "type": EventType.RESOURCE_CHANGE if hasattr(EventType, 'RESOURCE_CHANGE') else "resource_change",
+            "description": req.description or "Resources dwindle as scarcity grips the land.",
+            "importance": 0.8,
+        },
+        "disaster": {
+            "title": "Natural Disaster",
+            "type": EventType.ENVIRONMENTAL if hasattr(EventType, 'ENVIRONMENTAL') else "environmental",
+            "description": req.description or "A catastrophic disaster strikes the region.",
+            "importance": 1.0,
+        },
+    }
+
+    cfg = event_configs.get(req.event_type)
+    if not cfg:
+        raise HTTPException(status_code=400, detail=f"Unknown event type: {req.event_type}. Valid: {list(event_configs.keys())}")
+
+    event = Event(
+        id=str(uuid.uuid4()),
+        tick=sim.tick,
+        type=cfg["type"],
+        title=cfg["title"],
+        description=cfg["description"],
+        participants=[],
+        outcomes=[f"[God Mode] {req.event_type}"],
+        importance=cfg["importance"],
+    )
+    sim.events.append(event)
+
+    # Apply effects
+    alive_chars = [c for c in sim.characters.values() if c.alive]
+    if req.event_type == "resource_boom":
+        for char in alive_chars:
+            for res in char.resources:
+                char.resources[res] = char.resources[res] * 1.5
+    elif req.event_type == "resource_bust":
+        for char in alive_chars:
+            for res in char.resources:
+                char.resources[res] = char.resources[res] * 0.5
+    elif req.event_type == "disaster":
+        import random
+        for char in alive_chars:
+            damage = random.randint(10, 40)
+            char.health = max(0, (char.health or 100) - damage)
+            if char.health <= 0:
+                char.alive = False
+                char.cause_of_death = "natural_disaster"
+                char.death_tick = sim.tick
+
+    engine.db.save(sim)
+    return {"status": "ok", "event_id": event.id, "event_type": req.event_type}
+
+
 @app.get("/api/simulations/{sim_id}/events", response_model=list[Event])
 def get_events(sim_id: str, since_tick: int = Query(default=0, ge=0)):
     sim = _get_sim(sim_id)

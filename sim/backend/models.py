@@ -115,11 +115,20 @@ class Character(BaseModel):
     cause_of_death: str | None = None
     death_tick: int | None = None
     parent_ids: list[str] = []
+    spouse_id: str | None = None
+    relationship_types: dict[str, str] = {}  # character_id -> "friend"/"rival"/"spouse"/"parent"/"child"
     # Social
     group_id: str | None = None
     group_role: str | None = None  # leader, officer, member
     # Trade
     trade_skill: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Inventory
+    equipped_items: list[str] = []  # WorldItem IDs
+    # Disease
+    disease: dict | None = None  # {"type": str, "severity": float, "duration": int, "contagion_rate": float}
+    # Justice
+    crime_record: list[dict] = []  # [{"type": "attack"|"kill"|"bully"|"betray", "target_id": str, "tick": int}]
+    reputation: float = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 class CharacterCreate(BaseModel):
@@ -157,6 +166,9 @@ class EventType(str, Enum):
     TRADE_COMPLETED = "trade_completed"
     TRADE_POSTED = "trade_posted"
     MARKET_SHIFT = "market_shift"
+    DISEASE_OUTBREAK = "disease_outbreak"
+    DISEASE_SPREAD = "disease_spread"
+    PROPERTY_CLAIMED = "property_claimed"
 
 
 class Event(BaseModel):
@@ -181,6 +193,7 @@ class Location(BaseModel):
     resource_regen_rate: dict[str, float] = Field(default_factory=lambda: {"food": 1.0, "materials": 0.5})
     capacity: int = 10
     owner_group_id: str | None = None
+    owner_id: str | None = None  # individual character owner
     modifiers: dict[str, float] = Field(default_factory=dict)
     is_removable: bool = True
 

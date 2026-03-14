@@ -9,7 +9,7 @@ interface SimStore {
   isRunning: boolean;
   autoPlaySpeed: number;
   inspectorTab: 'stats' | 'memory' | 'relations' | 'mind';
-  activePanel: 'events' | 'chat' | 'market' | 'groups';
+  activePanel: 'events' | 'chat' | 'market' | 'groups' | 'graph';
 
   // Replay
   replayMode: boolean;
@@ -23,7 +23,7 @@ interface SimStore {
   setRunning: (running: boolean) => void;
   setAutoPlaySpeed: (speed: number) => void;
   setInspectorTab: (tab: 'stats' | 'memory' | 'relations' | 'mind') => void;
-  setActivePanel: (panel: 'events' | 'chat' | 'market' | 'groups') => void;
+  setActivePanel: (panel: 'events' | 'chat' | 'market' | 'groups' | 'graph') => void;
   setReplayMode: (mode: boolean) => void;
   setReplayTick: (tick: number) => void;
   setReplayTicks: (ticks: number[]) => void;

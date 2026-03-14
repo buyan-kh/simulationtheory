@@ -377,6 +377,41 @@ class AgentBrain:
             urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.3
             urgency[ActionType.ALLY] = urgency.get(ActionType.ALLY, 0) + 0.3
 
+        # Disease: sick agents want to rest, avoid social actions
+        if character.disease:
+            urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 1.5
+            urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) - 1.0
+            urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) - 1.0
+            urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) - 1.0
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 1.0
+
+        # Property owners: defend property, reduced gather urgency (passive income)
+        if state:
+            owns_property = any(
+                loc.owner_id == character.id for loc in state.environment.locations
+            )
+            if owns_property:
+                urgency[ActionType.DEFEND] = urgency.get(ActionType.DEFEND, 0) + 0.5
+                urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) - 0.3
+
+        # Justice: agents with justice/protect goals want to attack criminals
+        has_justice_goal = any(
+            kw in g.lower() for g in character.goals for kw in ("justice", "protect")
+        )
+        if has_justice_goal and state:
+            nearby_criminals = any(
+                c.reputation < -0.3 and c.alive and c.id != character.id
+                for c in state.characters.values()
+            )
+            if nearby_criminals:
+                urgency[ActionType.ATTACK] = urgency.get(ActionType.ATTACK, 0) + 0.8
+
+        # Bad reputation: penalize cooperative actions
+        if character.reputation < -0.5:
+            urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) - 0.3
+            urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.3
+            urgency[ActionType.ALLY] = urgency.get(ActionType.ALLY, 0) - 0.3
+
         return urgency
 
     def _compute_environmental_modifiers(self, perception: dict) -> dict[ActionType, float]:
@@ -527,6 +562,15 @@ class AgentBrain:
                             target_score += 0.2
                         elif action_type in {ActionType.ATTACK, ActionType.BETRAY}:
                             target_score -= 0.4
+
+                    # Reputation check: don't cooperate with known criminals
+                    if state:
+                        other_char_rep = state.characters.get(nc["id"])
+                        if other_char_rep and other_char_rep.reputation < -0.3:
+                            if action_type in {ActionType.COOPERATE, ActionType.ALLY, ActionType.SHARE}:
+                                target_score -= 0.5
+                            elif action_type in {ActionType.ATTACK, ActionType.COMPETE}:
+                                target_score += 0.3
 
                     # Reciprocity: respond to what the other character did last
                     reciprocity = self._compute_reciprocity(nc)
