@@ -11,6 +11,34 @@ class PersonalityTraits(BaseModel):
     extraversion: float = Field(default=0.5, ge=0.0, le=1.0)
     agreeableness: float = Field(default=0.5, ge=0.0, le=1.0)
     neuroticism: float = Field(default=0.5, ge=0.0, le=1.0)
+    # HEXACO 6th dimension: fairness, sincerity, greed avoidance, modesty
+    honesty_humility: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class SchwartzValues(BaseModel):
+    """Schwartz's Theory of Basic Human Values — drives WHAT agents pursue.
+    Organized into 4 higher-order groups with motivational tensions."""
+    # Self-Enhancement (power, achievement)
+    self_enhancement: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Openness to Change (stimulation, self-direction, hedonism)
+    openness_to_change: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Self-Transcendence (universalism, benevolence)
+    self_transcendence: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Conservation (tradition, conformity, security)
+    conservation: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class RelationshipType(str, Enum):
+    FRIEND = "friend"
+    RIVAL = "rival"
+    SPOUSE = "spouse"
+    PARENT = "parent"
+    CHILD = "child"
+    EX_SPOUSE = "ex_spouse"
+    ROMANTIC = "romantic"  # courting / dating
+    COLLEAGUE = "colleague"
+    MENTOR = "mentor"
+    MENTEE = "mentee"
 
 
 class EmotionalState(BaseModel):
@@ -64,6 +92,8 @@ class ActionType(str, Enum):
     TEACH = "teach"
     COURT = "court"
     CRAFT = "craft"
+    PROPOSE = "propose"
+    ATTEND_EVENT = "attend_event"
 
 
 class Action(BaseModel):
@@ -116,7 +146,7 @@ class Character(BaseModel):
     death_tick: int | None = None
     parent_ids: list[str] = []
     spouse_id: str | None = None
-    relationship_types: dict[str, str] = {}  # character_id -> "friend"/"rival"/"spouse"/"parent"/"child"
+    relationship_types: dict[str, str] = {}  # character_id -> RelationshipType value
     # Social
     group_id: str | None = None
     group_role: str | None = None  # leader, officer, member
@@ -129,6 +159,16 @@ class Character(BaseModel):
     # Justice
     crime_record: list[dict] = []  # [{"type": "attack"|"kill"|"bully"|"betray", "target_id": str, "tick": int}]
     reputation: float = Field(default=0.0, ge=-1.0, le=1.0)
+    # Schwartz Values — what this character pursues
+    values: SchwartzValues = Field(default_factory=SchwartzValues)
+    # Multi-dimensional identity
+    occupation: str = ""  # primary role: "farmer", "trader", "fighter", "scholar", etc.
+    skills: list[str] = []  # learned abilities: "cooking", "fighting", "teaching", etc.
+    hobbies: list[str] = []  # leisure interests: "painting", "music", "gardening", etc.
+    social_roles: list[str] = []  # earned tags: "parent", "leader", "veteran", "founder", etc.
+    # Courtship
+    courtship_target: str | None = None  # character ID being courted
+    courtship_progress: float = Field(default=0.0, ge=0.0, le=1.0)  # 0->1, marriage at 1.0
 
 
 class CharacterCreate(BaseModel):
@@ -169,6 +209,16 @@ class EventType(str, Enum):
     DISEASE_OUTBREAK = "disease_outbreak"
     DISEASE_SPREAD = "disease_spread"
     PROPERTY_CLAIMED = "property_claimed"
+    # Social events
+    WEDDING = "wedding"
+    DIVORCE = "divorce"
+    BIRTHDAY_PARTY = "birthday_party"
+    FUNERAL = "funeral"
+    COMMUNITY_GATHERING = "community_gathering"
+    COURTSHIP_STARTED = "courtship_started"
+    COURTSHIP_ADVANCED = "courtship_advanced"
+    SKILL_LEARNED = "skill_learned"
+    OCCUPATION_CHANGED = "occupation_changed"
 
 
 class Event(BaseModel):
@@ -339,6 +389,19 @@ class MarketState(BaseModel):
     })
 
 
+class SocialEvent(BaseModel):
+    """A scheduled social event (party, wedding, funeral, gathering)."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event_type: str  # "birthday_party", "wedding", "funeral", "community_gathering"
+    host_id: str  # character who organized it
+    invited_ids: list[str] = []  # invited characters
+    attendee_ids: list[str] = []  # who actually showed up
+    location: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    scheduled_tick: int = 0  # when it starts
+    duration: int = 3  # ticks
+    honor_id: str | None = None  # birthday person, deceased, or bride/groom
+
+
 class SimulationState(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
@@ -354,6 +417,7 @@ class SimulationState(BaseModel):
     groups: dict[str, Group] = {}
     market: MarketState = Field(default_factory=MarketState)
     world_items: list[WorldItem] = []
+    social_events: list[SocialEvent] = []  # active/upcoming social events
 
 
 class SimulationSummary(BaseModel):

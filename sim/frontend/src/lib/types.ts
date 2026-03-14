@@ -4,6 +4,14 @@ export interface PersonalityTraits {
   extraversion: number;
   agreeableness: number;
   neuroticism: number;
+  honesty_humility: number;
+}
+
+export interface SchwartzValues {
+  self_enhancement: number;
+  openness_to_change: number;
+  self_transcendence: number;
+  conservation: number;
 }
 
 export interface EmotionalState {
@@ -37,7 +45,7 @@ export type ActionType =
   | 'observe' | 'communicate'
   | 'trade' | 'form_group' | 'join_group' | 'leave_group'
   | 'build_home' | 'kill' | 'bully' | 'learn' | 'teach' | 'court'
-  | 'craft';
+  | 'craft' | 'propose' | 'attend_event';
 
 export interface Action {
   type: ActionType;
@@ -87,6 +95,16 @@ export interface Character {
   trade_skill?: number;
   // Inventory
   equipped_items?: string[];
+  // Schwartz Values
+  values?: SchwartzValues;
+  // Multi-dimensional identity
+  occupation?: string;
+  skills?: string[];
+  hobbies?: string[];
+  social_roles?: string[];
+  // Courtship
+  courtship_target?: string | null;
+  courtship_progress?: number;
 }
 
 export interface CharacterCreate {
@@ -103,7 +121,10 @@ export type EventType =
   | 'alliance_formed' | 'conflict' | 'negotiation' | 'resource_change' | 'emotional_shift'
   | 'death' | 'birth'
   | 'group_formed' | 'group_dissolved' | 'group_conflict' | 'member_joined' | 'member_left' | 'leadership_change'
-  | 'trade_completed' | 'trade_posted' | 'market_shift';
+  | 'trade_completed' | 'trade_posted' | 'market_shift'
+  | 'disease_outbreak' | 'disease_spread' | 'property_claimed'
+  | 'wedding' | 'divorce' | 'birthday_party' | 'funeral' | 'community_gathering'
+  | 'courtship_started' | 'courtship_advanced' | 'skill_learned' | 'occupation_changed';
 
 export interface SimEvent {
   id: string;
@@ -217,6 +238,18 @@ export interface WorldItem {
   placed_in_house: string | null;
 }
 
+export interface SocialEvent {
+  id: string;
+  event_type: string;
+  host_id: string;
+  invited_ids: string[];
+  attendee_ids: string[];
+  location: { x: number; y: number };
+  scheduled_tick: number;
+  duration: number;
+  honor_id: string | null;
+}
+
 export interface SimulationState {
   id: string;
   name: string;
@@ -232,6 +265,7 @@ export interface SimulationState {
   groups: Record<string, Group>;
   market: MarketState;
   world_items: WorldItem[];
+  social_events: SocialEvent[];
 }
 
 export interface SimulationSummary {
@@ -270,6 +304,10 @@ export interface AnalyticsSummary {
   wealthiest: string | null;
   most_connected: string | null;
 }
+
+export type RelationshipTypeEnum =
+  | 'friend' | 'rival' | 'spouse' | 'parent' | 'child'
+  | 'ex_spouse' | 'romantic' | 'colleague' | 'mentor' | 'mentee';
 
 export interface RelationshipGraph {
   nodes: { id: string; name: string; alive: boolean; group_id: string | null }[];

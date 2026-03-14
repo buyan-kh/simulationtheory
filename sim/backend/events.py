@@ -148,6 +148,16 @@ class EventGenerator:
                 else:
                     events.append(self._courting(char, target, tick))
 
+            elif action.type == ActionType.PROPOSE:
+                events.append(Event(
+                    tick=tick, type=EventType.INTERACTION,
+                    title=f"{char.name} proposes to {target.name}",
+                    description=f"{char.name} has proposed to {target.name}! The result depends on their relationship.",
+                    participants=[char_id, target_id],
+                    outcomes=[f"{char.name} awaits an answer"],
+                    importance=0.8,
+                ))
+
         return events
 
     def generate_environmental_events(self, state: SimulationState) -> list[Event]:
@@ -1133,6 +1143,16 @@ class EventGenerator:
                     participants=[char_id],
                     outcomes=[f"Considering {action_name}"],
                     importance=0.15,
+                )
+
+            case ActionType.ATTEND_EVENT:
+                return Event(
+                    tick=tick, type=EventType.INTERACTION,
+                    title=f"{char.name} attends a social event",
+                    description=f"{char.name} heads to a social gathering, enjoying the company of others.",
+                    participants=[char_id],
+                    outcomes=[f"{char.name} socializes at the event"],
+                    importance=0.3,
                 )
 
             case _:

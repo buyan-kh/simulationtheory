@@ -12,6 +12,7 @@ const TRAIT_COLORS: Record<keyof PersonalityTraits, string> = {
   extraversion: 'gold',
   agreeableness: 'magenta',
   neuroticism: 'red',
+  honesty_humility: 'orange',
 };
 
 const TRAIT_ABBREV: Record<keyof PersonalityTraits, string> = {
@@ -20,6 +21,7 @@ const TRAIT_ABBREV: Record<keyof PersonalityTraits, string> = {
   extraversion: 'EXT',
   agreeableness: 'AGR',
   neuroticism: 'NEU',
+  honesty_humility: 'H-H',
 };
 
 const TEMPLATES = [
@@ -30,7 +32,7 @@ const TEMPLATES = [
     data: {
       name: 'The Diplomat',
       profile: 'A skilled negotiator who values peace and alliance-building above all. Masters the art of compromise and sees every conflict as an opportunity for collaboration.',
-      traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3 },
+      traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3, honesty_humility: 0.8 },
       goals: ['Forge lasting alliances', 'Resolve conflicts peacefully', 'Build trust networks'],
       motivations: ['Harmony', 'Legacy', 'Cooperation'],
     },
@@ -42,7 +44,7 @@ const TEMPLATES = [
     data: {
       name: 'The Warrior',
       profile: 'A fierce combatant driven by honor and the desire to prove strength in battle. Protects the weak but challenges the strong.',
-      traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5 },
+      traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5, honesty_humility: 0.6 },
       goals: ['Defeat all rivals', 'Protect the weak', 'Earn glory'],
       motivations: ['Honor', 'Strength', 'Justice'],
     },
@@ -54,7 +56,7 @@ const TEMPLATES = [
     data: {
       name: 'The Trickster',
       profile: 'A cunning manipulator who thrives on chaos and misdirection. Always three steps ahead, weaving webs of deception.',
-      traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4 },
+      traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4, honesty_humility: 0.2 },
       goals: ['Sow discord among others', 'Accumulate secret power', 'Never be caught'],
       motivations: ['Chaos', 'Freedom', 'Curiosity'],
     },
@@ -66,7 +68,7 @@ const TEMPLATES = [
     data: {
       name: 'The Scholar',
       profile: 'A curious mind devoted to understanding the world through observation and analysis. Knowledge is the ultimate currency.',
-      traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4 },
+      traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4, honesty_humility: 0.7 },
       goals: ['Discover hidden knowledge', 'Map the environment', 'Understand all agents'],
       motivations: ['Knowledge', 'Truth', 'Discovery'],
     },
@@ -85,6 +87,7 @@ export default function CharacterCreator() {
     extraversion: 0.5,
     agreeableness: 0.5,
     neuroticism: 0.5,
+    honesty_humility: 0.5,
   });
   const [goals, setGoals] = useState<string[]>(['']);
   const [motivations, setMotivations] = useState<string[]>(['']);
@@ -340,7 +343,8 @@ export default function CharacterCreator() {
                           backgroundColor: key === 'openness' ? '#00e5ff' :
                             key === 'conscientiousness' ? '#00ff88' :
                             key === 'extraversion' ? '#ffd700' :
-                            key === 'agreeableness' ? '#ff00aa' : '#ff3366',
+                            key === 'agreeableness' ? '#ff00aa' :
+                            key === 'neuroticism' ? '#ff3366' : '#ff8c00',
                         }}
                       />
                     </div>

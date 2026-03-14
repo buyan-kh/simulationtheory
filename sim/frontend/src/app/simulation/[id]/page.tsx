@@ -590,20 +590,20 @@ interface CharTemplate {
 }
 
 const TEMPLATES: CharTemplate[] = [
-  { label: 'Diplomat', icon: '♦', color: '#00e5ff', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3 }, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'], motivations: ['loyalty', 'compassion'] },
-  { label: 'Warrior', icon: '⚔', color: '#ff3366', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5 }, goals: ['Defeat all rivals', 'Protect the weak'], motivations: ['vengeance', 'loyalty'] },
-  { label: 'Trickster', icon: '★', color: '#ff00aa', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4 }, goals: ['Sow discord among others', 'Accumulate secret power'], motivations: ['greed', 'curiosity'] },
-  { label: 'Scholar', icon: '◆', color: '#ffd700', profile: 'A curious mind devoted to understanding the world through observation and study.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4 }, goals: ['Discover hidden knowledge', 'Map the environment'], motivations: ['curiosity', 'compassion'] },
-  { label: 'Healer', icon: '✚', color: '#44cc88', profile: 'A compassionate caretaker who puts the wellbeing of others before their own.', traits: { openness: 0.6, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.95, neuroticism: 0.6 }, goals: ['Keep everyone healthy', 'Build a sanctuary'], motivations: ['compassion', 'loyalty'] },
-  { label: 'Merchant', icon: '⬡', color: '#ffaa44', profile: 'A shrewd trader with an eye for profit and a knack for deal-making.', traits: { openness: 0.6, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.5, neuroticism: 0.3 }, goals: ['Amass great wealth', 'Control the market'], motivations: ['greed', 'curiosity'] },
-  { label: 'Assassin', icon: '◇', color: '#8844cc', profile: 'A silent operative who strikes from the shadows with deadly precision.', traits: { openness: 0.3, conscientiousness: 0.8, extraversion: 0.2, agreeableness: 0.1, neuroticism: 0.5 }, goals: ['Eliminate key targets', 'Remain undetected'], motivations: ['vengeance', 'greed'] },
-  { label: 'Bard', icon: '♫', color: '#ff66aa', profile: 'A charismatic entertainer who uses charm and stories to influence everyone.', traits: { openness: 0.9, conscientiousness: 0.4, extraversion: 0.95, agreeableness: 0.7, neuroticism: 0.3 }, goals: ['Become legendary', 'Know everyones secrets'], motivations: ['curiosity', 'compassion'] },
-  { label: 'Guardian', icon: '▣', color: '#4488ff', profile: 'A steadfast protector devoted to defending the community at all costs.', traits: { openness: 0.3, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.7, neuroticism: 0.4 }, goals: ['Protect the settlement', 'Uphold justice'], motivations: ['loyalty', 'vengeance'] },
-  { label: 'Hermit', icon: '☾', color: '#6a7a8a', profile: 'A reclusive loner who shuns society and finds peace in solitude and nature.', traits: { openness: 0.7, conscientiousness: 0.5, extraversion: 0.1, agreeableness: 0.4, neuroticism: 0.7 }, goals: ['Achieve inner peace', 'Understand the natural world'], motivations: ['curiosity'] },
-  { label: 'Tyrant', icon: '♛', color: '#cc2222', profile: 'A ruthless authoritarian who craves total dominance and control over others.', traits: { openness: 0.3, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.05, neuroticism: 0.6 }, goals: ['Rule over everyone', 'Crush all opposition'], motivations: ['greed', 'vengeance'] },
-  { label: 'Explorer', icon: '⚐', color: '#22ccaa', profile: 'A restless adventurer always seeking the unknown beyond the horizon.', traits: { openness: 0.95, conscientiousness: 0.4, extraversion: 0.6, agreeableness: 0.5, neuroticism: 0.3 }, goals: ['Discover every corner of the world', 'Find legendary artifacts'], motivations: ['curiosity'] },
-  { label: 'Prophet', icon: '☀', color: '#eedd44', profile: 'A mystical visionary who claims to see the future and speaks in riddles.', traits: { openness: 0.9, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.6, neuroticism: 0.8 }, goals: ['Guide others toward their destiny', 'Prevent catastrophe'], motivations: ['compassion', 'curiosity'] },
-  { label: 'Spy', icon: '⊘', color: '#7a8a9a', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
+  { label: 'Diplomat', icon: '♦', color: '#00e5ff', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3, honesty_humility: 0.85 }, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'], motivations: ['loyalty', 'compassion'] },
+  { label: 'Warrior', icon: '⚔', color: '#ff3366', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5, honesty_humility: 0.6 }, goals: ['Defeat all rivals', 'Protect the weak'], motivations: ['vengeance', 'loyalty'] },
+  { label: 'Trickster', icon: '★', color: '#ff00aa', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4, honesty_humility: 0.1 }, goals: ['Sow discord among others', 'Accumulate secret power'], motivations: ['greed', 'curiosity'] },
+  { label: 'Scholar', icon: '◆', color: '#ffd700', profile: 'A curious mind devoted to understanding the world through observation and study.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Discover hidden knowledge', 'Map the environment'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Healer', icon: '✚', color: '#44cc88', profile: 'A compassionate caretaker who puts the wellbeing of others before their own.', traits: { openness: 0.6, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.95, neuroticism: 0.6, honesty_humility: 0.9 }, goals: ['Keep everyone healthy', 'Build a sanctuary'], motivations: ['compassion', 'loyalty'] },
+  { label: 'Merchant', icon: '⬡', color: '#ffaa44', profile: 'A shrewd trader with an eye for profit and a knack for deal-making.', traits: { openness: 0.6, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.4 }, goals: ['Amass great wealth', 'Control the market'], motivations: ['greed', 'curiosity'] },
+  { label: 'Assassin', icon: '◇', color: '#8844cc', profile: 'A silent operative who strikes from the shadows with deadly precision.', traits: { openness: 0.3, conscientiousness: 0.8, extraversion: 0.2, agreeableness: 0.1, neuroticism: 0.5, honesty_humility: 0.15 }, goals: ['Eliminate key targets', 'Remain undetected'], motivations: ['vengeance', 'greed'] },
+  { label: 'Bard', icon: '♫', color: '#ff66aa', profile: 'A charismatic entertainer who uses charm and stories to influence everyone.', traits: { openness: 0.9, conscientiousness: 0.4, extraversion: 0.95, agreeableness: 0.7, neuroticism: 0.3, honesty_humility: 0.5 }, goals: ['Become legendary', 'Know everyones secrets'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Guardian', icon: '▣', color: '#4488ff', profile: 'A steadfast protector devoted to defending the community at all costs.', traits: { openness: 0.3, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.7, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Protect the settlement', 'Uphold justice'], motivations: ['loyalty', 'vengeance'] },
+  { label: 'Hermit', icon: '☾', color: '#6a7a8a', profile: 'A reclusive loner who shuns society and finds peace in solitude and nature.', traits: { openness: 0.7, conscientiousness: 0.5, extraversion: 0.1, agreeableness: 0.4, neuroticism: 0.7, honesty_humility: 0.7 }, goals: ['Achieve inner peace', 'Understand the natural world'], motivations: ['curiosity'] },
+  { label: 'Tyrant', icon: '♛', color: '#cc2222', profile: 'A ruthless authoritarian who craves total dominance and control over others.', traits: { openness: 0.3, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.05, neuroticism: 0.6, honesty_humility: 0.05 }, goals: ['Rule over everyone', 'Crush all opposition'], motivations: ['greed', 'vengeance'] },
+  { label: 'Explorer', icon: '⚐', color: '#22ccaa', profile: 'A restless adventurer always seeking the unknown beyond the horizon.', traits: { openness: 0.95, conscientiousness: 0.4, extraversion: 0.6, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.6 }, goals: ['Discover every corner of the world', 'Find legendary artifacts'], motivations: ['curiosity'] },
+  { label: 'Prophet', icon: '☀', color: '#eedd44', profile: 'A mystical visionary who claims to see the future and speaks in riddles.', traits: { openness: 0.9, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.6, neuroticism: 0.8, honesty_humility: 0.7 }, goals: ['Guide others toward their destiny', 'Prevent catastrophe'], motivations: ['compassion', 'curiosity'] },
+  { label: 'Spy', icon: '⊘', color: '#7a8a9a', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4, honesty_humility: 0.2 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
 ];
 
 function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
@@ -615,7 +615,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
   const [name, setName] = useState('');
   const [profile, setProfile] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [traits, setTraits] = useState<PersonalityTraits>({ openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5 });
+  const [traits, setTraits] = useState<PersonalityTraits>({ openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5, honesty_humility: 0.5 });
   const [goals, setGoals] = useState('');
   const [showTraits, setShowTraits] = useState(false);
   const [batchCount, setBatchCount] = useState(10);
@@ -787,12 +787,13 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                       ['Extraversion', 'extraversion', 'gold'],
                       ['Agreeableness', 'agreeableness', 'green'],
                       ['Neuroticism', 'neuroticism', 'red'],
+                      ['Honesty-Humility', 'honesty_humility', 'teal'],
                     ] as const).map(([label, key, color]) => (
                       <div key={key} className="flex items-center gap-2">
                         <span className="text-gray-400 w-28 truncate uppercase" style={{ fontSize: '7px', fontFamily: 'var(--font-pixel, monospace)' }}>{label}</span>
                         <div className="flex-1 relative" style={{ height: '10px' }}>
                           <div className="pixel-bar-container" style={{ height: '10px' }}>
-                            <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color] }} />
+                            <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366', teal: '#00ccaa' }[color] }} />
                           </div>
                           <input
                             type="range"
@@ -803,7 +804,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                             className="absolute inset-0 w-full opacity-0 cursor-pointer"
                           />
                         </div>
-                        <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
+                        <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366', teal: '#00ccaa' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
                           {Math.round(traits[key] * 100)}
                         </span>
                       </div>

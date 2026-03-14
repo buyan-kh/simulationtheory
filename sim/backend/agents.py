@@ -2,7 +2,7 @@ import math
 import random
 from models import (
     Character, SimulationState, Action, ActionType, Event, EventType,
-    MemoryEntry, EmotionalState, ChatMessage,
+    MemoryEntry, EmotionalState, ChatMessage, RelationshipType,
 )
 from spatial import SpatialGrid
 
@@ -35,6 +35,36 @@ PERSONALITY_ACTION_WEIGHTS: dict[str, dict[ActionType, float]] = {
         ActionType.DEFEND: 0.7, ActionType.REST: 0.5, ActionType.OBSERVE: 0.6,
         ActionType.ATTACK: 0.4, ActionType.BETRAY: 0.3, ActionType.BULLY: 0.3,
         ActionType.EXPLORE: -0.4, ActionType.NEGOTIATE: -0.3, ActionType.COURT: -0.3,
+    },
+    "honesty_humility": {
+        ActionType.COOPERATE: 0.6, ActionType.SHARE: 0.7, ActionType.TEACH: 0.5,
+        ActionType.NEGOTIATE: 0.4, ActionType.TRADE: 0.3,
+        ActionType.BETRAY: -0.9, ActionType.BULLY: -0.8, ActionType.KILL: -0.7,
+        ActionType.ATTACK: -0.4, ActionType.COMPETE: -0.2,
+    },
+}
+
+# Schwartz values → action weight modifiers
+VALUES_ACTION_WEIGHTS: dict[str, dict[ActionType, float]] = {
+    "self_enhancement": {
+        ActionType.COMPETE: 0.6, ActionType.GATHER: 0.5, ActionType.NEGOTIATE: 0.4,
+        ActionType.ATTACK: 0.3, ActionType.BULLY: 0.2,
+        ActionType.SHARE: -0.4, ActionType.COOPERATE: -0.2,
+    },
+    "openness_to_change": {
+        ActionType.EXPLORE: 0.7, ActionType.LEARN: 0.6, ActionType.CRAFT: 0.5,
+        ActionType.COURT: 0.3, ActionType.OBSERVE: 0.3,
+        ActionType.REST: -0.3, ActionType.DEFEND: -0.2,
+    },
+    "self_transcendence": {
+        ActionType.SHARE: 0.7, ActionType.COOPERATE: 0.6, ActionType.TEACH: 0.5,
+        ActionType.ALLY: 0.4, ActionType.COMMUNICATE: 0.3,
+        ActionType.ATTACK: -0.5, ActionType.BETRAY: -0.7, ActionType.KILL: -0.8,
+    },
+    "conservation": {
+        ActionType.DEFEND: 0.6, ActionType.REST: 0.4, ActionType.GATHER: 0.4,
+        ActionType.BUILD_HOME: 0.5, ActionType.ALLY: 0.3,
+        ActionType.EXPLORE: -0.3, ActionType.BETRAY: -0.4, ActionType.LEAVE_GROUP: -0.4,
     },
 }
 
@@ -121,6 +151,8 @@ RECIPROCITY_MAP: dict[str, dict[ActionType, float]] = {
     "form_group": {ActionType.ALLY: 0.3, ActionType.COOPERATE: 0.2},
     "join_group": {ActionType.ALLY: 0.2, ActionType.COOPERATE: 0.2},
     "leave_group": {ActionType.COMPETE: 0.1},
+    "propose": {ActionType.COURT: 0.4, ActionType.COOPERATE: 0.3, ActionType.SHARE: 0.2},
+    "attend_event": {ActionType.COOPERATE: 0.2, ActionType.COMMUNICATE: 0.2},
 }
 
 EMOTION_ACTION_MAP: dict[str, dict[ActionType, float]] = {
@@ -412,6 +444,26 @@ class AgentBrain:
             urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.3
             urgency[ActionType.ALLY] = urgency.get(ActionType.ALLY, 0) - 0.3
 
+        # Courtship urgency: if actively courting someone, boost court/propose
+        if character.courtship_target:
+            urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) + 0.6
+            if character.courtship_progress >= 0.8:
+                urgency[ActionType.PROPOSE] = urgency.get(ActionType.PROPOSE, 0) + 1.0
+        elif not character.spouse_id and character.age >= 18:
+            # Single adults have mild court interest
+            urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) + 0.2
+
+        # Social event attendance
+        if state:
+            for se in state.social_events:
+                if character.id in se.invited_ids and se.scheduled_tick <= state.tick < se.scheduled_tick + se.duration:
+                    urgency[ActionType.ATTEND_EVENT] = urgency.get(ActionType.ATTEND_EVENT, 0) + 2.0
+
+        # Crime record: agents with criminal past are more paranoid
+        if len(character.crime_record) >= 3:
+            urgency[ActionType.DEFEND] = urgency.get(ActionType.DEFEND, 0) + 0.4
+            urgency[ActionType.OBSERVE] = urgency.get(ActionType.OBSERVE, 0) + 0.3
+
         return urgency
 
     def _compute_environmental_modifiers(self, perception: dict) -> dict[ActionType, float]:
@@ -477,6 +529,12 @@ class AgentBrain:
                 weight = action_weights.get(action_type, 0.0)
                 base_score += trait_val * weight
 
+            # Values-driven modifiers (Schwartz)
+            for value_name, action_weights in VALUES_ACTION_WEIGHTS.items():
+                val = getattr(character.values, value_name, 0.5)
+                weight = action_weights.get(action_type, 0.0)
+                base_score += val * weight * 0.4
+
             # Emotion-driven modifiers
             for emotion_name, action_weights in EMOTION_ACTION_MAP.items():
                 emo_val = getattr(emotions, emotion_name, 0.0)
@@ -506,11 +564,13 @@ class AgentBrain:
                 ActionType.ALLY, ActionType.BETRAY, ActionType.ATTACK,
                 ActionType.DEFEND, ActionType.SHARE, ActionType.COMMUNICATE,
                 ActionType.KILL, ActionType.BULLY, ActionType.TEACH, ActionType.COURT,
+                ActionType.PROPOSE,
             }
 
             # Group/trade actions are solo (no target needed)
             is_solo_special = action_type in {
                 ActionType.TRADE, ActionType.FORM_GROUP, ActionType.JOIN_GROUP, ActionType.LEAVE_GROUP,
+                ActionType.ATTEND_EVENT,
             }
 
             if is_solo_special:
@@ -758,13 +818,14 @@ class AgentBrain:
         ActionType.REST, ActionType.GATHER, ActionType.EXPLORE,
         ActionType.OBSERVE, ActionType.BUILD_HOME, ActionType.LEARN,
         ActionType.CRAFT, ActionType.DEFEND, ActionType.FORM_GROUP,
+        ActionType.ATTEND_EVENT,
     ]
     _TARGETED_ACTIONS = [
         ActionType.COOPERATE, ActionType.ATTACK, ActionType.SHARE,
         ActionType.COMMUNICATE, ActionType.COMPETE, ActionType.COURT,
         ActionType.TEACH, ActionType.BULLY, ActionType.NEGOTIATE,
         ActionType.ALLY, ActionType.BETRAY, ActionType.TRADE,
-        ActionType.KILL,
+        ActionType.KILL, ActionType.PROPOSE,
     ]
 
     def decide_simple(self, character: Character, state: SimulationState, grid: SpatialGrid | None = None) -> Action:
@@ -799,7 +860,7 @@ class AgentBrain:
                 for trait_name, action_weights in PERSONALITY_ACTION_WEIGHTS.items():
                     score += getattr(traits, trait_name) * action_weights.get(action_type, 0.0)
                 # Simple relationship modifier
-                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT, ActionType.ALLY, ActionType.NEGOTIATE, ActionType.TRADE}:
+                if action_type in {ActionType.COOPERATE, ActionType.SHARE, ActionType.TEACH, ActionType.COURT, ActionType.ALLY, ActionType.NEGOTIATE, ActionType.TRADE, ActionType.PROPOSE}:
                     score += rel * 0.5
                 elif action_type in {ActionType.ATTACK, ActionType.COMPETE, ActionType.BULLY, ActionType.BETRAY, ActionType.KILL}:
                     score -= rel * 0.5

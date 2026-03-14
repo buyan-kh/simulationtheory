@@ -4,7 +4,8 @@ from models import (
     SimulationState, SimulationConfig, Character, CharacterCreate,
     BatchCharacterCreate,
     Action, ActionType, Event, EventType, Environment, ChatMessage, House, Location,
-    MemoryEntry, EmotionalState, PersonalityTraits, Needs,
+    MemoryEntry, EmotionalState, PersonalityTraits, Needs, SchwartzValues,
+    RelationshipType, SocialEvent,
 )
 from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
@@ -104,6 +105,10 @@ class SimulationEngine:
             position={"x": rng.uniform(-150, 150), "y": rng.uniform(-150, 150)},
             age=age,
             max_age=rng.randint(max(age + 15, 60), 100),
+            values=self._generate_random_values(rng),
+            occupation=rng.choice(self._OCCUPATIONS),
+            skills=rng.sample(self._SKILLS_POOL, k=rng.randint(1, 2)),
+            hobbies=rng.sample(self._HOBBIES_POOL, k=rng.randint(0, 2)),
         )
         sim.characters[char.id] = char
         self._assign_house(sim, char)
@@ -183,7 +188,49 @@ class SimulationEngine:
             extraversion=bell_trait(),
             agreeableness=bell_trait(),
             neuroticism=bell_trait(),
+            honesty_humility=bell_trait(),
         )
+
+    def _generate_random_values(self, rng: random.Random) -> SchwartzValues:
+        """Generate Schwartz values with motivational tensions built in."""
+        def bell_val() -> float:
+            return max(0.0, min(1.0, round(rng.gauss(0.5, 0.18), 3)))
+        se = bell_val()
+        oc = bell_val()
+        st = bell_val()
+        co = bell_val()
+        # Enforce tension: self_enhancement opposes self_transcendence
+        if se > 0.7:
+            st = min(st, 0.5 + rng.uniform(-0.1, 0.1))
+        elif st > 0.7:
+            se = min(se, 0.5 + rng.uniform(-0.1, 0.1))
+        # Enforce tension: openness_to_change opposes conservation
+        if oc > 0.7:
+            co = min(co, 0.5 + rng.uniform(-0.1, 0.1))
+        elif co > 0.7:
+            oc = min(oc, 0.5 + rng.uniform(-0.1, 0.1))
+        return SchwartzValues(
+            self_enhancement=max(0.0, min(1.0, se)),
+            openness_to_change=max(0.0, min(1.0, oc)),
+            self_transcendence=max(0.0, min(1.0, st)),
+            conservation=max(0.0, min(1.0, co)),
+        )
+
+    _OCCUPATIONS = [
+        "farmer", "trader", "scholar", "craftsperson", "hunter",
+        "healer", "guard", "cook", "builder", "entertainer",
+        "messenger", "fisher", "miner", "herbalist", "artist",
+    ]
+    _SKILLS_POOL = [
+        "cooking", "fighting", "negotiation", "herbalism", "carpentry",
+        "storytelling", "tracking", "fishing", "mining", "sewing",
+        "music", "painting", "leadership", "first_aid", "foraging",
+    ]
+    _HOBBIES_POOL = [
+        "painting", "music", "gardening", "stargazing", "cooking",
+        "whittling", "singing", "dancing", "swimming", "reading",
+        "chess", "poetry", "collecting", "birdwatching", "meditation",
+    ]
 
     def _generate_name(self, rng: random.Random, existing_names: set[str], prefix: str = "") -> str:
         """Generate a unique name, retrying on collision."""
@@ -213,6 +260,16 @@ class SimulationEngine:
             profile = rng.choice(self._PROFILES_POOL)
             age = rng.randint(16, 65)
 
+            values = self._generate_random_values(rng)
+            occupation = rng.choice(self._OCCUPATIONS)
+            skills = rng.sample(self._SKILLS_POOL, k=rng.randint(1, 3))
+            hobbies = rng.sample(self._HOBBIES_POOL, k=rng.randint(0, 2))
+            social_roles: list[str] = []
+            if age >= 30 and rng.random() < 0.3:
+                social_roles.append("veteran")
+            if age >= 40 and rng.random() < 0.2:
+                social_roles.append("elder")
+
             char = Character(
                 name=name,
                 profile=profile,
@@ -223,6 +280,11 @@ class SimulationEngine:
                 age=age,
                 max_age=rng.randint(max(age + 15, 60), 100),
                 trade_skill=round(rng.uniform(0.1, 0.9), 2),
+                values=values,
+                occupation=occupation,
+                skills=skills,
+                hobbies=hobbies,
+                social_roles=social_roles,
             )
 
             # Set starting emotions with slight variation
@@ -360,6 +422,21 @@ class SimulationEngine:
 
         # ── 10c. Gossip ──
         self._process_gossip(sim, actions)
+
+        # ── 10d. Courtship & Marriage ──
+        courtship_events = self._process_courtship(sim, actions)
+        all_events.extend(courtship_events)
+
+        # ── 10e. Social Events ──
+        social_events = self._process_social_events(sim, actions)
+        all_events.extend(social_events)
+
+        # ── 10f. Social Circles ──
+        self._detect_social_circles(sim)
+
+        # ── 10g. Skill & Occupation Development ──
+        skill_events = self._process_skill_development(sim, actions)
+        all_events.extend(skill_events)
 
         # ── 11. Location resource regeneration ──
         self._regen_location_resources(sim)
@@ -525,6 +602,8 @@ class SimulationEngine:
         "teach": {"social": 15.0, "fun": 5.0, "energy": -5.0},
         "court": {"social": 20.0, "fun": 15.0, "energy": -5.0},
         "craft": {"fun": 20.0, "energy": -10.0},
+        "propose": {"social": 25.0, "fun": 20.0, "energy": -5.0},
+        "attend_event": {"social": 30.0, "fun": 25.0, "hunger": 10.0},
     }
 
     def _update_needs(self, sim: SimulationState, actions: dict[str, "Action"]):
@@ -682,6 +761,8 @@ class SimulationEngine:
         "learn": "knowledge",
         "teach": "knowledge",
         "craft": "knowledge",
+        "propose": "park",
+        "attend_event": "park",
     }
 
     # Fallback coordinates if no matching location found
@@ -710,6 +791,8 @@ class SimulationEngine:
         "learn": (60, 60),           # Library
         "teach": (60, 60),           # Library
         "craft": (60, 60),           # Library
+        "propose": (-60, 40),        # Central Park
+        "attend_event": (-60, 40),   # Central Park (overridden by event location)
     }
 
     _location_type_cache: dict[str, dict[str, Location]] = {}  # sim_id -> {type -> Location}
@@ -746,6 +829,29 @@ class SimulationEngine:
                 continue
 
             # Determine target position based on action
+            # Social event attendance: move to the event location
+            if action.type == ActionType.ATTEND_EVENT:
+                for se in sim.social_events:
+                    if char.id in se.invited_ids and se.scheduled_tick <= sim.tick < se.scheduled_tick + se.duration:
+                        target_x = se.location["x"]
+                        target_y = se.location["y"]
+                        break
+                else:
+                    continue  # No active event to attend
+
+                dx = target_x - char.position["x"]
+                dy = target_y - char.position["y"]
+                dist = (dx * dx + dy * dy) ** 0.5
+                if dist < 5:
+                    char.position["x"] += rng.uniform(-3.0, 3.0)
+                    char.position["y"] += rng.uniform(-3.0, 3.0)
+                else:
+                    speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
+                    move = min(speed, dist)
+                    char.position["x"] += (dx / dist) * move
+                    char.position["y"] += (dy / dist) * move
+                continue
+
             if action.type.value == "rest" and char.house_id:
                 house = house_index.get(char.house_id)
                 if house:
@@ -1027,6 +1133,7 @@ class SimulationEngine:
             extraversion=blend(p1.traits.extraversion, p2.traits.extraversion),
             agreeableness=blend(p1.traits.agreeableness, p2.traits.agreeableness),
             neuroticism=blend(p1.traits.neuroticism, p2.traits.neuroticism),
+            honesty_humility=blend(p1.traits.honesty_humility, p2.traits.honesty_humility),
         )
 
         # Name generation
@@ -1036,6 +1143,14 @@ class SimulationEngine:
         # Inherit some goals/motivations
         goals = list(set(rng.sample(p1.goals, min(1, len(p1.goals))) + rng.sample(p2.goals, min(1, len(p2.goals)))))
         motivations = list(set(rng.sample(p1.motivations, min(1, len(p1.motivations))) + rng.sample(p2.motivations, min(1, len(p2.motivations)))))
+
+        # Blend values from parents
+        child_values = SchwartzValues(
+            self_enhancement=blend(p1.values.self_enhancement, p2.values.self_enhancement),
+            openness_to_change=blend(p1.values.openness_to_change, p2.values.openness_to_change),
+            self_transcendence=blend(p1.values.self_transcendence, p2.values.self_transcendence),
+            conservation=blend(p1.values.conservation, p2.values.conservation),
+        )
 
         child = Character(
             name=name,
@@ -1048,6 +1163,8 @@ class SimulationEngine:
             parent_ids=[p1.id, p2.id],
             position={"x": (p1.position["x"] + p2.position["x"]) / 2, "y": (p1.position["y"] + p2.position["y"]) / 2},
             needs=Needs(hunger=90, energy=90, social=90, fun=90, hygiene=90),
+            values=child_values,
+            social_roles=["child"],
         )
 
         # Parents get positive relationship with child
@@ -1063,6 +1180,476 @@ class SimulationEngine:
         child.relationship_types[p2.id] = "child"
 
         return child
+
+    # ── Courtship & Marriage ──
+
+    def _process_courtship(self, sim: SimulationState, actions: dict[str, Action]) -> list[Event]:
+        """Process courtship progression, proposals, weddings, and divorce."""
+        events: list[Event] = []
+        rng = random.Random(hash(("courtship", sim.tick)))
+
+        for char_id, action in actions.items():
+            char = sim.characters.get(char_id)
+            if not char or not char.alive:
+                continue
+
+            if action.type == ActionType.COURT and action.target_id:
+                target = sim.characters.get(action.target_id)
+                if not target or not target.alive or target.spouse_id:
+                    continue
+                if char.spouse_id:
+                    continue
+
+                rel = char.relationships.get(action.target_id, 0)
+                if rel < 0.2:
+                    continue
+
+                # Start or advance courtship
+                if char.courtship_target != action.target_id:
+                    char.courtship_target = action.target_id
+                    char.courtship_progress = 0.1
+                    char.relationship_types[action.target_id] = RelationshipType.ROMANTIC.value
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.COURTSHIP_STARTED,
+                        title=f"{char.name} begins courting {target.name}",
+                        description=f"{char.name} has started courting {target.name}.",
+                        participants=[char.id, target.id],
+                        importance=0.5,
+                    ))
+                else:
+                    # Progress based on relationship strength and compatibility
+                    compatibility = 1.0 - abs(char.traits.extraversion - target.traits.extraversion) * 0.3
+                    compatibility -= abs(char.values.conservation - target.values.conservation) * 0.2
+                    progress = 0.05 + rel * 0.05 + compatibility * 0.03
+                    char.courtship_progress = min(1.0, char.courtship_progress + progress)
+                    # Mutual relationship boost
+                    target.relationships[char.id] = min(1.0, target.relationships.get(char.id, 0) + 0.03)
+
+            elif action.type == ActionType.PROPOSE and action.target_id:
+                target = sim.characters.get(action.target_id)
+                if not target or not target.alive:
+                    continue
+                if char.spouse_id or target.spouse_id:
+                    continue
+                if char.courtship_progress < 0.7:
+                    continue
+
+                target_rel = target.relationships.get(char.id, 0)
+                # Acceptance based on target's feelings + compatibility
+                accept_chance = target_rel * 0.6 + char.courtship_progress * 0.3
+                if rng.random() < accept_chance:
+                    # Wedding!
+                    char.spouse_id = target.id
+                    target.spouse_id = char.id
+                    char.relationship_types[target.id] = RelationshipType.SPOUSE.value
+                    target.relationship_types[char.id] = RelationshipType.SPOUSE.value
+                    char.courtship_target = None
+                    char.courtship_progress = 0.0
+                    target.courtship_target = None
+                    target.courtship_progress = 0.0
+                    if "spouse" not in char.social_roles:
+                        char.social_roles.append("spouse")
+                    if "spouse" not in target.social_roles:
+                        target.social_roles.append("spouse")
+
+                    # Schedule a wedding event
+                    wedding_loc = {"x": -60.0, "y": 40.0}  # Central Park
+                    for loc in sim.environment.locations:
+                        if loc.type == "park":
+                            wedding_loc = {"x": loc.x, "y": loc.y}
+                            break
+
+                    # Invite close friends (top relationships)
+                    all_rels = {}
+                    for rid, rv in char.relationships.items():
+                        if rid != target.id:
+                            all_rels[rid] = rv
+                    for rid, rv in target.relationships.items():
+                        if rid != char.id:
+                            all_rels[rid] = max(all_rels.get(rid, 0), rv)
+                    invited = sorted(all_rels, key=all_rels.get, reverse=True)[:10]
+                    invited = [i for i in invited if i in sim.characters and sim.characters[i].alive]
+
+                    se = SocialEvent(
+                        event_type="wedding",
+                        host_id=char.id,
+                        invited_ids=[char.id, target.id] + invited,
+                        location=wedding_loc,
+                        scheduled_tick=sim.tick + 2,
+                        duration=3,
+                        honor_id=target.id,
+                    )
+                    sim.social_events.append(se)
+
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.WEDDING,
+                        title=f"{char.name} and {target.name} are getting married!",
+                        description=f"{char.name} proposed to {target.name} and they accepted! The wedding is scheduled.",
+                        participants=[char.id, target.id] + invited,
+                        importance=0.9,
+                    ))
+
+                    # Happiness boost for both
+                    char.emotional_state.happiness = min(1.0, char.emotional_state.happiness + 0.5)
+                    target.emotional_state.happiness = min(1.0, target.emotional_state.happiness + 0.5)
+                else:
+                    # Rejected
+                    char.courtship_progress = max(0.0, char.courtship_progress - 0.3)
+                    char.emotional_state.sadness = min(1.0, char.emotional_state.sadness + 0.3)
+
+        # Divorce: married couples with deeply negative relationships may split
+        if sim.tick % 24 == 0:  # Check once per day
+            checked_pairs: set[tuple[str, str]] = set()
+            for char in sim.characters.values():
+                if not char.alive or not char.spouse_id:
+                    continue
+                pair = tuple(sorted((char.id, char.spouse_id)))
+                if pair in checked_pairs:
+                    continue
+                checked_pairs.add(pair)
+
+                spouse = sim.characters.get(char.spouse_id)
+                if not spouse or not spouse.alive:
+                    continue
+
+                rel1 = char.relationships.get(char.spouse_id, 0)
+                rel2 = spouse.relationships.get(char.id, 0)
+                avg_rel = (rel1 + rel2) / 2
+
+                if avg_rel < -0.4 and rng.random() < 0.1:
+                    char.spouse_id = None
+                    spouse.spouse_id = None
+                    char.relationship_types[spouse.id] = RelationshipType.EX_SPOUSE.value
+                    spouse.relationship_types[char.id] = RelationshipType.EX_SPOUSE.value
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.DIVORCE,
+                        title=f"{char.name} and {spouse.name} have divorced",
+                        description=f"After irreconcilable differences, {char.name} and {spouse.name} have separated.",
+                        participants=[char.id, spouse.id],
+                        importance=0.7,
+                    ))
+
+        return events
+
+    # ── Social Events (parties, funerals, gatherings) ──
+
+    def _process_social_events(self, sim: SimulationState, actions: dict[str, Action]) -> list[Event]:
+        """Process active social events and generate new ones organically."""
+        events: list[Event] = []
+        rng = random.Random(hash(("social_events", sim.tick)))
+
+        # Process active events
+        active_events = [se for se in sim.social_events
+                         if se.scheduled_tick <= sim.tick < se.scheduled_tick + se.duration]
+
+        for se in active_events:
+            # Characters attending move toward event location and get social boosts
+            for char_id in se.invited_ids:
+                char = sim.characters.get(char_id)
+                if not char or not char.alive:
+                    continue
+                action = actions.get(char_id)
+                if action and action.type == ActionType.ATTEND_EVENT:
+                    if char_id not in se.attendee_ids:
+                        se.attendee_ids.append(char_id)
+                    # Social and fun boosts for attending
+                    char.needs.social = min(100.0, char.needs.social + 10.0)
+                    char.needs.fun = min(100.0, char.needs.fun + 10.0)
+                    char.emotional_state.happiness = min(1.0, char.emotional_state.happiness + 0.1)
+                    # Build relationships with other attendees
+                    for other_id in se.attendee_ids:
+                        if other_id != char_id:
+                            char.relationships[other_id] = min(
+                                1.0, char.relationships.get(other_id, 0) + 0.05)
+
+        # Clean up expired events
+        sim.social_events = [se for se in sim.social_events
+                             if sim.tick < se.scheduled_tick + se.duration]
+
+        # Generate new events organically (check every 48 ticks ~ 2 days)
+        if sim.tick % 48 != 0:
+            return events
+
+        alive_chars = [c for c in sim.characters.values() if c.alive]
+        if len(alive_chars) < 3:
+            return events
+
+        # Birthday parties: characters whose age just changed (once per day)
+        for char in alive_chars:
+            if sim.tick % (24 * 365) == (hash(char.id) % (24 * 365)):
+                # It's their birthday! Throw a party if they're social enough
+                if char.traits.extraversion < 0.3:
+                    continue
+                # Get top friends
+                friends = sorted(
+                    [(rid, rv) for rid, rv in char.relationships.items()
+                     if rid in sim.characters and sim.characters[rid].alive and rv > 0.2],
+                    key=lambda x: x[1], reverse=True
+                )[:8]
+                if len(friends) < 2:
+                    continue
+                invited = [f[0] for f in friends]
+                park_loc = {"x": -60.0, "y": 40.0}
+                for loc in sim.environment.locations:
+                    if loc.type == "park":
+                        park_loc = {"x": loc.x, "y": loc.y}
+                        break
+                se = SocialEvent(
+                    event_type="birthday_party",
+                    host_id=char.id,
+                    invited_ids=[char.id] + invited,
+                    location=park_loc,
+                    scheduled_tick=sim.tick + 4,
+                    duration=4,
+                    honor_id=char.id,
+                )
+                sim.social_events.append(se)
+                events.append(Event(
+                    tick=sim.tick, type=EventType.BIRTHDAY_PARTY,
+                    title=f"{char.name} is throwing a birthday party!",
+                    description=f"{char.name} is celebrating their birthday and has invited {len(invited)} friends.",
+                    participants=[char.id] + invited,
+                    importance=0.5,
+                ))
+
+        # Funerals: triggered by recent deaths
+        for event in sim.events[-20:]:
+            if event.type == EventType.DEATH and event.tick == sim.tick - 1:
+                dead_id = event.participants[0] if event.participants else None
+                if not dead_id:
+                    continue
+                dead_char = sim.characters.get(dead_id)
+                if not dead_char:
+                    continue
+                # Invite everyone who knew the deceased
+                mourners = [
+                    rid for rid, rv in dead_char.relationships.items()
+                    if rid in sim.characters and sim.characters[rid].alive and abs(rv) > 0.1
+                ]
+                if len(mourners) < 1:
+                    continue
+                cemetery_loc = {"x": 180.0, "y": 160.0}
+                for loc in sim.environment.locations:
+                    if loc.type == "cemetery":
+                        cemetery_loc = {"x": loc.x, "y": loc.y}
+                        break
+                se = SocialEvent(
+                    event_type="funeral",
+                    host_id=mourners[0],
+                    invited_ids=mourners,
+                    location=cemetery_loc,
+                    scheduled_tick=sim.tick + 2,
+                    duration=3,
+                    honor_id=dead_id,
+                )
+                sim.social_events.append(se)
+                events.append(Event(
+                    tick=sim.tick, type=EventType.FUNERAL,
+                    title=f"Funeral for {dead_char.name}",
+                    description=f"A funeral is being held for {dead_char.name}. {len(mourners)} mourners are invited.",
+                    participants=mourners,
+                    importance=0.7,
+                ))
+
+        # Community gatherings: groups with high cohesion throw gatherings
+        for group in sim.groups.values():
+            if group.dissolved or len(group.members) < 3:
+                continue
+            avg_loyalty = sum(m.loyalty for m in group.members) / len(group.members)
+            if avg_loyalty > 0.6 and rng.random() < 0.15:
+                member_ids = [m.character_id for m in group.members
+                              if m.character_id in sim.characters and sim.characters[m.character_id].alive]
+                if len(member_ids) < 3:
+                    continue
+                # Invite some non-members who are friendly with group members
+                extra_invited: list[str] = []
+                for mid in member_ids[:3]:
+                    mc = sim.characters[mid]
+                    for rid, rv in mc.relationships.items():
+                        if rv > 0.3 and rid not in member_ids and rid not in extra_invited:
+                            if rid in sim.characters and sim.characters[rid].alive:
+                                extra_invited.append(rid)
+                                if len(extra_invited) >= 5:
+                                    break
+                    if len(extra_invited) >= 5:
+                        break
+
+                gathering_loc = {"x": 0.0, "y": 0.0}
+                for loc in sim.environment.locations:
+                    if loc.type == "park":
+                        gathering_loc = {"x": loc.x, "y": loc.y}
+                        break
+
+                se = SocialEvent(
+                    event_type="community_gathering",
+                    host_id=group.leader_id or member_ids[0],
+                    invited_ids=member_ids + extra_invited,
+                    location=gathering_loc,
+                    scheduled_tick=sim.tick + 3,
+                    duration=4,
+                )
+                sim.social_events.append(se)
+                events.append(Event(
+                    tick=sim.tick, type=EventType.COMMUNITY_GATHERING,
+                    title=f"{group.name} is hosting a community gathering",
+                    description=f"{group.name} is organizing a gathering. {len(member_ids)} members and {len(extra_invited)} guests invited.",
+                    participants=member_ids + extra_invited,
+                    importance=0.5,
+                ))
+                break  # One gathering per tick
+
+        return events
+
+    # ── Social Circles (emergent friend groups from relationship graph) ──
+
+    def _detect_social_circles(self, sim: SimulationState):
+        """Detect informal friend groups from the relationship graph.
+        Updates relationship_types with 'friend' for mutual high-affinity pairs.
+        Runs every 24 ticks (once per day) to avoid overhead."""
+        if sim.tick % 24 != 0:
+            return
+
+        for char in sim.characters.values():
+            if not char.alive:
+                continue
+
+            # Sort relationships by strength to identify Dunbar layers
+            rels = sorted(
+                [(rid, rv) for rid, rv in char.relationships.items()
+                 if rid in sim.characters and sim.characters[rid].alive],
+                key=lambda x: x[1], reverse=True
+            )
+
+            for i, (rid, rv) in enumerate(rels):
+                existing_type = char.relationship_types.get(rid)
+                # Don't overwrite family or romantic relationships
+                if existing_type in (
+                    RelationshipType.SPOUSE.value, RelationshipType.PARENT.value,
+                    RelationshipType.CHILD.value, RelationshipType.ROMANTIC.value,
+                    RelationshipType.EX_SPOUSE.value,
+                ):
+                    continue
+
+                other = sim.characters[rid]
+                mutual_rel = other.relationships.get(char.id, 0)
+
+                if rv > 0.5 and mutual_rel > 0.3:
+                    char.relationship_types[rid] = RelationshipType.FRIEND.value
+                elif rv < -0.3 and mutual_rel < -0.2:
+                    char.relationship_types[rid] = RelationshipType.RIVAL.value
+
+            # Set mentor/mentee based on teach actions
+            if char.last_action and char.last_action.type == ActionType.TEACH and char.last_action.target_id:
+                tid = char.last_action.target_id
+                existing = char.relationship_types.get(tid)
+                if existing not in (RelationshipType.SPOUSE.value, RelationshipType.PARENT.value, RelationshipType.CHILD.value):
+                    char.relationship_types[tid] = RelationshipType.MENTOR.value
+                    target = sim.characters.get(tid)
+                    if target:
+                        t_existing = target.relationship_types.get(char.id)
+                        if t_existing not in (RelationshipType.SPOUSE.value, RelationshipType.PARENT.value, RelationshipType.CHILD.value):
+                            target.relationship_types[char.id] = RelationshipType.MENTEE.value
+
+    # ── Skill & Occupation Development ──
+
+    def _process_skill_development(self, sim: SimulationState, actions: dict[str, Action]) -> list[Event]:
+        """Characters develop skills and may change occupation through actions."""
+        events: list[Event] = []
+        rng = random.Random(hash(("skills", sim.tick)))
+
+        # Only process every 24 ticks (once per day)
+        if sim.tick % 24 != 0:
+            return events
+
+        for char_id, action in actions.items():
+            char = sim.characters.get(char_id)
+            if not char or not char.alive:
+                continue
+
+            # Learn new skills through actions
+            skill_map = {
+                ActionType.GATHER: "foraging",
+                ActionType.CRAFT: "carpentry",
+                ActionType.TEACH: "leadership",
+                ActionType.LEARN: None,  # learns from nearby
+                ActionType.ATTACK: "fighting",
+                ActionType.DEFEND: "fighting",
+                ActionType.NEGOTIATE: "negotiation",
+                ActionType.TRADE: "negotiation",
+                ActionType.COMMUNICATE: "storytelling",
+                ActionType.COURT: None,
+                ActionType.BUILD_HOME: "carpentry",
+            }
+
+            potential_skill = skill_map.get(action.type)
+            if potential_skill and potential_skill not in char.skills:
+                # Chance to learn based on openness and practice
+                learn_chance = 0.02 + char.traits.openness * 0.03
+                if rng.random() < learn_chance:
+                    char.skills.append(potential_skill)
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.SKILL_LEARNED,
+                        title=f"{char.name} learned {potential_skill}",
+                        description=f"{char.name} has developed the skill of {potential_skill} through practice.",
+                        participants=[char.id],
+                        importance=0.4,
+                    ))
+
+            # Learning from a teacher
+            if action.type == ActionType.LEARN and action.target_id:
+                teacher = sim.characters.get(action.target_id)
+                if teacher and teacher.skills:
+                    teachable = [s for s in teacher.skills if s not in char.skills]
+                    if teachable and rng.random() < 0.08:
+                        new_skill = rng.choice(teachable)
+                        char.skills.append(new_skill)
+                        events.append(Event(
+                            tick=sim.tick, type=EventType.SKILL_LEARNED,
+                            title=f"{char.name} learned {new_skill} from {teacher.name}",
+                            description=f"{teacher.name} taught {char.name} the skill of {new_skill}.",
+                            participants=[char.id, teacher.id],
+                            importance=0.4,
+                        ))
+
+            # Occupation evolution based on primary activity patterns
+            if sim.tick % (24 * 7) == 0:  # Weekly check
+                action_type_str = action.type.value
+                occ_map = {
+                    "gather": "farmer", "craft": "craftsperson", "trade": "trader",
+                    "teach": "scholar", "learn": "scholar", "attack": "fighter",
+                    "defend": "guard", "negotiate": "trader", "communicate": "entertainer",
+                    "build_home": "builder", "explore": "hunter",
+                }
+                potential_occ = occ_map.get(action_type_str)
+                if potential_occ and potential_occ != char.occupation and rng.random() < 0.1:
+                    old_occ = char.occupation
+                    char.occupation = potential_occ
+                    events.append(Event(
+                        tick=sim.tick, type=EventType.OCCUPATION_CHANGED,
+                        title=f"{char.name} became a {potential_occ}",
+                        description=f"{char.name} has transitioned from {old_occ or 'no occupation'} to {potential_occ}.",
+                        participants=[char.id],
+                        importance=0.4,
+                    ))
+
+        # Update social roles based on life events
+        for char in sim.characters.values():
+            if not char.alive:
+                continue
+            if char.spouse_id and "spouse" not in char.social_roles:
+                char.social_roles.append("spouse")
+            if char.parent_ids and "child" not in char.social_roles:
+                char.social_roles.append("child")
+            if char.group_id and char.group_role == "leader" and "leader" not in char.social_roles:
+                char.social_roles.append("leader")
+            # Parent role
+            has_children = any(
+                char.id in c.parent_ids for c in sim.characters.values() if c.alive
+            )
+            if has_children and "parent" not in char.social_roles:
+                char.social_roles.append("parent")
+
+        return events
 
     # ── Location resource regeneration ──
 

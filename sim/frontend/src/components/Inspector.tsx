@@ -148,8 +148,57 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                 <TraitSlider label="Extra" value={character.traits.extraversion} onChange={() => {}} readOnly color="gold" />
                 <TraitSlider label="Agree" value={character.traits.agreeableness} onChange={() => {}} readOnly color="green" />
                 <TraitSlider label="Neuro" value={character.traits.neuroticism} onChange={() => {}} readOnly color="red" />
+                <TraitSlider label="H-H" value={character.traits.honesty_humility} onChange={() => {}} readOnly color="orange" />
               </div>
             </div>
+
+            {character.values && (
+              <>
+                <div className="pixel-divider" />
+                <div>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Values</div>
+                  <div className="space-y-2">
+                    <TraitSlider label="Self-Enh" value={character.values.self_enhancement} onChange={() => {}} readOnly color="red" />
+                    <TraitSlider label="Open-Chg" value={character.values.openness_to_change} onChange={() => {}} readOnly color="purple" />
+                    <TraitSlider label="Self-Tran" value={character.values.self_transcendence} onChange={() => {}} readOnly color="green" />
+                    <TraitSlider label="Conserv" value={character.values.conservation} onChange={() => {}} readOnly color="cyan" />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {(character.occupation || (character.skills && character.skills.length > 0)) && (
+              <>
+                <div className="pixel-divider" />
+                <div>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Identity</div>
+                  {character.occupation && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-pixel text-neon-gold" style={{ fontSize: '7px' }}>Job:</span>
+                      <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{character.occupation}</span>
+                    </div>
+                  )}
+                  {character.skills && character.skills.length > 0 && (
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="font-pixel text-neon-gold" style={{ fontSize: '7px' }}>Skills:</span>
+                      <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{character.skills.join(', ')}</span>
+                    </div>
+                  )}
+                  {character.hobbies && character.hobbies.length > 0 && (
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="font-pixel text-neon-gold" style={{ fontSize: '7px' }}>Hobbies:</span>
+                      <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{character.hobbies.join(', ')}</span>
+                    </div>
+                  )}
+                  {character.social_roles && character.social_roles.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <span className="font-pixel text-neon-gold" style={{ fontSize: '7px' }}>Roles:</span>
+                      <span className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>{character.social_roles.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="pixel-divider" />
 
