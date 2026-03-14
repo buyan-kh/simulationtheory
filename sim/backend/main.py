@@ -328,6 +328,30 @@ def get_event_frequency(sim_id: str):
     return analytics.event_frequency(sim)
 
 
+# ── LLM Brain ──
+
+class ApiKeyRequest(BaseModel):
+    api_key: str
+
+
+@app.post("/api/llm/configure")
+def configure_llm(req: ApiKeyRequest):
+    """Set the Anthropic API key for LLM-powered agents."""
+    import os
+    os.environ["ANTHROPIC_API_KEY"] = req.api_key
+    # Reset the brain so it re-checks availability
+    engine.llm_brain._available = None
+    engine.llm_brain._client = None
+    available = engine.llm_brain.is_available()
+    return {"status": "configured", "available": available}
+
+
+@app.get("/api/llm/status")
+def llm_status():
+    """Check LLM brain status."""
+    return engine.llm_brain.get_stats()
+
+
 @app.get("/api/simulations/{sim_id}/export/json")
 def export_json(sim_id: str):
     sim = _get_sim(sim_id)

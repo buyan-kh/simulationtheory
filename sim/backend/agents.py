@@ -354,11 +354,15 @@ class AgentBrain:
         elif energy < 40:
             urgency[ActionType.REST] = 0.3
 
-        # Low wealth: favor gathering and competing
+        # Low wealth: favor gathering and competing; penalize expensive actions
         if wealth < 15:
             urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.8
             urgency[ActionType.COMPETE] = urgency.get(ActionType.COMPETE, 0) + 0.3
             urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.6
+            urgency[ActionType.BUILD_HOME] = urgency.get(ActionType.BUILD_HOME, 0) - 1.5
+            urgency[ActionType.CRAFT] = urgency.get(ActionType.CRAFT, 0) - 0.8
+        elif wealth < 20:
+            urgency[ActionType.BUILD_HOME] = urgency.get(ActionType.BUILD_HOME, 0) - 1.0
         elif wealth < 30:
             urgency[ActionType.GATHER] = urgency.get(ActionType.GATHER, 0) + 0.4
             urgency[ActionType.SHARE] = urgency.get(ActionType.SHARE, 0) - 0.3
@@ -769,6 +773,14 @@ class AgentBrain:
         energy = character.resources.get("energy", 50)
         if energy < 20:
             scores.append((ActionType.REST, 2.0))
+
+        # Wealth awareness: don't try to build/craft if broke
+        wealth = character.resources.get("wealth", 0)
+        if wealth < 20:
+            scores = [(at, s - 1.5 if at == ActionType.BUILD_HOME else s) for at, s in scores]
+        if wealth < 5:
+            scores = [(at, s - 0.8 if at == ActionType.CRAFT else s) for at, s in scores]
+            scores.append((ActionType.GATHER, 1.5))
 
         # Night cycle: override — go to sleep
         hour = state.tick % 24

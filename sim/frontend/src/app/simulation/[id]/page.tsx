@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSimStore } from '@/lib/store';
-import { getSimulation, stepSimulation, updateConfig, addCharacter, batchCreateCharacters, getReplayTicks, getReplayState } from '@/lib/api';
+import { getSimulation, stepSimulation, updateConfig, addCharacter, batchCreateCharacters, getReplayTicks, getReplayState, configureLLM, getLLMStatus, addToSpotlight, removeFromSpotlight } from '@/lib/api';
 import type { SimulationConfig, CharacterCreate, PersonalityTraits } from '@/lib/types';
 import CharacterCard from '@/components/CharacterCard';
 import PixelCanvas from '@/components/PixelCanvas';
@@ -50,6 +50,8 @@ export default function SimulationPage() {
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [llmStatus, setLlmStatus] = useState<{ available: boolean; call_count: number; has_api_key: boolean } | null>(null);
+  const [spotlightIds, setSpotlightIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getSimulation(simId)
@@ -61,6 +63,7 @@ export default function SimulationPage() {
         setError(null);
       })
       .catch((e) => setError(e.message));
+    getLLMStatus().then(setLlmStatus).catch(() => {});
   }, [simId, setSimulation, addChatMessages]);
 
   const doStep = useCallback(async () => {
@@ -153,6 +156,11 @@ export default function SimulationPage() {
           stepping={stepping}
         />
         <div className="flex items-center gap-2">
+          {llmStatus?.available && spotlightIds.size > 0 && (
+            <span className="text-pixel-xs" style={{ fontSize: '7px', color: '#ffd700', textShadow: '0 0 4px rgba(255,215,0,0.4)' }}>
+              AI: {spotlightIds.size} agent{spotlightIds.size !== 1 ? 's' : ''}
+            </span>
+          )}
           {error && (
             <span className="text-pixel-xs text-neon-red">{error}</span>
           )}
@@ -211,12 +219,39 @@ export default function SimulationPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {characters.map((char) => (
-              <CharacterCard
-                key={char.id}
-                character={char}
-                selected={char.id === selectedCharacterId}
-                onClick={() => selectCharacter(char.id === selectedCharacterId ? null : char.id)}
-              />
+              <div key={char.id} className="relative">
+                <CharacterCard
+                  character={char}
+                  selected={char.id === selectedCharacterId}
+                  onClick={() => selectCharacter(char.id === selectedCharacterId ? null : char.id)}
+                />
+                {llmStatus?.available && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const isSpotlight = spotlightIds.has(char.id);
+                      if (isSpotlight) {
+                        removeFromSpotlight(simId, char.id).then((res) => {
+                          setSpotlightIds(new Set(res.spotlight));
+                        }).catch(() => {});
+                      } else {
+                        addToSpotlight(simId, char.id).then((res) => {
+                          setSpotlightIds(new Set(res.spotlight));
+                        }).catch(() => {});
+                      }
+                    }}
+                    className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-center leading-none"
+                    style={{
+                      fontSize: '8px',
+                      color: spotlightIds.has(char.id) ? '#ffd700' : '#4a4a6a',
+                      textShadow: spotlightIds.has(char.id) ? '0 0 4px rgba(255,215,0,0.6)' : 'none',
+                    }}
+                    title={spotlightIds.has(char.id) ? 'AI Brain ON (click to disable)' : 'Enable AI Brain (spotlight)'}
+                  >
+                    {spotlightIds.has(char.id) ? '★' : '☆'}
+                  </button>
+                )}
+              </div>
             ))}
             {characters.length === 0 && (
               <div className="text-center py-8">
@@ -300,6 +335,13 @@ export default function SimulationPage() {
             setSimulation(updated);
             setShowSettings(false);
           }}
+          llmStatus={llmStatus}
+          onConfigureLLM={async (key) => {
+            const result = await configureLLM(key);
+            const status = await getLLMStatus();
+            setLlmStatus(status);
+            return result.available;
+          }}
         />
       )}
 
@@ -341,20 +383,85 @@ export default function SimulationPage() {
   );
 }
 
-function SettingsModal({ config, onClose, onSave }: {
+function SettingsModal({ config, onClose, onSave, llmStatus, onConfigureLLM }: {
   config: SimulationConfig;
   onClose: () => void;
   onSave: (config: Partial<SimulationConfig>) => void;
+  llmStatus: { available: boolean; call_count: number; has_api_key: boolean } | null;
+  onConfigureLLM: (key: string) => Promise<boolean>;
 }) {
   const [local, setLocal] = useState(config);
+  const [apiKey, setApiKey] = useState('');
+  const [llmConfiguring, setLlmConfiguring] = useState(false);
+  const [llmMessage, setLlmMessage] = useState('');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
-      <div className="pixel-panel p-6 w-[420px]" onClick={(e) => e.stopPropagation()}
+      <div className="pixel-panel p-6 w-[420px] max-h-[90vh] overflow-y-auto pixel-scrollbar" onClick={(e) => e.stopPropagation()}
         style={{ borderColor: '#ffd700', boxShadow: '0 0 12px rgba(255,215,0,0.3), 4px 4px 0 #000' }}
       >
         <div className="text-pixel-sm text-neon-gold mb-5 tracking-wider" style={{ textShadow: '0 0 8px rgba(255,215,0,0.5)' }}>
           SIMULATION CONFIG
+        </div>
+
+        {/* LLM Brain Section */}
+        <div className="mb-5 p-3" style={{ background: '#0a0a2a', border: '2px solid #4a4a8a', borderRadius: '2px' }}>
+          <div className="text-pixel-xs tracking-wider mb-2" style={{ color: '#ffd700' }}>
+            AI BRAIN (FREE WILL)
+          </div>
+          <div className="text-gray-400 mb-3" style={{ fontSize: '7px' }}>
+            Give agents real consciousness via Claude AI. Spotlight agents will think, speak, and act with genuine free will. They can even search the web for ideas.
+          </div>
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ background: llmStatus?.available ? '#00ff88' : '#ff3366', boxShadow: llmStatus?.available ? '0 0 4px #00ff88' : '0 0 4px #ff3366' }}
+            />
+            <span className="text-pixel-xs" style={{ color: llmStatus?.available ? '#00ff88' : '#ff3366' }}>
+              {llmStatus?.available ? `ACTIVE (${llmStatus.call_count} calls)` : 'NOT CONFIGURED'}
+            </span>
+          </div>
+          {!llmStatus?.available && (
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Anthropic API key..."
+                className="pixel-input text-pixel-xs flex-1"
+                style={{ fontSize: '8px' }}
+              />
+              <button
+                onClick={async () => {
+                  if (!apiKey.trim()) return;
+                  setLlmConfiguring(true);
+                  try {
+                    const ok = await onConfigureLLM(apiKey.trim());
+                    setLlmMessage(ok ? 'Connected!' : 'Failed — check key');
+                    setApiKey('');
+                  } catch {
+                    setLlmMessage('Error connecting');
+                  }
+                  setLlmConfiguring(false);
+                }}
+                disabled={llmConfiguring || !apiKey.trim()}
+                className="pixel-btn pixel-btn-gold text-pixel-xs"
+                style={{ fontSize: '7px' }}
+              >
+                {llmConfiguring ? '...' : 'CONNECT'}
+              </button>
+            </div>
+          )}
+          {llmMessage && (
+            <div className="text-pixel-xs mt-1" style={{ color: llmMessage.includes('!') ? '#00ff88' : '#ff3366', fontSize: '7px' }}>
+              {llmMessage}
+            </div>
+          )}
+          {llmStatus?.available && (
+            <div className="text-gray-500 mt-1" style={{ fontSize: '7px' }}>
+              Click the star (★) on any agent to give them AI consciousness
+            </div>
+          )}
         </div>
 
         <div className="space-y-5">
