@@ -8,13 +8,13 @@ interface EmotionDisplayProps {
 }
 
 const EMOTION_CONFIG: Record<keyof EmotionalState, { color: string; emoji: string }> = {
-  happiness: { color: '#00ff88', emoji: '😊' },
-  anger: { color: '#ff3366', emoji: '😠' },
-  fear: { color: '#aa44ff', emoji: '😨' },
-  trust: { color: '#00e5ff', emoji: '🤝' },
-  surprise: { color: '#ffd700', emoji: '😮' },
-  disgust: { color: '#ff8844', emoji: '🤢' },
-  sadness: { color: '#4488ff', emoji: '😢' },
+  happiness: { color: '#5a9a5a', emoji: '😊' },
+  anger: { color: '#c4555a', emoji: '😠' },
+  fear: { color: '#8a6aaa', emoji: '😨' },
+  trust: { color: '#4a9aaa', emoji: '🤝' },
+  surprise: { color: '#c49a35', emoji: '😮' },
+  disgust: { color: '#cc7744', emoji: '🤢' },
+  sadness: { color: '#6a88b5', emoji: '😢' },
 };
 
 export function getDominantEmotion(emotions: EmotionalState): keyof EmotionalState {

@@ -146,7 +146,7 @@ export default function CharacterCreator() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       <div className="pixel-panel p-4 mb-4">
-        <h1 className="text-pixel-lg text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+        <h1 className="text-pixel-lg text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(196,90,122,0.5)' }}>
           CHARACTER CREATOR
         </h1>
         <div className="text-pixel-xs text-gray-500 mt-1">
@@ -164,7 +164,7 @@ export default function CharacterCreator() {
               className={`pixel-panel p-3 text-left transition-all hover:bg-white/5 ${
                 selectedTemplate === t.label ? 'border-neon-cyan' : ''
               }`}
-              style={selectedTemplate === t.label ? { borderColor: '#00e5ff', boxShadow: '0 0 8px rgba(0,229,255,0.3), 4px 4px 0 #000' } : {}}
+              style={selectedTemplate === t.label ? { borderColor: '#4a9aaa', boxShadow: '0 0 8px rgba(74,154,170,0.3), 4px 4px 0 #000' } : {}}
             >
               <div className={`text-pixel-lg text-${t.color} mb-2 text-center`}>
                 {t.icon}
@@ -308,9 +308,9 @@ export default function CharacterCreator() {
         <div>
           <div className="sticky top-14">
             <div className="text-pixel-xs text-gray-500 tracking-wider mb-2">PREVIEW</div>
-            <div className="pixel-panel p-4" style={{ borderColor: '#00e5ff', boxShadow: '0 0 8px rgba(0,229,255,0.2), 4px 4px 0 #000' }}>
+            <div className="pixel-panel p-4" style={{ borderColor: '#4a9aaa', boxShadow: '0 0 8px rgba(74,154,170,0.2), 4px 4px 0 #000' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 border-2 border-[#3a3a5c] bg-pixel-bg flex items-center justify-center text-pixel-lg">
+                <div className="w-12 h-12 border-2 border-[#b5a890] bg-pixel-bg flex items-center justify-center text-pixel-lg">
                   {imageUrl ? (
                     <img src={imageUrl} alt="" className="w-full h-full object-cover" style={{ imageRendering: 'pixelated' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
@@ -340,11 +340,11 @@ export default function CharacterCreator() {
                         className="pixel-bar-fill"
                         style={{
                           width: `${val * 100}%`,
-                          backgroundColor: key === 'openness' ? '#00e5ff' :
-                            key === 'conscientiousness' ? '#00ff88' :
-                            key === 'extraversion' ? '#ffd700' :
-                            key === 'agreeableness' ? '#ff00aa' :
-                            key === 'neuroticism' ? '#ff3366' : '#ff8c00',
+                          backgroundColor: key === 'openness' ? '#4a9aaa' :
+                            key === 'conscientiousness' ? '#5a9a5a' :
+                            key === 'extraversion' ? '#c49a35' :
+                            key === 'agreeableness' ? '#c45a7a' :
+                            key === 'neuroticism' ? '#c4555a' : '#cc7744',
                         }}
                       />
                     </div>

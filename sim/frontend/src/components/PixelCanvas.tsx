@@ -292,7 +292,7 @@ export default function PixelCanvas({
             }
           }
 
-          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillStyle = 'rgba(100,80,60,0.25)';
           const labelW = item.name.length * 3.5 + 6;
           const labelX = px + (item.width * itemScale) / 2 - labelW / 2;
           const labelY = py - 8;
@@ -351,7 +351,7 @@ export default function PixelCanvas({
           const f = simToWorld(fsx, fsy);
           const t = simToWorld(tsx, tsy);
 
-          ctx.strokeStyle = isPositive ? '#00ff88' : '#ff3366';
+          ctx.strokeStyle = isPositive ? '#5a9a5a' : '#c4555a';
           ctx.lineWidth = 1 + strength * 2;
           ctx.globalAlpha = 0.3 + strength * 0.4;
           if (!isPositive) ctx.setLineDash([6, 4]);
@@ -387,7 +387,7 @@ export default function PixelCanvas({
   }, [characters, locations, selectedCharacterId, chatMessages, currentTick, worldItems, buildCharacterSprites, buildRelationshipSprites, buildWorldItemSprites]);
 
   return (
-    <div ref={containerRef} className="w-full h-full overflow-hidden relative bg-[#0a0a1a]">
+    <div ref={containerRef} className="w-full h-full overflow-hidden relative bg-[#e8dfd2]">
       <canvas ref={canvasRef} className="block" />
       <Minimap
         characters={characters}

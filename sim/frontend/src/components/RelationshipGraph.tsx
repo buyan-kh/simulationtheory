@@ -22,8 +22,8 @@ interface NodePos {
 }
 
 const GROUP_COLORS = [
-  '#00e5ff', '#ff00aa', '#ffd700', '#00ff88', '#ff3366',
-  '#44ccff', '#aa44ff', '#ff8844', '#88ff88', '#ff66aa',
+  '#4a9aaa', '#c45a7a', '#c49a35', '#5a9a5a', '#c4555a',
+  '#5a9aaa', '#8a6aaa', '#cc7744', '#6aaa6a', '#c45a7a',
 ];
 
 export default function RelationshipGraph({ simId, selectedCharacterId, onSelectCharacter }: RelationshipGraphProps) {
@@ -140,7 +140,7 @@ export default function RelationshipGraph({ simId, selectedCharacterId, onSelect
       ctx.beginPath();
       ctx.moveTo(src.x, src.y);
       ctx.lineTo(tgt.x, tgt.y);
-      ctx.strokeStyle = edge.weight > 0 ? `rgba(0,255,136,${Math.min(Math.abs(edge.weight), 0.8)})` : `rgba(255,51,102,${Math.min(Math.abs(edge.weight), 0.8)})`;
+      ctx.strokeStyle = edge.weight > 0 ? `rgba(90,154,90,${Math.min(Math.abs(edge.weight), 0.8)})` : `rgba(196,85,90,${Math.min(Math.abs(edge.weight), 0.8)})`;
       ctx.lineWidth = Math.abs(edge.weight) * 3;
       ctx.stroke();
     }
@@ -167,13 +167,13 @@ export default function RelationshipGraph({ simId, selectedCharacterId, onSelect
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.fillStyle = node.alive ? color : '#333';
       ctx.fill();
-      ctx.strokeStyle = isSelected ? '#fff' : '#1a1a3a';
+      ctx.strokeStyle = isSelected ? '#fff' : '#ece5d8';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       // Label
       ctx.font = '7px monospace';
-      ctx.fillStyle = node.alive ? '#ccc' : '#555';
+      ctx.fillStyle = node.alive ? '#4a4a5a' : '#aaa';
       ctx.textAlign = 'center';
       ctx.fillText(node.name.slice(0, 8), node.x, node.y + r + 10);
     }
@@ -239,7 +239,7 @@ export default function RelationshipGraph({ simId, selectedCharacterId, onSelect
           ref={canvasRef}
           onClick={handleClick}
           className="w-full h-full cursor-pointer"
-          style={{ background: '#06061a' }}
+          style={{ background: '#f5f0e6' }}
         />
       </div>
     </div>

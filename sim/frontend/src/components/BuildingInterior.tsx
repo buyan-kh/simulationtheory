@@ -31,7 +31,7 @@ const WOOD_DK = '#6B4A0E';
 const SHELF = '#9A7820';
 const GLASS = '#3a5a8a';
 const GLASS_LT = '#4a6a9a';
-const GOLD = '#ffd700';
+const GOLD = '#c49a35';
 const FIRE_1 = '#ff6622';
 const FIRE_2 = '#ffaa22';
 const FIRE_3 = '#ffdd44';
@@ -506,7 +506,7 @@ const drawCafeInterior: DrawFn = (ctx, w, h) => {
   rect(ctx, cx + 24, h - 50, 10, 2, '#7a5a3a');
   rect(ctx, cx + 28, h - 48, 2, 8, '#5a3a1a');
   // Menu board
-  rect(ctx, cx + 10, 8, 20, 14, '#1a1a2a');
+  rect(ctx, cx + 10, 8, 20, 14, '#d8d0c2');
   rect(ctx, cx + 12, 10, 16, 10, '#2a2a3a');
 };
 
@@ -686,7 +686,7 @@ export default function BuildingInterior({
       }
 
       // Tiny label
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillStyle = 'rgba(100,80,60,0.25)';
       ctx.fillRect(ix, iy - 5, item.width + 2, 4);
       ctx.fillStyle = '#cccccc';
       ctx.font = '3px monospace';
@@ -712,11 +712,11 @@ export default function BuildingInterior({
       />
 
       <div
-        className="relative z-40 h-full flex flex-col bg-[#12122a] border-t-2 border-[#4a4a8a]"
-        style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.6)' }}
+        className="relative z-40 h-full flex flex-col bg-[#f5f0e6] border-t-2 border-[#a89880]"
+        style={{ boxShadow: '0 -4px 20px rgba(100,80,60,0.25)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b-2 border-[#2a2a5a] bg-[#1a1a3a] shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b-2 border-[#c4b6a2] bg-[#ece5d8] shrink-0">
           <div className="flex items-center gap-3">
             <span
               className="text-pixel-sm text-neon-gold tracking-wider"
@@ -744,13 +744,13 @@ export default function BuildingInterior({
               ref={canvasRef}
               width={INTERIOR_W * DRAW_SCALE}
               height={INTERIOR_H * DRAW_SCALE}
-              className="max-w-full max-h-full border-2 border-[#2a2a5a] rounded"
+              className="max-w-full max-h-full border-2 border-[#c4b6a2] rounded"
               style={{ imageRendering: 'pixelated' }}
             />
           </div>
 
           {/* Info sidebar */}
-          <div className="w-[200px] border-l-2 border-[#2a2a5a] p-3 overflow-y-auto shrink-0">
+          <div className="w-[200px] border-l-2 border-[#c4b6a2] p-3 overflow-y-auto shrink-0">
             {/* Building details */}
             <div className="mb-4">
               <div className="text-pixel-xs text-gray-400 tracking-wider mb-2">DETAILS</div>
@@ -790,7 +790,7 @@ export default function BuildingInterior({
                   >
                     <div
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: char.alive ? '#00ff88' : '#ff3366' }}
+                      style={{ backgroundColor: char.alive ? '#5a9a5a' : '#c4555a' }}
                     />
                     <span className="text-pixel-xs text-gray-300 truncate">
                       {char.name}

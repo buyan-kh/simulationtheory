@@ -61,9 +61,9 @@ export default function ReplayControls({ currentTick, maxTick, ticks, onSeek, on
   };
 
   return (
-    <div className="pixel-panel p-2" style={{ borderColor: '#ff00aa' }}>
+    <div className="pixel-panel p-2" style={{ borderColor: '#c45a7a' }}>
       <div className="flex items-center gap-2 mb-2">
-        <span className="font-pixel animate-pixel-blink" style={{ fontSize: '8px', color: '#ff00aa' }}>REPLAY</span>
+        <span className="font-pixel animate-pixel-blink" style={{ fontSize: '8px', color: '#c45a7a' }}>REPLAY</span>
         <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '8px' }}>
           Tick {currentTick}/{maxTick}
         </span>
@@ -82,7 +82,7 @@ export default function ReplayControls({ currentTick, maxTick, ticks, onSeek, on
           value={currentTick}
           onChange={handleSlider}
           className="w-full"
-          style={{ accentColor: '#ff00aa' }}
+          style={{ accentColor: '#c45a7a' }}
         />
       </div>
 

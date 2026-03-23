@@ -20,8 +20,8 @@ const COORD_RANGE = 240; // -120 to 120
 
 // Character colors by index
 const CHAR_COLORS = [
-  '#00e5ff', '#ff00aa', '#00ff88', '#ffd700',
-  '#ff3366', '#4488ff', '#aa44ff', '#ff8844',
+  '#4a9aaa', '#c45a7a', '#5a9a5a', '#c49a35',
+  '#c4555a', '#6a88b5', '#8a6aaa', '#cc7744',
 ];
 
 // Building class for each location type
@@ -259,7 +259,7 @@ export default function WorldView({
                   y1={from.py}
                   x2={to.px}
                   y2={to.py}
-                  stroke={isPositive ? '#00ff88' : '#ff3366'}
+                  stroke={isPositive ? '#5a9a5a' : '#c4555a'}
                   strokeWidth={1 + strength * 2}
                   strokeDasharray={isPositive ? 'none' : '6,4'}
                   opacity={0.3 + strength * 0.4}
@@ -312,7 +312,7 @@ export default function WorldView({
               )}
 
               {/* Character name */}
-              <div className="char-name" style={{ color: isSelected ? '#ffd700' : '#d0d0e0' }}>
+              <div className="char-name" style={{ color: isSelected ? '#c49a35' : '#2a2a3a' }}>
                 {c.name}
               </div>
 
@@ -321,13 +321,13 @@ export default function WorldView({
                 className={`char-letter ${isDead ? '' : isWalking ? 'char-letter-walking' : 'char-letter-idle'}`}
                 style={{
                   background: isDead ? '#1a1a1a' : `${color}15`,
-                  borderColor: isSelected ? '#ffd700' : color,
+                  borderColor: isSelected ? '#c49a35' : color,
                   color: isDead ? '#666' : moodColor,
                   filter: isDead ? 'grayscale(100%)' : 'none',
                   opacity: isDead ? 0.4 : 1,
                   boxShadow: isSelected
-                    ? `0 0 10px rgba(255,215,0,0.6), 2px 2px 0 0 rgba(0,0,0,0.5)`
-                    : `2px 2px 0 0 rgba(0,0,0,0.5)`,
+                    ? `0 0 10px rgba(196,154,53,0.4), 2px 2px 0 0 rgba(100,80,60,0.25)`
+                    : `2px 2px 0 0 rgba(100,80,60,0.25)`,
                 }}
               >
                 {isDead ? 'X' : c.name.charAt(0).toUpperCase()}

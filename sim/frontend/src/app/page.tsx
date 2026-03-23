@@ -45,7 +45,7 @@ export default function TitleScreen() {
       <div className="w-full max-w-3xl">
         <div className="pixel-panel p-8 mb-6 text-center">
           <div className="mb-6">
-            <pre className="text-neon-cyan text-pixel-xs leading-tight inline-block text-left" style={{ textShadow: '0 0 10px rgba(0,229,255,0.6)' }}>
+            <pre className="text-neon-cyan text-pixel-xs leading-tight inline-block text-left" style={{ textShadow: '0 0 10px rgba(74,154,170,0.6)' }}>
 {`
  ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗
  ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝
@@ -56,7 +56,7 @@ export default function TitleScreen() {
             </pre>
           </div>
 
-          <div className="text-pixel-lg text-neon-magenta mb-2 tracking-widest" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+          <div className="text-pixel-lg text-neon-magenta mb-2 tracking-widest" style={{ textShadow: '0 0 8px rgba(196,90,122,0.5)' }}>
             S I M
           </div>
 
@@ -115,7 +115,7 @@ export default function TitleScreen() {
 
         {recentSims.length > 0 && (
           <div className="pixel-panel p-4">
-            <div className="text-pixel-xs text-neon-gold mb-3 tracking-wider" style={{ textShadow: '0 0 6px rgba(255,215,0,0.4)' }}>
+            <div className="text-pixel-xs text-neon-gold mb-3 tracking-wider" style={{ textShadow: '0 0 6px rgba(196,154,53,0.4)' }}>
               SAVED SESSIONS
             </div>
             <div className="space-y-1">
@@ -180,10 +180,10 @@ export default function TitleScreen() {
 
 function FeatureCard({ icon, title, desc, color }: { icon: string; title: string; desc: string; color: string }) {
   const colorMap: Record<string, { text: string; glow: string; iconBg: string }> = {
-    cyan: { text: 'text-neon-cyan', glow: '0 0 6px rgba(0,229,255,0.4)', iconBg: 'bg-neon-cyan/10 border-neon-cyan/30' },
-    magenta: { text: 'text-neon-magenta', glow: '0 0 6px rgba(255,0,170,0.4)', iconBg: 'bg-neon-magenta/10 border-neon-magenta/30' },
-    gold: { text: 'text-neon-gold', glow: '0 0 6px rgba(255,215,0,0.4)', iconBg: 'bg-neon-gold/10 border-neon-gold/30' },
-    green: { text: 'text-neon-green', glow: '0 0 6px rgba(0,255,136,0.4)', iconBg: 'bg-neon-green/10 border-neon-green/30' },
+    cyan: { text: 'text-neon-cyan', glow: '0 0 6px rgba(74,154,170,0.4)', iconBg: 'bg-neon-cyan/10 border-neon-cyan/30' },
+    magenta: { text: 'text-neon-magenta', glow: '0 0 6px rgba(196,90,122,0.4)', iconBg: 'bg-neon-magenta/10 border-neon-magenta/30' },
+    gold: { text: 'text-neon-gold', glow: '0 0 6px rgba(196,154,53,0.4)', iconBg: 'bg-neon-gold/10 border-neon-gold/30' },
+    green: { text: 'text-neon-green', glow: '0 0 6px rgba(90,154,90,0.4)', iconBg: 'bg-neon-green/10 border-neon-green/30' },
   };
   const c = colorMap[color];
   return (

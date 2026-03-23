@@ -32,10 +32,10 @@ export default function GroupPanel({ groups, characters }: GroupPanelProps) {
             <div
               key={group.id}
               className="p-2"
-              style={{ background: '#0a0a1a', border: '1px solid #44ccff' }}
+              style={{ background: '#e8dfd2', border: '1px solid #5a9aaa' }}
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className="font-pixel" style={{ fontSize: '9px', color: '#44ccff' }}>⚑</span>
+                <span className="font-pixel" style={{ fontSize: '9px', color: '#5a9aaa' }}>⚑</span>
                 <span className="font-pixel text-pixel-text truncate" style={{ fontSize: '8px' }}>
                   {group.name}
                 </span>
@@ -43,7 +43,7 @@ export default function GroupPanel({ groups, characters }: GroupPanelProps) {
               {leader && (
                 <div className="mb-1">
                   <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>
-                    Leader: <span style={{ color: '#ffd700' }}>{leader.name}</span>
+                    Leader: <span style={{ color: '#c49a35' }}>{leader.name}</span>
                   </span>
                 </div>
               )}
@@ -60,7 +60,7 @@ export default function GroupPanel({ groups, characters }: GroupPanelProps) {
                       >
                         {char.name}
                       </span>
-                      <span className="font-pixel" style={{ fontSize: '6px', color: m.loyalty > 0.6 ? '#00ff88' : m.loyalty < 0.3 ? '#ff3366' : '#ffaa44' }}>
+                      <span className="font-pixel" style={{ fontSize: '6px', color: m.loyalty > 0.6 ? '#5a9a5a' : m.loyalty < 0.3 ? '#c4555a' : '#ffaa44' }}>
                         {Math.round(m.loyalty * 100)}%
                       </span>
                     </div>
@@ -77,7 +77,7 @@ export default function GroupPanel({ groups, characters }: GroupPanelProps) {
               {group.goals.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {group.goals.map((g, i) => (
-                    <span key={i} className="pixel-badge font-pixel" style={{ fontSize: '5px', borderColor: '#44ccff', color: '#44ccff' }}>
+                    <span key={i} className="pixel-badge font-pixel" style={{ fontSize: '5px', borderColor: '#5a9aaa', color: '#5a9aaa' }}>
                       {g}
                     </span>
                   ))}
@@ -96,7 +96,7 @@ export default function GroupPanel({ groups, characters }: GroupPanelProps) {
               <div
                 key={group.id}
                 className="p-2 opacity-40"
-                style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}
               >
                 <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>
                   {group.name} (T{group.dissolved_tick})

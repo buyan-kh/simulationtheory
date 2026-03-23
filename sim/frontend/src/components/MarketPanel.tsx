@@ -28,7 +28,7 @@ export default function MarketPanel({ market, characters }: MarketPanelProps) {
               <span
                 key={res}
                 className="pixel-badge font-pixel"
-                style={{ fontSize: '6px', borderColor: '#ffd700', color: '#ffd700' }}
+                style={{ fontSize: '6px', borderColor: '#c49a35', color: '#c49a35' }}
               >
                 {res}: {price.toFixed(1)}
               </span>
@@ -49,7 +49,7 @@ export default function MarketPanel({ market, characters }: MarketPanelProps) {
                   <div
                     key={offer.id}
                     className="p-1.5"
-                    style={{ background: '#0a0a1a', border: '1px solid #ccaa44' }}
+                    style={{ background: '#e8dfd2', border: '1px solid #ccaa44' }}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-pixel text-pixel-text truncate" style={{ fontSize: '7px' }}>
@@ -83,7 +83,7 @@ export default function MarketPanel({ market, characters }: MarketPanelProps) {
                   <div
                     key={trade.id}
                     className="p-1.5"
-                    style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                    style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}
                   >
                     <div className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>
                       T{trade.tick}: {seller?.name || '?'} → {buyer?.name || '?'}

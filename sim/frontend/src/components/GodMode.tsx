@@ -63,7 +63,7 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
   return (
     <div className="pixel-panel">
       <div className="pixel-panel-title flex items-center gap-2">
-        <span style={{ color: '#ff3366' }}>*</span>
+        <span style={{ color: '#c4555a' }}>*</span>
         <span>God Mode</span>
       </div>
       <div className="p-3 space-y-3">
@@ -136,7 +136,7 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
                 }}
                 disabled={!introduceTarget}
                 className="pixel-btn"
-                style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#44ccff', color: '#44ccff' }}
+                style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#5a9aaa', color: '#5a9aaa' }}
               >
                 Meet
               </button>
@@ -161,7 +161,7 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
             <button
               onClick={() => doAction('Event', () => godRequest(`/api/simulations/${simId}/spawn-event`, { event_type: eventType }))}
               className="pixel-btn"
-              style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#ff8844', color: '#ff8844' }}
+              style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#cc7744', color: '#cc7744' }}
             >
               Trigger
             </button>
@@ -193,7 +193,7 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
                 doAction('Smite', () => godRequest(`${charUrl}/smite`));
               }}
               className="pixel-btn flex-1 animate-pixel-blink"
-              style={{ fontSize: '7px', padding: '3px 6px', background: '#ff1144', color: '#fff', border: '2px solid #ff3366' }}
+              style={{ fontSize: '7px', padding: '3px 6px', background: '#c44448', color: '#fff', border: '2px solid #c4555a' }}
             >
               CONFIRM KILL?
             </button>
@@ -201,7 +201,7 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
         </div>
 
         {status && (
-          <div className="font-pixel text-center" style={{ fontSize: '7px', color: status.startsWith('Error') ? '#ff3366' : '#00ff88' }}>
+          <div className="font-pixel text-center" style={{ fontSize: '7px', color: status.startsWith('Error') ? '#c4555a' : '#5a9a5a' }}>
             {status}
           </div>
         )}

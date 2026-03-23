@@ -132,8 +132,8 @@ export default function SimulationPage() {
 
   return (
     <div className="h-[calc(100vh-40px)] flex flex-col">
-      <div className="bg-pixel-panel border-b-2 border-[#4a4a8a] px-3 py-1.5 flex items-center justify-between shrink-0"
-        style={{ boxShadow: '0 2px 0 0 rgba(0,0,0,0.3)' }}
+      <div className="bg-pixel-panel border-b-2 border-[#a89880] px-3 py-1.5 flex items-center justify-between shrink-0"
+        style={{ boxShadow: '0 2px 0 0 rgba(100,80,60,0.15)' }}
       >
         <div className="flex items-center gap-4">
           <button
@@ -142,8 +142,8 @@ export default function SimulationPage() {
           >
             &lt; BACK
           </button>
-          <div className="w-[2px] h-5 bg-[#2a2a5a]" />
-          <span className="text-pixel-sm text-neon-cyan" style={{ textShadow: '0 0 6px rgba(0,229,255,0.4)' }}>
+          <div className="w-[2px] h-5 bg-[#c4b6a2]" />
+          <span className="text-pixel-sm text-neon-cyan" style={{ textShadow: '0 0 6px rgba(74,154,170,0.4)' }}>
             NEXUS SIM
           </span>
         </div>
@@ -159,7 +159,7 @@ export default function SimulationPage() {
         />
         <div className="flex items-center gap-2">
           {llmStatus?.available && spotlightIds.size > 0 && (
-            <span className="text-pixel-xs" style={{ fontSize: '7px', color: '#ffd700', textShadow: '0 0 4px rgba(255,215,0,0.4)' }}>
+            <span className="text-pixel-xs" style={{ fontSize: '7px', color: '#c49a35', textShadow: '0 0 4px rgba(196,154,53,0.4)' }}>
               AI: {spotlightIds.size} agent{spotlightIds.size !== 1 ? 's' : ''}
             </span>
           )}
@@ -215,8 +215,8 @@ export default function SimulationPage() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        <div className="w-[220px] border-r-2 border-[#4a4a8a] bg-pixel-panel overflow-y-auto pixel-scrollbar shrink-0 flex flex-col">
-          <div className="px-3 py-2 border-b-2 border-[#2a2a5a] bg-[#1a1a3a]">
+        <div className="w-[220px] border-r-2 border-[#a89880] bg-pixel-panel overflow-y-auto pixel-scrollbar shrink-0 flex flex-col">
+          <div className="px-3 py-2 border-b-2 border-[#c4b6a2] bg-[#ece5d8]">
             <span className="text-pixel-xs text-gray-400 tracking-wider">AGENTS ({characters.length})</span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
@@ -245,8 +245,8 @@ export default function SimulationPage() {
                     className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-center leading-none"
                     style={{
                       fontSize: '8px',
-                      color: spotlightIds.has(char.id) ? '#ffd700' : '#4a4a6a',
-                      textShadow: spotlightIds.has(char.id) ? '0 0 4px rgba(255,215,0,0.6)' : 'none',
+                      color: spotlightIds.has(char.id) ? '#c49a35' : '#a89880',
+                      textShadow: spotlightIds.has(char.id) ? '0 0 4px rgba(196,154,53,0.6)' : 'none',
                     }}
                     title={spotlightIds.has(char.id) ? 'AI Brain ON (click to disable)' : 'Enable AI Brain (spotlight)'}
                   >
@@ -262,7 +262,7 @@ export default function SimulationPage() {
               </div>
             )}
           </div>
-          <div className="p-2 border-t-2 border-[#2a2a5a]">
+          <div className="p-2 border-t-2 border-[#c4b6a2]">
             <button
               onClick={() => setShowAddChar(true)}
               className="pixel-btn pixel-btn-green text-pixel-xs w-full py-2"
@@ -288,7 +288,7 @@ export default function SimulationPage() {
           </div>
 
           {selectedCharacter && (
-            <div className="h-[250px] border-t-2 border-[#4a4a8a] shrink-0 flex">
+            <div className="h-[250px] border-t-2 border-[#a89880] shrink-0 flex">
               <div className="flex-1 min-w-0">
                 <Inspector
                   character={selectedCharacter}
@@ -297,7 +297,7 @@ export default function SimulationPage() {
                   worldItems={simulation.world_items || []}
                 />
               </div>
-              <div className="w-[200px] border-l-2 border-[#4a4a8a] shrink-0 overflow-y-auto pixel-scrollbar">
+              <div className="w-[200px] border-l-2 border-[#a89880] shrink-0 overflow-y-auto pixel-scrollbar">
                 <GodMode
                   simId={simId}
                   characterId={selectedCharacter.id}
@@ -313,22 +313,22 @@ export default function SimulationPage() {
           )}
         </div>
 
-        <div className="w-[280px] border-l-2 border-[#4a4a8a] bg-pixel-panel shrink-0 flex flex-col">
+        <div className="w-[280px] border-l-2 border-[#a89880] bg-pixel-panel shrink-0 flex flex-col">
           <div className="flex shrink-0">
             {([
               { key: 'events' as const, label: 'EVENTS', color: 'neon-cyan' },
               { key: 'chat' as const, label: 'CHAT', color: 'neon-magenta' },
-              { key: 'groups' as const, label: 'GROUPS', color: '#44ccff' },
-              { key: 'market' as const, label: 'MARKET', color: '#ffcc00' },
-              { key: 'graph' as const, label: 'GRAPH', color: '#aa44ff' },
+              { key: 'groups' as const, label: 'GROUPS', color: '#5a9aaa' },
+              { key: 'market' as const, label: 'MARKET', color: '#c49a35' },
+              { key: 'graph' as const, label: 'GRAPH', color: '#8a6aaa' },
             ] as const).map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActivePanel(tab.key)}
                 className={`flex-1 px-1.5 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
                   activePanel === tab.key
-                    ? `bg-[#12122a]`
-                    : 'text-gray-500 border-[#2a2a5a] bg-[#1a1a3a] hover:text-gray-300'
+                    ? `bg-[#f5f0e6]`
+                    : 'text-gray-500 border-[#c4b6a2] bg-[#ece5d8] hover:text-gray-300'
                 }`}
                 style={activePanel === tab.key ? { color: tab.color, borderColor: tab.color } : { fontSize: '7px' }}
               >
@@ -418,15 +418,15 @@ function SettingsModal({ config, onClose, onSave, llmStatus, onConfigureLLM }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
       <div className="pixel-panel p-6 w-[420px] max-h-[90vh] overflow-y-auto pixel-scrollbar" onClick={(e) => e.stopPropagation()}
-        style={{ borderColor: '#ffd700', boxShadow: '0 0 12px rgba(255,215,0,0.3), 4px 4px 0 #000' }}
+        style={{ borderColor: '#c49a35', boxShadow: '0 0 12px rgba(196,154,53,0.3), 4px 4px 0 #000' }}
       >
-        <div className="text-pixel-sm text-neon-gold mb-5 tracking-wider" style={{ textShadow: '0 0 8px rgba(255,215,0,0.5)' }}>
+        <div className="text-pixel-sm text-neon-gold mb-5 tracking-wider" style={{ textShadow: '0 0 8px rgba(196,154,53,0.5)' }}>
           SIMULATION CONFIG
         </div>
 
         {/* LLM Brain Section */}
-        <div className="mb-5 p-3" style={{ background: '#0a0a2a', border: '2px solid #4a4a8a', borderRadius: '2px' }}>
-          <div className="text-pixel-xs tracking-wider mb-2" style={{ color: '#ffd700' }}>
+        <div className="mb-5 p-3" style={{ background: '#e8dfd2', border: '2px solid #a89880', borderRadius: '2px' }}>
+          <div className="text-pixel-xs tracking-wider mb-2" style={{ color: '#c49a35' }}>
             AI BRAIN (FREE WILL)
           </div>
           <div className="text-gray-400 mb-3" style={{ fontSize: '7px' }}>
@@ -435,9 +435,9 @@ function SettingsModal({ config, onClose, onSave, llmStatus, onConfigureLLM }: {
           <div className="flex items-center gap-2 mb-2">
             <div
               className="w-2 h-2 rounded-full"
-              style={{ background: llmStatus?.available ? '#00ff88' : '#ff3366', boxShadow: llmStatus?.available ? '0 0 4px #00ff88' : '0 0 4px #ff3366' }}
+              style={{ background: llmStatus?.available ? '#5a9a5a' : '#c4555a', boxShadow: llmStatus?.available ? '0 0 4px #5a9a5a' : '0 0 4px #c4555a' }}
             />
-            <span className="text-pixel-xs" style={{ color: llmStatus?.available ? '#00ff88' : '#ff3366' }}>
+            <span className="text-pixel-xs" style={{ color: llmStatus?.available ? '#5a9a5a' : '#c4555a' }}>
               {llmStatus?.available ? `ACTIVE (${llmStatus.call_count} calls)` : 'NOT CONFIGURED'}
             </span>
           </div>
@@ -473,7 +473,7 @@ function SettingsModal({ config, onClose, onSave, llmStatus, onConfigureLLM }: {
             </div>
           )}
           {llmMessage && (
-            <div className="text-pixel-xs mt-1" style={{ color: llmMessage.includes('!') ? '#00ff88' : '#ff3366', fontSize: '7px' }}>
+            <div className="text-pixel-xs mt-1" style={{ color: llmMessage.includes('!') ? '#5a9a5a' : '#c4555a', fontSize: '7px' }}>
               {llmMessage}
             </div>
           )}
@@ -485,9 +485,9 @@ function SettingsModal({ config, onClose, onSave, llmStatus, onConfigureLLM }: {
         </div>
 
         <div className="space-y-5">
-          <PixelSliderField label="RANDOMNESS" value={local.randomness} onChange={(v) => setLocal({ ...local, randomness: v })} color="#00e5ff" />
-          <PixelSliderField label="INFO SYMMETRY" value={local.information_symmetry} onChange={(v) => setLocal({ ...local, information_symmetry: v })} color="#00ff88" />
-          <PixelSliderField label="SCARCITY" value={local.resource_scarcity} onChange={(v) => setLocal({ ...local, resource_scarcity: v })} color="#ff00aa" />
+          <PixelSliderField label="RANDOMNESS" value={local.randomness} onChange={(v) => setLocal({ ...local, randomness: v })} color="#4a9aaa" />
+          <PixelSliderField label="INFO SYMMETRY" value={local.information_symmetry} onChange={(v) => setLocal({ ...local, information_symmetry: v })} color="#5a9a5a" />
+          <PixelSliderField label="SCARCITY" value={local.resource_scarcity} onChange={(v) => setLocal({ ...local, resource_scarcity: v })} color="#c45a7a" />
           <div>
             <label className="text-pixel-xs text-gray-500 tracking-wider block mb-2">MAX TICKS</label>
             <input
@@ -590,20 +590,20 @@ interface CharTemplate {
 }
 
 const TEMPLATES: CharTemplate[] = [
-  { label: 'Diplomat', icon: '♦', color: '#00e5ff', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3, honesty_humility: 0.85 }, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'], motivations: ['loyalty', 'compassion'] },
-  { label: 'Warrior', icon: '⚔', color: '#ff3366', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5, honesty_humility: 0.6 }, goals: ['Defeat all rivals', 'Protect the weak'], motivations: ['vengeance', 'loyalty'] },
-  { label: 'Trickster', icon: '★', color: '#ff00aa', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4, honesty_humility: 0.1 }, goals: ['Sow discord among others', 'Accumulate secret power'], motivations: ['greed', 'curiosity'] },
-  { label: 'Scholar', icon: '◆', color: '#ffd700', profile: 'A curious mind devoted to understanding the world through observation and study.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Discover hidden knowledge', 'Map the environment'], motivations: ['curiosity', 'compassion'] },
-  { label: 'Healer', icon: '✚', color: '#44cc88', profile: 'A compassionate caretaker who puts the wellbeing of others before their own.', traits: { openness: 0.6, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.95, neuroticism: 0.6, honesty_humility: 0.9 }, goals: ['Keep everyone healthy', 'Build a sanctuary'], motivations: ['compassion', 'loyalty'] },
-  { label: 'Merchant', icon: '⬡', color: '#ffaa44', profile: 'A shrewd trader with an eye for profit and a knack for deal-making.', traits: { openness: 0.6, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.4 }, goals: ['Amass great wealth', 'Control the market'], motivations: ['greed', 'curiosity'] },
-  { label: 'Assassin', icon: '◇', color: '#8844cc', profile: 'A silent operative who strikes from the shadows with deadly precision.', traits: { openness: 0.3, conscientiousness: 0.8, extraversion: 0.2, agreeableness: 0.1, neuroticism: 0.5, honesty_humility: 0.15 }, goals: ['Eliminate key targets', 'Remain undetected'], motivations: ['vengeance', 'greed'] },
-  { label: 'Bard', icon: '♫', color: '#ff66aa', profile: 'A charismatic entertainer who uses charm and stories to influence everyone.', traits: { openness: 0.9, conscientiousness: 0.4, extraversion: 0.95, agreeableness: 0.7, neuroticism: 0.3, honesty_humility: 0.5 }, goals: ['Become legendary', 'Know everyones secrets'], motivations: ['curiosity', 'compassion'] },
-  { label: 'Guardian', icon: '▣', color: '#4488ff', profile: 'A steadfast protector devoted to defending the community at all costs.', traits: { openness: 0.3, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.7, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Protect the settlement', 'Uphold justice'], motivations: ['loyalty', 'vengeance'] },
-  { label: 'Hermit', icon: '☾', color: '#6a7a8a', profile: 'A reclusive loner who shuns society and finds peace in solitude and nature.', traits: { openness: 0.7, conscientiousness: 0.5, extraversion: 0.1, agreeableness: 0.4, neuroticism: 0.7, honesty_humility: 0.7 }, goals: ['Achieve inner peace', 'Understand the natural world'], motivations: ['curiosity'] },
-  { label: 'Tyrant', icon: '♛', color: '#cc2222', profile: 'A ruthless authoritarian who craves total dominance and control over others.', traits: { openness: 0.3, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.05, neuroticism: 0.6, honesty_humility: 0.05 }, goals: ['Rule over everyone', 'Crush all opposition'], motivations: ['greed', 'vengeance'] },
-  { label: 'Explorer', icon: '⚐', color: '#22ccaa', profile: 'A restless adventurer always seeking the unknown beyond the horizon.', traits: { openness: 0.95, conscientiousness: 0.4, extraversion: 0.6, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.6 }, goals: ['Discover every corner of the world', 'Find legendary artifacts'], motivations: ['curiosity'] },
-  { label: 'Prophet', icon: '☀', color: '#eedd44', profile: 'A mystical visionary who claims to see the future and speaks in riddles.', traits: { openness: 0.9, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.6, neuroticism: 0.8, honesty_humility: 0.7 }, goals: ['Guide others toward their destiny', 'Prevent catastrophe'], motivations: ['compassion', 'curiosity'] },
-  { label: 'Spy', icon: '⊘', color: '#7a8a9a', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4, honesty_humility: 0.2 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
+  { label: 'Diplomat', icon: '♦', color: '#4a9aaa', profile: 'A skilled negotiator who values peace and alliance-building above all.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.9, neuroticism: 0.3, honesty_humility: 0.85 }, goals: ['Forge lasting alliances', 'Resolve conflicts peacefully'], motivations: ['loyalty', 'compassion'] },
+  { label: 'Warrior', icon: '⚔', color: '#c4555a', profile: 'A fierce combatant driven by honor and the desire to prove strength.', traits: { openness: 0.4, conscientiousness: 0.6, extraversion: 0.7, agreeableness: 0.3, neuroticism: 0.5, honesty_humility: 0.6 }, goals: ['Defeat all rivals', 'Protect the weak'], motivations: ['vengeance', 'loyalty'] },
+  { label: 'Trickster', icon: '★', color: '#c45a7a', profile: 'A cunning manipulator who thrives on chaos and misdirection.', traits: { openness: 0.9, conscientiousness: 0.3, extraversion: 0.8, agreeableness: 0.2, neuroticism: 0.4, honesty_humility: 0.1 }, goals: ['Sow discord among others', 'Accumulate secret power'], motivations: ['greed', 'curiosity'] },
+  { label: 'Scholar', icon: '◆', color: '#c49a35', profile: 'A curious mind devoted to understanding the world through observation and study.', traits: { openness: 0.95, conscientiousness: 0.85, extraversion: 0.3, agreeableness: 0.6, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Discover hidden knowledge', 'Map the environment'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Healer', icon: '✚', color: '#5a9a5a', profile: 'A compassionate caretaker who puts the wellbeing of others before their own.', traits: { openness: 0.6, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.95, neuroticism: 0.6, honesty_humility: 0.9 }, goals: ['Keep everyone healthy', 'Build a sanctuary'], motivations: ['compassion', 'loyalty'] },
+  { label: 'Merchant', icon: '⬡', color: '#cc7744', profile: 'A shrewd trader with an eye for profit and a knack for deal-making.', traits: { openness: 0.6, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.4 }, goals: ['Amass great wealth', 'Control the market'], motivations: ['greed', 'curiosity'] },
+  { label: 'Assassin', icon: '◇', color: '#8a6aaa', profile: 'A silent operative who strikes from the shadows with deadly precision.', traits: { openness: 0.3, conscientiousness: 0.8, extraversion: 0.2, agreeableness: 0.1, neuroticism: 0.5, honesty_humility: 0.15 }, goals: ['Eliminate key targets', 'Remain undetected'], motivations: ['vengeance', 'greed'] },
+  { label: 'Bard', icon: '♫', color: '#c45a7a', profile: 'A charismatic entertainer who uses charm and stories to influence everyone.', traits: { openness: 0.9, conscientiousness: 0.4, extraversion: 0.95, agreeableness: 0.7, neuroticism: 0.3, honesty_humility: 0.5 }, goals: ['Become legendary', 'Know everyones secrets'], motivations: ['curiosity', 'compassion'] },
+  { label: 'Guardian', icon: '▣', color: '#6a88b5', profile: 'A steadfast protector devoted to defending the community at all costs.', traits: { openness: 0.3, conscientiousness: 0.9, extraversion: 0.5, agreeableness: 0.7, neuroticism: 0.4, honesty_humility: 0.8 }, goals: ['Protect the settlement', 'Uphold justice'], motivations: ['loyalty', 'vengeance'] },
+  { label: 'Hermit', icon: '☾', color: '#8a7e72', profile: 'A reclusive loner who shuns society and finds peace in solitude and nature.', traits: { openness: 0.7, conscientiousness: 0.5, extraversion: 0.1, agreeableness: 0.4, neuroticism: 0.7, honesty_humility: 0.7 }, goals: ['Achieve inner peace', 'Understand the natural world'], motivations: ['curiosity'] },
+  { label: 'Tyrant', icon: '♛', color: '#c4555a', profile: 'A ruthless authoritarian who craves total dominance and control over others.', traits: { openness: 0.3, conscientiousness: 0.7, extraversion: 0.8, agreeableness: 0.05, neuroticism: 0.6, honesty_humility: 0.05 }, goals: ['Rule over everyone', 'Crush all opposition'], motivations: ['greed', 'vengeance'] },
+  { label: 'Explorer', icon: '⚐', color: '#5a9a7a', profile: 'A restless adventurer always seeking the unknown beyond the horizon.', traits: { openness: 0.95, conscientiousness: 0.4, extraversion: 0.6, agreeableness: 0.5, neuroticism: 0.3, honesty_humility: 0.6 }, goals: ['Discover every corner of the world', 'Find legendary artifacts'], motivations: ['curiosity'] },
+  { label: 'Prophet', icon: '☀', color: '#c49a35', profile: 'A mystical visionary who claims to see the future and speaks in riddles.', traits: { openness: 0.9, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.6, neuroticism: 0.8, honesty_humility: 0.7 }, goals: ['Guide others toward their destiny', 'Prevent catastrophe'], motivations: ['compassion', 'curiosity'] },
+  { label: 'Spy', icon: '⊘', color: '#8a7e72', profile: 'A master of disguise who gathers intelligence and plays all sides.', traits: { openness: 0.7, conscientiousness: 0.8, extraversion: 0.6, agreeableness: 0.3, neuroticism: 0.4, honesty_humility: 0.2 }, goals: ['Uncover every secret', 'Stay one step ahead'], motivations: ['curiosity', 'greed'] },
 ];
 
 function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
@@ -634,24 +634,24 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
       <div className="pixel-panel p-5 w-[560px] max-h-[85vh] overflow-y-auto pixel-scrollbar" onClick={(e) => e.stopPropagation()}
-        style={{ borderColor: '#ff00aa', boxShadow: '0 0 12px rgba(255,0,170,0.3), 4px 4px 0 #000' }}
+        style={{ borderColor: '#c45a7a', boxShadow: '0 0 12px rgba(196,90,122,0.3), 4px 4px 0 #000' }}
       >
         <div className="flex items-center justify-between mb-3">
-          <div className="text-pixel-sm text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(255,0,170,0.5)' }}>
+          <div className="text-pixel-sm text-neon-magenta tracking-wider" style={{ textShadow: '0 0 8px rgba(196,90,122,0.5)' }}>
             ADD {mode === 'batch' ? 'AGENTS' : 'CHARACTER'}
           </div>
-          <div className="flex" style={{ border: '2px solid #4a4a8a' }}>
+          <div className="flex" style={{ border: '2px solid #a89880' }}>
             <button
               onClick={() => setMode('single')}
               className="px-3 py-1 text-pixel-xs tracking-wider transition-colors"
-              style={mode === 'single' ? { background: '#ff00aa30', color: '#ff00aa', borderRight: '2px solid #4a4a8a' } : { color: '#6a6a9a', borderRight: '2px solid #4a4a8a' }}
+              style={mode === 'single' ? { background: '#c45a7a30', color: '#c45a7a', borderRight: '2px solid #a89880' } : { color: '#8a7a64', borderRight: '2px solid #a89880' }}
             >
               SINGLE
             </button>
             <button
               onClick={() => setMode('batch')}
               className="px-3 py-1 text-pixel-xs tracking-wider transition-colors"
-              style={mode === 'batch' ? { background: '#00e5ff30', color: '#00e5ff' } : { color: '#6a6a9a' }}
+              style={mode === 'batch' ? { background: '#4a9aaa30', color: '#4a9aaa' } : { color: '#8a7a64' }}
             >
               BATCH
             </button>
@@ -660,7 +660,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
 
         {mode === 'batch' ? (
           <div className="space-y-4">
-            <div className="p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+            <div className="p-3" style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
               <div className="text-pixel-xs text-gray-400 mb-2">Spawn many agents at once with randomized traits, goals, and personalities.</div>
             </div>
 
@@ -682,8 +682,8 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                       onClick={() => setBatchCount(n)}
                       className="px-2 py-1 text-pixel-xs transition-colors"
                       style={batchCount === n
-                        ? { background: '#00e5ff20', color: '#00e5ff', border: '1px solid #00e5ff' }
-                        : { color: '#6a6a9a', border: '1px solid #3a3a6a' }
+                        ? { background: '#4a9aaa20', color: '#4a9aaa', border: '1px solid #4a9aaa' }
+                        : { color: '#8a7a64', border: '1px solid #b5a890' }
                       }
                     >
                       {n}
@@ -780,7 +780,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                   PERSONALITY TRAITS
                 </button>
                 {showTraits && (
-                  <div className="mt-2 space-y-1.5 p-3" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                  <div className="mt-2 space-y-1.5 p-3" style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
                     {([
                       ['Openness', 'openness', 'purple'],
                       ['Conscientiousness', 'conscientiousness', 'cyan'],
@@ -793,7 +793,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                         <span className="text-gray-400 w-28 truncate uppercase" style={{ fontSize: '7px', fontFamily: 'var(--font-pixel, monospace)' }}>{label}</span>
                         <div className="flex-1 relative" style={{ height: '10px' }}>
                           <div className="pixel-bar-container" style={{ height: '10px' }}>
-                            <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366', teal: '#00ccaa' }[color] }} />
+                            <div className="pixel-bar-fill" style={{ width: `${traits[key] * 100}%`, background: { purple: '#8a6aaa', cyan: '#4a9aaa', gold: '#c49a35', green: '#5a9a5a', red: '#c4555a', teal: '#5a9a7a' }[color] }} />
                           </div>
                           <input
                             type="range"
@@ -804,7 +804,7 @@ function QuickAddCharacter({ onClose, onAdd, onBatchAdd }: {
                             className="absolute inset-0 w-full opacity-0 cursor-pointer"
                           />
                         </div>
-                        <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#aa44ff', cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', red: '#ff3366', teal: '#00ccaa' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
+                        <span className="w-7 text-right" style={{ fontSize: '7px', color: { purple: '#8a6aaa', cyan: '#4a9aaa', gold: '#c49a35', green: '#5a9a5a', red: '#c4555a', teal: '#5a9a7a' }[color], fontFamily: 'var(--font-pixel, monospace)' }}>
                           {Math.round(traits[key] * 100)}
                         </span>
                       </div>

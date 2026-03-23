@@ -20,18 +20,18 @@ function NavLink({ href, label }: { href: string; label: string }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-pixel-bg scanlines">
+    <html lang="en">
+      <body className="min-h-screen bg-pixel-bg">
         <nav className="fixed top-0 left-0 right-0 z-50 bg-pixel-panel border-b-3 border-pixel-border-light"
           style={{
-            boxShadow: 'inset 0 -2px 0 0 #2a2a5a, 0 4px 0 0 rgba(0,0,0,0.3)',
-            borderBottom: '3px solid #4a4a8a',
+            boxShadow: 'inset 0 -2px 0 0 #c4b6a2, 0 4px 0 0 rgba(100,80,60,0.1)',
+            borderBottom: '3px solid #a89880',
           }}
         >
           <div className="max-w-[1800px] mx-auto px-4 h-10 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-neon-cyan border-2 border-pixel-border-highlight flex items-center justify-center font-pixel text-pixel-xs text-pixel-bg font-bold"
-                style={{ boxShadow: '2px 2px 0 0 rgba(0,0,0,0.4)' }}
+              <div className="w-6 h-6 bg-neon-cyan border-2 border-pixel-border-highlight flex items-center justify-center font-pixel text-pixel-xs text-white font-bold"
+                style={{ boxShadow: '2px 2px 0 0 rgba(100,80,60,0.2)' }}
               >
                 N
               </div>

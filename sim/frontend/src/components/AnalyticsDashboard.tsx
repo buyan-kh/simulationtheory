@@ -45,7 +45,7 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.85)' }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(100,80,60,0.15)' }}>
         <div className="font-pixel text-neon-cyan animate-pixel-blink" style={{ fontSize: '10px' }}>
           Loading analytics...
         </div>
@@ -105,10 +105,10 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
   const maxActionCount = actionEntries.length > 0 ? Math.max(...actionEntries.map(e => e[1])) : 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.85)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(100,80,60,0.15)' }}>
       <div
         className="pixel-panel w-full max-w-4xl max-h-[90vh] overflow-y-auto pixel-scrollbar"
-        style={{ borderColor: '#ff00aa' }}
+        style={{ borderColor: '#c45a7a' }}
       >
         <div className="pixel-panel-title flex items-center justify-between">
           <span>Analytics Dashboard</span>
@@ -123,14 +123,14 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
             <div>
               <div className="font-pixel text-neon-cyan uppercase mb-3" style={{ fontSize: '9px' }}>Overview</div>
               <div className="grid grid-cols-4 gap-3">
-                <StatCard label="Ticks" value={summary.total_ticks} color="#00e5ff" />
-                <StatCard label="Alive" value={summary.alive_characters} color="#00ff88" />
-                <StatCard label="Dead" value={summary.dead_characters} color="#ff3366" />
-                <StatCard label="Events" value={summary.total_events} color="#ffd700" />
-                <StatCard label="Groups" value={summary.total_groups} color="#44ccff" />
-                <StatCard label="Avg Rel" value={summary.avg_relationship.toFixed(2)} color="#aa44ff" />
-                <StatCard label="Top Influence" value={summary.most_influential || '-'} color="#ffd700" small />
-                <StatCard label="Wealthiest" value={summary.wealthiest || '-'} color="#00ff88" small />
+                <StatCard label="Ticks" value={summary.total_ticks} color="#4a9aaa" />
+                <StatCard label="Alive" value={summary.alive_characters} color="#5a9a5a" />
+                <StatCard label="Dead" value={summary.dead_characters} color="#c4555a" />
+                <StatCard label="Events" value={summary.total_events} color="#c49a35" />
+                <StatCard label="Groups" value={summary.total_groups} color="#5a9aaa" />
+                <StatCard label="Avg Rel" value={summary.avg_relationship.toFixed(2)} color="#8a6aaa" />
+                <StatCard label="Top Influence" value={summary.most_influential || '-'} color="#c49a35" small />
+                <StatCard label="Wealthiest" value={summary.wealthiest || '-'} color="#5a9a5a" small />
               </div>
             </div>
           )}
@@ -156,8 +156,8 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                       <span className="font-pixel w-24 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                         {c.name}
                       </span>
-                      <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                        <div style={{ width: `${(w / maxWealth) * 100}%`, height: '100%', background: '#ffd700' }} />
+                      <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                        <div style={{ width: `${(w / maxWealth) * 100}%`, height: '100%', background: '#c49a35' }} />
                       </div>
                       <span className="font-pixel w-12 text-right text-neon-gold" style={{ fontSize: '7px' }}>
                         {Math.round(w)}
@@ -182,10 +182,10 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                       <span className="font-pixel w-24 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                         {c.name}
                       </span>
-                      <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                        <div style={{ width: `${(inf / maxInfluence) * 100}%`, height: '100%', background: '#aa44ff' }} />
+                      <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                        <div style={{ width: `${(inf / maxInfluence) * 100}%`, height: '100%', background: '#8a6aaa' }} />
                       </div>
-                      <span className="font-pixel w-12 text-right" style={{ fontSize: '7px', color: '#aa44ff' }}>
+                      <span className="font-pixel w-12 text-right" style={{ fontSize: '7px', color: '#8a6aaa' }}>
                         {Math.round(inf)}
                       </span>
                     </div>
@@ -208,10 +208,10 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                       <span className="font-pixel w-24 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                         {c.name}
                       </span>
-                      <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                        <div style={{ width: `${(cnt / maxConnections) * 100}%`, height: '100%', background: '#44ccff' }} />
+                      <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                        <div style={{ width: `${(cnt / maxConnections) * 100}%`, height: '100%', background: '#5a9aaa' }} />
                       </div>
-                      <span className="font-pixel w-12 text-right" style={{ fontSize: '7px', color: '#44ccff' }}>
+                      <span className="font-pixel w-12 text-right" style={{ fontSize: '7px', color: '#5a9aaa' }}>
                         {cnt}
                       </span>
                     </div>
@@ -231,10 +231,10 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                     <span className="font-pixel w-28 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                       {type}
                     </span>
-                    <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                      <div style={{ width: `${(count / maxActionCount) * 100}%`, height: '100%', background: '#00e5ff' }} />
+                    <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                      <div style={{ width: `${(count / maxActionCount) * 100}%`, height: '100%', background: '#4a9aaa' }} />
                     </div>
-                    <span className="font-pixel w-8 text-right" style={{ fontSize: '7px', color: '#00e5ff' }}>
+                    <span className="font-pixel w-8 text-right" style={{ fontSize: '7px', color: '#4a9aaa' }}>
                       {count}
                     </span>
                   </div>
@@ -253,8 +253,8 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                     <span className="font-pixel w-28 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                       {type}
                     </span>
-                    <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                      <div style={{ width: `${(count / maxEventCount) * 100}%`, height: '100%', background: '#ff00aa' }} />
+                    <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                      <div style={{ width: `${(count / maxEventCount) * 100}%`, height: '100%', background: '#c45a7a' }} />
                     </div>
                     <span className="font-pixel w-8 text-right text-neon-gold" style={{ fontSize: '7px' }}>
                       {count}
@@ -276,10 +276,10 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                       <span className="font-pixel w-28 truncate text-pixel-text" style={{ fontSize: '7px' }}>
                         {cause}
                       </span>
-                      <div className="flex-1" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
-                        <div style={{ width: `${(count / maxDeathCount) * 100}%`, height: '100%', background: '#ff3366' }} />
+                      <div className="flex-1" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
+                        <div style={{ width: `${(count / maxDeathCount) * 100}%`, height: '100%', background: '#c4555a' }} />
                       </div>
-                      <span className="font-pixel w-8 text-right" style={{ fontSize: '7px', color: '#ff3366' }}>
+                      <span className="font-pixel w-8 text-right" style={{ fontSize: '7px', color: '#c4555a' }}>
                         {count}
                       </span>
                     </div>
@@ -300,7 +300,7 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                   const tgt = graph.nodes.find(n => n.id === edge.target);
                   return (
                     <div key={i} className="flex items-center gap-2 px-2 py-0.5"
-                      style={{ background: '#0a0a1a' }}>
+                      style={{ background: '#e8dfd2' }}>
                       <span className="font-pixel w-20 truncate" style={{ fontSize: '7px', color: src?.alive ? '#ddd' : '#666' }}>
                         {src?.name || '?'}
                       </span>
@@ -308,13 +308,13 @@ export default function AnalyticsDashboard({ simId, onClose }: AnalyticsDashboar
                         <div style={{
                           height: '2px',
                           width: `${Math.abs(edge.weight) * 100}%`,
-                          background: edge.weight > 0 ? '#00ff88' : '#ff3366',
+                          background: edge.weight > 0 ? '#5a9a5a' : '#c4555a',
                         }} />
                       </div>
                       <span className="font-pixel w-20 truncate text-right" style={{ fontSize: '7px', color: tgt?.alive ? '#ddd' : '#666' }}>
                         {tgt?.name || '?'}
                       </span>
-                      <span className="font-pixel w-8 text-right" style={{ fontSize: '6px', color: edge.weight > 0 ? '#00ff88' : '#ff3366' }}>
+                      <span className="font-pixel w-8 text-right" style={{ fontSize: '6px', color: edge.weight > 0 ? '#5a9a5a' : '#c4555a' }}>
                         {edge.weight > 0 ? '+' : ''}{(edge.weight * 100).toFixed(0)}
                       </span>
                     </div>
@@ -396,7 +396,7 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
     const toY = (val: number) => pad.top + ch - (val / maxPop) * ch;
 
     // Grid lines
-    ctx.strokeStyle = '#1a1a3a';
+    ctx.strokeStyle = '#ece5d8';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = pad.top + (ch / 4) * i;
@@ -408,7 +408,7 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
 
     // Total line (darker)
     ctx.beginPath();
-    ctx.strokeStyle = '#ffd70060';
+    ctx.strokeStyle = '#c49a3560';
     ctx.lineWidth = 1;
     for (let i = 0; i < data.length; i++) {
       const x = toX(data[i].tick);
@@ -419,7 +419,7 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
 
     // Alive line
     ctx.beginPath();
-    ctx.strokeStyle = '#00ff88';
+    ctx.strokeStyle = '#5a9a5a';
     ctx.lineWidth = 2;
     for (let i = 0; i < data.length; i++) {
       const x = toX(data[i].tick);
@@ -438,7 +438,7 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
     ctx.lineTo(toX(data[data.length - 1].tick), pad.top + ch);
     ctx.lineTo(toX(data[0].tick), pad.top + ch);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(0,255,136,0.08)';
+    ctx.fillStyle = 'rgba(90,154,90,0.12)';
     ctx.fill();
 
     // Axes labels
@@ -453,9 +453,9 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
 
     // Legend
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#00ff88';
+    ctx.fillStyle = '#5a9a5a';
     ctx.fillText('Alive', pad.left + 4, pad.top + 8);
-    ctx.fillStyle = '#ffd700';
+    ctx.fillStyle = '#c49a35';
     ctx.fillText('Total', pad.left + 40, pad.top + 8);
   }, [data]);
 
@@ -466,12 +466,12 @@ function PopulationChart({ data }: { data: { tick: number; alive: number; total:
       ref={canvasRef}
       width={600}
       height={120}
-      style={{ width: '100%', height: '120px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+      style={{ width: '100%', height: '120px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}
     />
   );
 }
 
-const PIE_COLORS = ['#ff3366', '#ff6644', '#ff9922', '#ffcc00', '#88cc44', '#44ccaa', '#4488ff', '#8844ff', '#cc44aa', '#888888'];
+const PIE_COLORS = ['#c4555a', '#ff6644', '#ff9922', '#ffcc00', '#88cc44', '#44ccaa', '#6a88b5', '#8844ff', '#cc44aa', '#888888'];
 
 function DeathPieChart({ entries, total }: { entries: [string, number][]; total: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -498,7 +498,7 @@ function DeathPieChart({ entries, total }: { entries: [string, number][]; total:
       ctx.closePath();
       ctx.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
       ctx.fill();
-      ctx.strokeStyle = '#0a0a1a';
+      ctx.strokeStyle = '#e8dfd2';
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -544,7 +544,7 @@ function DeathPieChart({ entries, total }: { entries: [string, number][]; total:
 
 function StatCard({ label, value, color, small }: { label: string; value: string | number; color: string; small?: boolean }) {
   return (
-    <div className="p-2 text-center" style={{ background: '#0a0a1a', border: `1px solid ${color}40` }}>
+    <div className="p-2 text-center" style={{ background: '#e8dfd2', border: `1px solid ${color}40` }}>
       <div className="font-pixel" style={{ fontSize: small ? '8px' : '12px', color }}>
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>

@@ -23,7 +23,7 @@ export default function CharacterCard({ character, selected, onClick }: Characte
         selected ? 'glow-gold' : ''
       } ${!character.alive ? 'opacity-40' : ''}`}
       style={{
-        borderColor: selected ? '#ffd700' : undefined,
+        borderColor: selected ? '#c49a35' : undefined,
       }}
     >
       <div className="flex items-start gap-3">
@@ -47,12 +47,12 @@ export default function CharacterCard({ character, selected, onClick }: Characte
             )}
             <span style={{ fontSize: '10px' }}>{getMoodEmoji(character.emotional_state)}</span>
             {character.group_role && (
-              <span className="pixel-badge font-pixel" style={{ fontSize: '5px', borderColor: '#44ccff', color: '#44ccff' }}>
+              <span className="pixel-badge font-pixel" style={{ fontSize: '5px', borderColor: '#5a9aaa', color: '#5a9aaa' }}>
                 {character.group_role === 'leader' ? '♛' : '⚑'}
               </span>
             )}
             {!character.alive && (
-              <span className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ff3366', color: '#ff3366' }}>
+              <span className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#c4555a', color: '#c4555a' }}>
                 DEAD
               </span>
             )}
@@ -60,12 +60,12 @@ export default function CharacterCard({ character, selected, onClick }: Characte
 
           {character.health !== undefined && character.alive && (
             <div className="mt-1 flex items-center gap-1">
-              <span className="font-pixel" style={{ fontSize: '6px', color: character.health < 30 ? '#ff3366' : '#44cc88' }}>HP</span>
-              <div style={{ flex: 1, height: '3px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+              <span className="font-pixel" style={{ fontSize: '6px', color: character.health < 30 ? '#c4555a' : '#4a9a68' }}>HP</span>
+              <div style={{ flex: 1, height: '3px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
                 <div style={{
                   width: `${Math.round(character.health)}%`,
                   height: '100%',
-                  background: character.health < 30 ? '#ff3366' : character.health < 60 ? '#ffaa44' : '#44cc88',
+                  background: character.health < 30 ? '#c4555a' : character.health < 60 ? '#c48a40' : '#4a9a68',
                 }} />
               </div>
             </div>

@@ -14,7 +14,7 @@ export default function ChatBubble({ message, characterName }: ChatBubbleProps) 
 
   return (
     <div className={message.is_thought ? 'speech-bubble thought-bubble' : 'speech-bubble'}>
-      <div className="font-pixel" style={{ fontSize: '6px', marginBottom: '2px', color: '#6a6a8a' }}>
+      <div className="font-pixel" style={{ fontSize: '6px', marginBottom: '2px', color: '#8a7e72' }}>
         {characterName}
       </div>
       <div className="font-pixel leading-tight" style={{ fontSize: '7px' }}>

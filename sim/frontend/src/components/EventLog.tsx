@@ -8,26 +8,26 @@ interface EventLogProps {
 }
 
 const EVENT_STYLES: Record<string, { color: string; icon: string }> = {
-  conflict: { color: '#ff3366', icon: '⚔' },
-  alliance_formed: { color: '#00ff88', icon: '🛡' },
-  negotiation: { color: '#ff8844', icon: '🤝' },
-  interaction: { color: '#00e5ff', icon: '💬' },
-  environmental: { color: '#ffd700', icon: '☁' },
-  emergent: { color: '#ff00aa', icon: '✦' },
-  resource_change: { color: '#4488ff', icon: '💎' },
-  decision: { color: '#d0d0e0', icon: '►' },
-  emotional_shift: { color: '#aa44ff', icon: '💜' },
-  death: { color: '#ff1144', icon: '💀' },
-  birth: { color: '#88ff88', icon: '✧' },
-  group_formed: { color: '#44ccff', icon: '⚑' },
+  conflict: { color: '#c4555a', icon: '⚔' },
+  alliance_formed: { color: '#5a9a5a', icon: '🛡' },
+  negotiation: { color: '#cc7744', icon: '🤝' },
+  interaction: { color: '#4a9aaa', icon: '💬' },
+  environmental: { color: '#c49a35', icon: '☁' },
+  emergent: { color: '#c45a7a', icon: '✦' },
+  resource_change: { color: '#6a88b5', icon: '💎' },
+  decision: { color: '#2a2a3a', icon: '►' },
+  emotional_shift: { color: '#8a6aaa', icon: '💜' },
+  death: { color: '#c44448', icon: '💀' },
+  birth: { color: '#6aaa6a', icon: '✧' },
+  group_formed: { color: '#5a9aaa', icon: '⚑' },
   group_dissolved: { color: '#886644', icon: '⚐' },
-  group_conflict: { color: '#ff4488', icon: '⚔' },
-  member_joined: { color: '#44ffaa', icon: '►' },
-  member_left: { color: '#ffaa44', icon: '◄' },
-  leadership_change: { color: '#ffdd00', icon: '♛' },
-  trade_completed: { color: '#ffcc00', icon: '⬡' },
-  trade_posted: { color: '#ccaa44', icon: '⬡' },
-  market_shift: { color: '#ff8800', icon: '⬡' },
+  group_conflict: { color: '#c4607a', icon: '⚔' },
+  member_joined: { color: '#5aaa8a', icon: '►' },
+  member_left: { color: '#c48a40', icon: '◄' },
+  leadership_change: { color: '#c4aa35', icon: '♛' },
+  trade_completed: { color: '#c49a30', icon: '⬡' },
+  trade_posted: { color: '#a88a38', icon: '⬡' },
+  market_shift: { color: '#cc7730', icon: '⬡' },
 };
 
 export default function EventLog({ events }: EventLogProps) {
@@ -71,8 +71,8 @@ export default function EventLog({ events }: EventLogProps) {
               className={`p-2 cursor-pointer ${isImportant ? 'glow-gold' : ''}`}
               onClick={() => setExpanded(isExpanded ? null : event.id)}
               style={{
-                background: '#0a0a1a',
-                border: `1px solid ${isImportant ? style.color : '#2a2a5a'}`,
+                background: '#e8dfd2',
+                border: `1px solid ${isImportant ? style.color : '#c4b6a2'}`,
                 boxShadow: isImportant ? `0 0 6px ${style.color}40` : 'none',
               }}
             >
@@ -98,7 +98,7 @@ export default function EventLog({ events }: EventLogProps) {
                             <span
                               key={i}
                               className="pixel-badge font-pixel"
-                              style={{ fontSize: '6px', borderColor: '#2a2a5a', color: '#6a6a8a' }}
+                              style={{ fontSize: '6px', borderColor: '#c4b6a2', color: '#c8c0b0' }}
                             >
                               {o}
                             </span>
@@ -109,7 +109,7 @@ export default function EventLog({ events }: EventLogProps) {
                   )}
                 </div>
                 {isImportant && (
-                  <span className="font-pixel animate-pixel-blink" style={{ fontSize: '8px', color: '#ff00aa' }}>!</span>
+                  <span className="font-pixel animate-pixel-blink" style={{ fontSize: '8px', color: '#c45a7a' }}>!</span>
                 )}
               </div>
             </div>

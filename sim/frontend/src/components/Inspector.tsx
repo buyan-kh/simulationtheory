@@ -62,10 +62,10 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
           style={{
             width: 20,
             height: 20,
-            background: '#1a1a3a',
-            border: '2px solid #4a4a8a',
+            background: '#ece5d8',
+            border: '2px solid #a89880',
             fontSize: '8px',
-            color: '#00e5ff',
+            color: '#4a9aaa',
           }}
         >
           {character.name.charAt(0)}
@@ -73,7 +73,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
         <span>{character.name}</span>
       </div>
 
-      <div className="flex" style={{ borderBottom: '2px solid #2a2a5a' }}>
+      <div className="flex" style={{ borderBottom: '2px solid #c4b6a2' }}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -93,7 +93,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
               <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Vitals</div>
               <div className="grid grid-cols-2 gap-2">
                 {character.age !== undefined && (
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
                     <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>Age</div>
                     <div className="font-pixel text-neon-gold" style={{ fontSize: '10px' }}>
                       {character.age}{character.max_age ? `/${character.max_age}` : ''}
@@ -101,15 +101,15 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   </div>
                 )}
                 {character.health !== undefined && (
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
                     <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>Health</div>
-                    <NeedBar label="" value={character.health} color={character.health < 30 ? '#ff3366' : '#44cc88'} icon="♥" />
+                    <NeedBar label="" value={character.health} color={character.health < 30 ? '#c4555a' : '#4a9a68'} icon="♥" />
                   </div>
                 )}
               </div>
               {!character.alive && character.cause_of_death && (
-                <div className="mt-2 p-2" style={{ background: '#1a0a0a', border: '1px solid #ff3366' }}>
-                  <span className="font-pixel" style={{ fontSize: '7px', color: '#ff3366' }}>
+                <div className="mt-2 p-2" style={{ background: '#f0e0e0', border: '1px solid #c4555a' }}>
+                  <span className="font-pixel" style={{ fontSize: '7px', color: '#c4555a' }}>
                     Died from {character.cause_of_death} {character.death_tick !== undefined ? `at tick ${character.death_tick}` : ''}
                   </span>
                 </div>
@@ -130,8 +130,8 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
               <>
                 <div>
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Group</div>
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '1px solid #44ccff' }}>
-                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#44ccff', color: '#44ccff' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '1px solid #5a9aaa' }}>
+                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#5a9aaa', color: '#5a9aaa' }}>
                       {character.group_role || 'member'}
                     </span>
                   </div>
@@ -268,7 +268,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Beliefs</div>
                   <div className="flex flex-wrap gap-1">
                     {Object.entries(memory.beliefs).map(([k, v]) => (
-                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ffd700', color: '#ffd700' }}>
+                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#c49a35', color: '#c49a35' }}>
                         {k}: {v}
                       </span>
                     ))}
@@ -282,7 +282,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Short-term</div>
                   <div className="space-y-1">
                     {memory.short_term.map((m) => (
-                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #00e5ff' }}>
+                      <div key={m.id} className="p-2" style={{ background: '#e8dfd2', borderLeft: '2px solid #4a9aaa' }}>
                         <div className="flex gap-2 mb-1">
                           <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
                           <span className="font-pixel text-neon-gold" style={{ fontSize: '6px' }}>
@@ -302,7 +302,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Long-term</div>
                   <div className="space-y-1">
                     {memory.long_term.slice(0, 10).map((m) => (
-                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #ff00aa' }}>
+                      <div key={m.id} className="p-2" style={{ background: '#e8dfd2', borderLeft: '2px solid #c45a7a' }}>
                         <div className="flex gap-2 mb-1">
                           <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
                           <span className="font-pixel text-neon-gold" style={{ fontSize: '6px' }}>
@@ -324,7 +324,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Beliefs (local)</div>
                   <div className="flex flex-wrap gap-1">
                     {Object.entries(character.memory.beliefs).map(([k, v]) => (
-                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#ffd700', color: '#ffd700' }}>
+                      <span key={k} className="pixel-badge font-pixel" style={{ fontSize: '6px', borderColor: '#c49a35', color: '#c49a35' }}>
                         {k}: {v}
                       </span>
                     ))}
@@ -338,7 +338,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Recent Memories</div>
                   <div className="space-y-1">
                     {character.memory.short_term.map((m) => (
-                      <div key={m.id} className="p-2" style={{ background: '#0a0a1a', borderLeft: '2px solid #00e5ff' }}>
+                      <div key={m.id} className="p-2" style={{ background: '#e8dfd2', borderLeft: '2px solid #4a9aaa' }}>
                         <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '6px' }}>T{m.tick}</span>
                         <p className="font-pixel text-pixel-text mt-1" style={{ fontSize: '7px' }}>{m.content}</p>
                       </div>
@@ -372,11 +372,11 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                           {(() => {
                             const relType = character.relationship_types?.[id];
                             if (!relType) return null;
-                            const colors: Record<string, string> = { spouse: '#ff66aa', parent: '#ffaa44', child: '#44ccff', friend: '#44ff88', rival: '#ff4444' };
-                            return <span style={{ color: colors[relType] || '#aaa', marginLeft: '2px', fontSize: '6px' }}>[{relType}]</span>;
+                            const colors: Record<string, string> = { spouse: '#c46a8a', parent: '#c48a40', child: '#5a9aaa', friend: '#5aaa6a', rival: '#c44444' };
+                            return <span style={{ color: colors[relType] || '#888', marginLeft: '2px', fontSize: '6px' }}>[{relType}]</span>;
                           })()}
                         </span>
-                        <div className="flex-1 relative" style={{ height: '8px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}>
+                        <div className="flex-1 relative" style={{ height: '8px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}>
                           <div
                             style={{
                               position: 'absolute',
@@ -384,7 +384,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                               top: 0,
                               width: '1px',
                               height: '100%',
-                              background: '#4a4a8a',
+                              background: '#a89880',
                             }}
                           />
                           {isPositive ? (
@@ -395,7 +395,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                                 top: 0,
                                 height: '100%',
                                 width: `${Math.abs(value) * 50}%`,
-                                background: '#00ff88',
+                                background: '#5a9a5a',
                                 transition: 'width 0.3s steps(8)',
                               }}
                             />
@@ -407,7 +407,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                                 top: 0,
                                 height: '100%',
                                 width: `${Math.abs(value) * 50}%`,
-                                background: '#ff3366',
+                                background: '#c4555a',
                                 transition: 'width 0.3s steps(8)',
                               }}
                             />
@@ -415,7 +415,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                         </div>
                         <span
                           className="font-pixel w-8 text-right"
-                          style={{ fontSize: '7px', color: isPositive ? '#00ff88' : '#ff3366' }}
+                          style={{ fontSize: '7px', color: isPositive ? '#5a9a5a' : '#c4555a' }}
                         >
                           {value > 0 ? '+' : ''}{Math.round(value * 100)}
                         </span>
@@ -438,7 +438,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                     <div
                       key={key}
                       className="text-center p-2"
-                      style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                      style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}
                     >
                       <div className="font-pixel text-neon-gold" style={{ fontSize: '10px' }}>{Math.round(val)}</div>
                       <div className="font-pixel text-pixel-text-dim uppercase" style={{ fontSize: '6px' }}>{key}</div>
@@ -460,8 +460,8 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
               <>
                 <div>
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Current Action</div>
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
-                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#00e5ff', color: '#00e5ff' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '2px solid #c4b6a2' }}>
+                    <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#4a9aaa', color: '#4a9aaa' }}>
                       {reasoning.action.type}
                     </span>
                     <p className="font-pixel text-pixel-text mt-2" style={{ fontSize: '7px' }}>{reasoning.action.detail}</p>
@@ -470,7 +470,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                 <div className="pixel-divider" />
                 <div>
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Reasoning Trace</div>
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '2px solid #c4b6a2' }}>
                     <p className="font-pixel text-pixel-text leading-relaxed whitespace-pre-wrap" style={{ fontSize: '7px' }}>
                       {reasoning.reasoning}
                     </p>
@@ -481,9 +481,9 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
               <>
                 <div>
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Last Action</div>
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '2px solid #c4b6a2' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#00e5ff', color: '#00e5ff' }}>
+                      <span className="pixel-badge font-pixel" style={{ fontSize: '7px', borderColor: '#4a9aaa', color: '#4a9aaa' }}>
                         {character.last_action.type}
                       </span>
                       {character.last_action.target_id && (
@@ -498,7 +498,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                 <div className="pixel-divider" />
                 <div>
                   <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Reasoning</div>
-                  <div className="p-2" style={{ background: '#0a0a1a', border: '2px solid #2a2a5a' }}>
+                  <div className="p-2" style={{ background: '#e8dfd2', border: '2px solid #c4b6a2' }}>
                     <p className="font-pixel text-pixel-text leading-relaxed whitespace-pre-wrap" style={{ fontSize: '7px' }}>
                       {character.last_action.reasoning || character.last_reasoning || 'No reasoning available'}
                     </p>
@@ -518,7 +518,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                   <span
                     key={i}
                     className="pixel-badge font-pixel"
-                    style={{ fontSize: '6px', borderColor: '#aa44ff', color: '#aa44ff' }}
+                    style={{ fontSize: '6px', borderColor: '#8a6aaa', color: '#8a6aaa' }}
                   >
                     {m}
                   </span>
@@ -545,11 +545,11 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                       <div
                         key={itemId}
                         className="flex items-center gap-2 p-2"
-                        style={{ background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+                        style={{ background: '#e8dfd2', border: '1px solid #c4b6a2' }}
                       >
                         <span
                           className="pixel-badge font-pixel"
-                          style={{ fontSize: '6px', borderColor: '#ffaa33', color: '#ffaa33' }}
+                          style={{ fontSize: '6px', borderColor: '#c48a30', color: '#c48a30' }}
                         >
                           {item?.item_type || '?'}
                         </span>
@@ -576,12 +576,12 @@ function NeedBar({ label, value, color, icon }: { label: string; value: number; 
   return (
     <div className="flex items-center gap-1.5">
       <span className="font-pixel w-3 text-center" style={{ fontSize: '7px' }}>{icon}</span>
-      <span className="font-pixel w-12 truncate" style={{ fontSize: '7px', color: isCritical ? '#ff3366' : '#aaaaaa' }}>
+      <span className="font-pixel w-12 truncate" style={{ fontSize: '7px', color: isCritical ? '#c4555a' : '#8a8a8a' }}>
         {label}
       </span>
       <div
         className="flex-1 relative"
-        style={{ height: '6px', background: '#0a0a1a', border: '1px solid #2a2a5a' }}
+        style={{ height: '6px', background: '#e8dfd2', border: '1px solid #c4b6a2' }}
       >
         <div
           style={{
@@ -590,7 +590,7 @@ function NeedBar({ label, value, color, icon }: { label: string; value: number; 
             top: 0,
             height: '100%',
             width: `${pct}%`,
-            background: isCritical ? '#ff3366' : color,
+            background: isCritical ? '#c4555a' : color,
             transition: 'width 0.3s ease',
             animation: isCritical ? 'pulse 1s ease-in-out infinite' : undefined,
           }}
@@ -598,7 +598,7 @@ function NeedBar({ label, value, color, icon }: { label: string; value: number; 
       </div>
       <span
         className="font-pixel w-7 text-right"
-        style={{ fontSize: '7px', color: isCritical ? '#ff3366' : color }}
+        style={{ fontSize: '7px', color: isCritical ? '#c4555a' : color }}
       >
         {pct}
       </span>

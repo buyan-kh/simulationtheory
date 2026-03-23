@@ -8,7 +8,7 @@ interface ChatLogProps {
   characters: Record<string, Character>;
 }
 
-const CHAR_COLORS = ['#00e5ff', '#ff00aa', '#00ff88', '#ffd700', '#ff3366', '#4488ff', '#aa44ff', '#ff8844'];
+const CHAR_COLORS = ['#4a9aaa', '#c45a7a', '#5a9a5a', '#c49a35', '#c4555a', '#6a88b5', '#8a6aaa', '#cc7744'];
 
 function getCharColor(index: number): string {
   return CHAR_COLORS[index % CHAR_COLORS.length];
@@ -41,8 +41,8 @@ export default function ChatLog({ messages, characters }: ChatLogProps) {
               key={msg.id}
               className={`p-2 ${msg.is_thought ? 'opacity-60' : ''}`}
               style={{
-                background: '#0a0a1a',
-                borderLeft: `2px solid ${msg.is_thought ? '#6a6a8a' : color}`,
+                background: '#e8dfd2',
+                borderLeft: `2px solid ${msg.is_thought ? '#c8c0b0' : color}`,
               }}
             >
               <div className="flex items-center gap-2 mb-1">

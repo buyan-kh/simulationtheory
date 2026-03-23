@@ -9,14 +9,14 @@ interface ResourceBarProps {
 }
 
 const COLOR_MAP: Record<string, string> = {
-  cyan: '#00e5ff',
-  gold: '#ffd700',
-  green: '#00ff88',
-  red: '#ff3366',
-  blue: '#4488ff',
-  magenta: '#ff00aa',
-  purple: '#aa44ff',
-  orange: '#ff8844',
+  cyan: '#4a9aaa',
+  gold: '#c49a35',
+  green: '#5a9a5a',
+  red: '#c4555a',
+  blue: '#6a88b5',
+  magenta: '#c45a7a',
+  purple: '#8a6aaa',
+  orange: '#cc7744',
 };
 
 export default function ResourceBar({ label, value, max = 100, color = 'cyan', compact = false }: ResourceBarProps) {

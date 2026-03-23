@@ -12,19 +12,19 @@ interface CharacterSpriteProps {
 }
 
 const TRAIT_BORDER_COLORS: Record<string, string> = {
-  openness: '#aa44ff',
-  conscientiousness: '#00e5ff',
-  extraversion: '#ffd700',
-  agreeableness: '#00ff88',
-  neuroticism: '#ff3366',
+  openness: '#8a6aaa',
+  conscientiousness: '#4a9aaa',
+  extraversion: '#c49a35',
+  agreeableness: '#5a9a5a',
+  neuroticism: '#c4555a',
 };
 
 const ARCHETYPE_HAT_COLORS: Record<string, string> = {
-  openness: '#aa44ff',
-  conscientiousness: '#4488ff',
-  extraversion: '#ff8844',
-  agreeableness: '#00ff88',
-  neuroticism: '#ff3366',
+  openness: '#8a6aaa',
+  conscientiousness: '#6a88b5',
+  extraversion: '#cc7744',
+  agreeableness: '#5a9a5a',
+  neuroticism: '#c4555a',
 };
 
 function getDominantTrait(traits: Character['traits']): string {
@@ -41,8 +41,8 @@ function getDominantTrait(traits: Character['traits']): string {
 
 export default function CharacterSprite({ character, selected, onClick, compact = false, showName = true }: CharacterSpriteProps) {
   const dominantTrait = getDominantTrait(character.traits);
-  const borderColor = selected ? '#ffd700' : (TRAIT_BORDER_COLORS[dominantTrait] || '#4a4a8a');
-  const hatColor = ARCHETYPE_HAT_COLORS[dominantTrait] || '#4a4a8a';
+  const borderColor = selected ? '#c49a35' : (TRAIT_BORDER_COLORS[dominantTrait] || '#a89880');
+  const hatColor = ARCHETYPE_HAT_COLORS[dominantTrait] || '#a89880';
   const moodColor = getMoodColor(character.emotional_state);
   const size = compact ? 28 : 40;
   const isDead = !character.alive;
@@ -58,11 +58,11 @@ export default function CharacterSprite({ character, selected, onClick, compact 
         style={{
           width: size,
           height: size,
-          background: isDead ? '#1a1a1a' : '#12122a',
+          background: isDead ? '#1a1a1a' : '#f5f0e6',
           border: `3px solid ${borderColor}`,
           boxShadow: selected
-            ? `0 0 8px rgba(255,215,0,0.5), inset 0 0 4px rgba(255,215,0,0.2), 2px 2px 0 0 rgba(0,0,0,0.4)`
-            : `2px 2px 0 0 rgba(0,0,0,0.4)`,
+            ? `0 0 8px rgba(196,154,53,0.35), inset 0 0 4px rgba(196,154,53,0.15), 2px 2px 0 0 rgba(100,80,60,0.2)`
+            : `2px 2px 0 0 rgba(100,80,60,0.2)`,
           imageRendering: 'pixelated',
           filter: isDead ? 'grayscale(100%)' : 'none',
           opacity: isDead ? 0.5 : 1,
@@ -77,7 +77,7 @@ export default function CharacterSprite({ character, selected, onClick, compact 
             width: compact ? 10 : 14,
             height: compact ? 5 : 6,
             background: hatColor,
-            border: '1px solid rgba(0,0,0,0.3)',
+            border: '1px solid rgba(100,80,60,0.15)',
           }}
         />
 
@@ -109,7 +109,7 @@ export default function CharacterSprite({ character, selected, onClick, compact 
           style={{
             fontSize: '6px',
             maxWidth: size + 16,
-            color: selected ? '#ffd700' : undefined,
+            color: selected ? '#c49a35' : undefined,
           }}
         >
           {character.name}
