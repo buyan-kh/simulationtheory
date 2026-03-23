@@ -89,6 +89,7 @@ class SimulationEngine:
             count = len(self.db.list_summaries()) + 1
             sim.name = f"Simulation #{count}"
         self.simulations[sim.id] = sim
+        self.agent_memory.wipe_sim_dir(sim.id)  # fresh start — no stale files
         self.db.save(sim)
         return sim
 

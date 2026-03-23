@@ -32,6 +32,9 @@ Thumbs.db
 # Database
 *.db
 
+# Agent memory files (generated per session)
+agent_memories/
+
 # Generated
 next-env.d.ts
 *.tsbuildinfo
