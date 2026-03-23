@@ -297,14 +297,6 @@ class AgentMemoryManager:
         os.makedirs(path, exist_ok=True)
         return path
 
-    def wipe_sim_dir(self, sim_id: str):
-        """Remove all existing .txt files for a simulation (fresh start)."""
-        sim_dir = _sim_dir(sim_id)
-        if os.path.exists(sim_dir):
-            for f in os.listdir(sim_dir):
-                if f.endswith(".txt"):
-                    os.remove(os.path.join(sim_dir, f))
-
     def write_agent_file(self, char: Character, sim: SimulationState):
         """Write/update the .txt file for a single agent."""
         sim_dir = self._ensure_sim_dir(sim.id)
