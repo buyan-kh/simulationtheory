@@ -55,6 +55,49 @@ export default function SimulationPage() {
   const [llmStatus, setLlmStatus] = useState<{ available: boolean; call_count: number; has_api_key: boolean } | null>(null);
   const [spotlightIds, setSpotlightIds] = useState<Set<string>>(new Set());
 
+  // Panel resize & collapse state
+  const [leftWidth, setLeftWidth] = useState(220);
+  const [rightWidth, setRightWidth] = useState(280);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const draggingRef = useRef<'left' | 'right' | null>(null);
+  const dragStartXRef = useRef(0);
+  const dragStartWidthRef = useRef(0);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      e.preventDefault();
+      const dx = e.clientX - dragStartXRef.current;
+      if (draggingRef.current === 'left') {
+        setLeftWidth(Math.max(150, Math.min(400, dragStartWidthRef.current + dx)));
+      } else {
+        setRightWidth(Math.max(200, Math.min(600, dragStartWidthRef.current - dx)));
+      }
+    };
+    const onMouseUp = () => {
+      if (draggingRef.current) {
+        draggingRef.current = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  const startDrag = useCallback((panel: 'left' | 'right', e: React.MouseEvent) => {
+    draggingRef.current = panel;
+    dragStartXRef.current = e.clientX;
+    dragStartWidthRef.current = panel === 'left' ? leftWidth : rightWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [leftWidth, rightWidth]);
+
   useEffect(() => {
     getSimulation(simId)
       .then((sim) => {
@@ -215,63 +258,91 @@ export default function SimulationPage() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        <div className="w-[220px] border-r-2 border-[#a89880] bg-pixel-panel overflow-y-auto pixel-scrollbar shrink-0 flex flex-col">
-          <div className="px-3 py-2 border-b-2 border-[#c4b6a2] bg-[#ece5d8]">
-            <span className="text-pixel-xs text-gray-400 tracking-wider">AGENTS ({characters.length})</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {characters.map((char) => (
-              <div key={char.id} className="relative">
-                <CharacterCard
-                  character={char}
-                  selected={char.id === selectedCharacterId}
-                  onClick={() => selectCharacter(char.id === selectedCharacterId ? null : char.id)}
-                />
-                {llmStatus?.available && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const isSpotlight = spotlightIds.has(char.id);
-                      if (isSpotlight) {
-                        removeFromSpotlight(simId, char.id).then((res) => {
-                          setSpotlightIds(new Set(res.spotlight));
-                        }).catch(() => {});
-                      } else {
-                        addToSpotlight(simId, char.id).then((res) => {
-                          setSpotlightIds(new Set(res.spotlight));
-                        }).catch(() => {});
-                      }
-                    }}
-                    className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-center leading-none"
-                    style={{
-                      fontSize: '8px',
-                      color: spotlightIds.has(char.id) ? '#c49a35' : '#a89880',
-                      textShadow: spotlightIds.has(char.id) ? '0 0 4px rgba(196,154,53,0.6)' : 'none',
-                    }}
-                    title={spotlightIds.has(char.id) ? 'AI Brain ON (click to disable)' : 'Enable AI Brain (spotlight)'}
-                  >
-                    {spotlightIds.has(char.id) ? '★' : '☆'}
-                  </button>
-                )}
-              </div>
-            ))}
-            {characters.length === 0 && (
-              <div className="text-center py-8">
-                <div className="text-pixel-lg text-gray-600 mb-2">?</div>
-                <div className="text-pixel-xs text-gray-600 mb-3">NO AGENTS</div>
-              </div>
-            )}
-          </div>
-          <div className="p-2 border-t-2 border-[#c4b6a2]">
+        {/* Left sidebar */}
+        {leftCollapsed ? (
+          <div className="shrink-0 bg-pixel-panel border-r-2 border-[#a89880] flex flex-col items-center py-2" style={{ width: 28 }}>
             <button
-              onClick={() => setShowAddChar(true)}
-              className="pixel-btn pixel-btn-green text-pixel-xs w-full py-2"
-            >
-              + ADD AGENT
-            </button>
+              onClick={() => setLeftCollapsed(false)}
+              className="text-pixel-xs text-gray-500 hover:text-[#4a9aaa] transition-colors"
+              style={{ fontSize: '10px', padding: '4px 2px', lineHeight: 1, fontFamily: "'Press Start 2P', monospace" }}
+              title="Expand agents panel"
+            >{'\u00BB'}</button>
           </div>
-        </div>
+        ) : (
+          <div className="border-r-2 border-[#a89880] bg-pixel-panel overflow-y-auto pixel-scrollbar shrink-0 flex flex-col" style={{ width: leftWidth }}>
+            <div className="px-3 py-2 border-b-2 border-[#c4b6a2] bg-[#ece5d8] flex items-center justify-between">
+              <span className="text-pixel-xs text-gray-400 tracking-wider">AGENTS ({characters.length})</span>
+              <button
+                onClick={() => setLeftCollapsed(true)}
+                className="text-pixel-xs text-gray-500 hover:text-[#4a9aaa] transition-colors"
+                style={{ fontSize: '10px', padding: '0 2px', lineHeight: 1, fontFamily: "'Press Start 2P', monospace" }}
+                title="Collapse agents panel"
+              >{'\u00AB'}</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              {characters.map((char) => (
+                <div key={char.id} className="relative">
+                  <CharacterCard
+                    character={char}
+                    selected={char.id === selectedCharacterId}
+                    onClick={() => selectCharacter(char.id === selectedCharacterId ? null : char.id)}
+                  />
+                  {llmStatus?.available && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const isSpotlight = spotlightIds.has(char.id);
+                        if (isSpotlight) {
+                          removeFromSpotlight(simId, char.id).then((res) => {
+                            setSpotlightIds(new Set(res.spotlight));
+                          }).catch(() => {});
+                        } else {
+                          addToSpotlight(simId, char.id).then((res) => {
+                            setSpotlightIds(new Set(res.spotlight));
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-center leading-none"
+                      style={{
+                        fontSize: '8px',
+                        color: spotlightIds.has(char.id) ? '#c49a35' : '#a89880',
+                        textShadow: spotlightIds.has(char.id) ? '0 0 4px rgba(196,154,53,0.6)' : 'none',
+                      }}
+                      title={spotlightIds.has(char.id) ? 'AI Brain ON (click to disable)' : 'Enable AI Brain (spotlight)'}
+                    >
+                      {spotlightIds.has(char.id) ? '\u2605' : '\u2606'}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {characters.length === 0 && (
+                <div className="text-center py-8">
+                  <div className="text-pixel-lg text-gray-600 mb-2">?</div>
+                  <div className="text-pixel-xs text-gray-600 mb-3">NO AGENTS</div>
+                </div>
+              )}
+            </div>
+            <div className="p-2 border-t-2 border-[#c4b6a2]">
+              <button
+                onClick={() => setShowAddChar(true)}
+                className="pixel-btn pixel-btn-green text-pixel-xs w-full py-2"
+              >
+                + ADD AGENT
+              </button>
+            </div>
+          </div>
+        )}
 
+        {/* Left resize handle */}
+        {!leftCollapsed && (
+          <div
+            onMouseDown={(e) => startDrag('left', e)}
+            style={{ width: 5, cursor: 'col-resize', background: '#e8dfd2', borderRight: '1px solid #c4b6a2', transition: 'background 0.1s' }}
+            className="shrink-0 hover:!bg-[#4a9aaa33]"
+          />
+        )}
+
+        {/* Center canvas */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 min-h-0">
             <PixelCanvas
@@ -313,37 +384,64 @@ export default function SimulationPage() {
           )}
         </div>
 
-        <div className="w-[280px] border-l-2 border-[#a89880] bg-pixel-panel shrink-0 flex flex-col">
-          <div className="flex shrink-0">
-            {([
-              { key: 'events' as const, label: 'EVENTS', color: 'neon-cyan' },
-              { key: 'chat' as const, label: 'CHAT', color: 'neon-magenta' },
-              { key: 'groups' as const, label: 'GROUPS', color: '#5a9aaa' },
-              { key: 'market' as const, label: 'MARKET', color: '#c49a35' },
-              { key: 'graph' as const, label: 'GRAPH', color: '#8a6aaa' },
-            ] as const).map(tab => (
+        {/* Right resize handle */}
+        {!rightCollapsed && (
+          <div
+            onMouseDown={(e) => startDrag('right', e)}
+            style={{ width: 5, cursor: 'col-resize', background: '#e8dfd2', borderLeft: '1px solid #c4b6a2', transition: 'background 0.1s' }}
+            className="shrink-0 hover:!bg-[#4a9aaa33]"
+          />
+        )}
+
+        {/* Right panel */}
+        {rightCollapsed ? (
+          <div className="shrink-0 bg-pixel-panel border-l-2 border-[#a89880] flex flex-col items-center py-2" style={{ width: 28 }}>
+            <button
+              onClick={() => setRightCollapsed(false)}
+              className="text-pixel-xs text-gray-500 hover:text-[#4a9aaa] transition-colors"
+              style={{ fontSize: '10px', padding: '4px 2px', lineHeight: 1, fontFamily: "'Press Start 2P', monospace" }}
+              title="Expand dashboard panel"
+            >{'\u00AB'}</button>
+          </div>
+        ) : (
+          <div className="border-l-2 border-[#a89880] bg-pixel-panel shrink-0 flex flex-col" style={{ width: rightWidth }}>
+            <div className="flex shrink-0">
+              {([
+                { key: 'events' as const, label: 'EVENTS', color: 'neon-cyan' },
+                { key: 'chat' as const, label: 'CHAT', color: 'neon-magenta' },
+                { key: 'groups' as const, label: 'GROUPS', color: '#5a9aaa' },
+                { key: 'market' as const, label: 'MARKET', color: '#c49a35' },
+                { key: 'graph' as const, label: 'GRAPH', color: '#8a6aaa' },
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActivePanel(tab.key)}
+                  className={`flex-1 px-1.5 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
+                    activePanel === tab.key
+                      ? `bg-[#f5f0e6]`
+                      : 'text-gray-500 border-[#c4b6a2] bg-[#ece5d8] hover:text-gray-300'
+                  }`}
+                  style={activePanel === tab.key ? { color: tab.color, borderColor: tab.color } : { fontSize: '7px' }}
+                >
+                  {tab.label}
+                </button>
+              ))}
               <button
-                key={tab.key}
-                onClick={() => setActivePanel(tab.key)}
-                className={`flex-1 px-1.5 py-2 text-pixel-xs tracking-wider border-b-2 transition-colors ${
-                  activePanel === tab.key
-                    ? `bg-[#f5f0e6]`
-                    : 'text-gray-500 border-[#c4b6a2] bg-[#ece5d8] hover:text-gray-300'
-                }`}
-                style={activePanel === tab.key ? { color: tab.color, borderColor: tab.color } : { fontSize: '7px' }}
-              >
-                {tab.label}
-              </button>
-            ))}
+                onClick={() => setRightCollapsed(true)}
+                className="px-2 py-2 text-gray-500 hover:text-[#4a9aaa] transition-colors border-b-2 border-[#c4b6a2] bg-[#ece5d8]"
+                style={{ fontSize: '10px', lineHeight: 1, fontFamily: "'Press Start 2P', monospace" }}
+                title="Collapse dashboard panel"
+              >{'\u00BB'}</button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {activePanel === 'events' && <EventLog events={events} />}
+              {activePanel === 'chat' && <ChatLog messages={chatMessages} characters={simulation.characters} />}
+              {activePanel === 'groups' && <GroupPanel groups={simulation.groups || {}} characters={simulation.characters} />}
+              {activePanel === 'market' && <MarketPanel market={simulation.market || { offers: [], history: [], price_index: {} }} characters={simulation.characters} />}
+              {activePanel === 'graph' && <RelationshipGraph simId={simId} selectedCharacterId={selectedCharacterId} onSelectCharacter={(id) => selectCharacter(id === selectedCharacterId ? null : id)} />}
+            </div>
           </div>
-          <div className="flex-1 overflow-hidden">
-            {activePanel === 'events' && <EventLog events={events} />}
-            {activePanel === 'chat' && <ChatLog messages={chatMessages} characters={simulation.characters} />}
-            {activePanel === 'groups' && <GroupPanel groups={simulation.groups || {}} characters={simulation.characters} />}
-            {activePanel === 'market' && <MarketPanel market={simulation.market || { offers: [], history: [], price_index: {} }} characters={simulation.characters} />}
-            {activePanel === 'graph' && <RelationshipGraph simId={simId} selectedCharacterId={selectedCharacterId} onSelectCharacter={(id) => selectCharacter(id === selectedCharacterId ? null : id)} />}
-          </div>
-        </div>
+        )}
       </div>
 
       {showSettings && (
