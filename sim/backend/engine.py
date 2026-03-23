@@ -21,6 +21,65 @@ from agent_memory import AgentMemoryManager
 # World bounds
 WORLD_BOUND = 300  # sim coords go from -300 to 300
 
+
+# ── Time-of-day helper ──
+# 24 ticks = 1 day. Converts tick to hour (0-23).
+def get_hour(tick: int) -> int:
+    return tick % 24
+
+
+def get_time_period(tick: int) -> str:
+    """Return the current time period: 'sleep', 'morning', 'work', 'free'."""
+    hour = get_hour(tick)
+    if hour >= 22 or hour < 6:
+        return "sleep"
+    elif hour < 8:
+        return "morning"
+    elif hour < 17:
+        return "work"
+    else:
+        return "free"
+
+
+# ── Occupation → work location mapping ──
+# Maps occupation to a list of location names (first match wins).
+OCCUPATION_WORK_LOCATIONS: dict[str, list[str]] = {
+    "farmer": ["The Farm", "South Farm"],
+    "trader": ["Market Square", "Trading Post"],
+    "scholar": ["Library"],
+    "craftsperson": ["Market Square"],
+    "hunter": ["Wilderness"],
+    "healer": ["Central Park", "Council Hall"],
+    "guard": ["The Arena", "Council Hall"],
+    "cook": ["Golden Plate", "McBurger's", "The Cozy Cafe"],
+    "builder": [],  # builders work anywhere — no fixed location
+    "entertainer": ["The Cozy Cafe", "Central Park"],
+    "messenger": ["Market Square"],
+    "fisher": ["Riverside Beach"],
+    "miner": ["Mountain Lodge"],
+    "herbalist": ["Wilderness", "Central Park"],
+    "artist": ["Library", "Central Park"],
+}
+
+# Work-related actions per occupation (boost these during work hours)
+OCCUPATION_WORK_ACTIONS: dict[str, list[str]] = {
+    "farmer": ["gather"],
+    "trader": ["trade", "negotiate"],
+    "scholar": ["learn", "observe"],
+    "craftsperson": ["craft"],
+    "hunter": ["gather", "explore"],
+    "healer": ["cooperate", "share"],
+    "guard": ["defend", "observe"],
+    "cook": ["gather", "craft"],
+    "builder": ["build_home", "craft"],
+    "entertainer": ["communicate", "cooperate"],
+    "messenger": ["communicate", "explore"],
+    "fisher": ["gather"],
+    "miner": ["gather"],
+    "herbalist": ["gather", "explore"],
+    "artist": ["craft", "learn"],
+}
+
 HOUSE_PLOTS = [
     # Town center residential area
     {"x": -30, "y": -30}, {"x": -15, "y": -35}, {"x": 0, "y": -40},
@@ -817,6 +876,24 @@ class SimulationEngine:
                 idx[loc.type] = loc
         return idx
 
+    def _get_work_location(self, char: Character, sim: SimulationState) -> tuple[float, float] | None:
+        """Find the work location for a character based on occupation. Returns (x, y) or None."""
+        loc_names = OCCUPATION_WORK_LOCATIONS.get(char.occupation, [])
+        if not loc_names:
+            return None
+        # Use character hash to pick a consistent workplace from the options
+        pick = hash(char.id) % len(loc_names)
+        target_name = loc_names[pick]
+        for loc in sim.environment.locations:
+            if loc.name == target_name:
+                return (loc.x, loc.y)
+        # Fallback: try first match
+        for name in loc_names:
+            for loc in sim.environment.locations:
+                if loc.name == name:
+                    return (loc.x, loc.y)
+        return None
+
     def _find_location_by_type(self, sim: SimulationState, loc_type: str, loc_index: dict[str, Location] | None = None) -> Location | None:
         if loc_index is not None:
             return loc_index.get(loc_type)
@@ -834,14 +911,46 @@ class SimulationEngine:
         house_index: dict[str, House] = {h.id: h for h in sim.environment.houses}
         loc_index = self._build_location_index(sim)
         rng = random.Random(hash(("move", sim.tick)))
+        period = get_time_period(sim.tick)
 
         for char_id, action in actions.items():
             char = sim.characters[char_id]
             if not char.alive:
                 continue
 
+            # ── Schedule-aware movement overrides ──
+            schedule_target: tuple[float, float] | None = None
+
+            if period == "sleep" and char.house_id:
+                # Night: go home to sleep
+                house = house_index.get(char.house_id)
+                if house:
+                    schedule_target = (house.position["x"], house.position["y"])
+
+            elif period == "morning" and char.house_id:
+                # Morning transition: start heading toward work (or linger at home)
+                work_loc = self._get_work_location(char, sim)
+                if work_loc:
+                    # Blend: 40% home, 60% work (gradually leaving home)
+                    house = house_index.get(char.house_id)
+                    if house:
+                        schedule_target = (
+                            house.position["x"] * 0.4 + work_loc[0] * 0.6,
+                            house.position["y"] * 0.4 + work_loc[1] * 0.6,
+                        )
+                    else:
+                        schedule_target = work_loc
+
+            elif period == "work" and char.occupation:
+                # Work hours: head to work location (but let action override if urgent)
+                work_loc = self._get_work_location(char, sim)
+                if work_loc and action.type.value != "attend_event":
+                    # Blend work location with action target so agents don't ignore
+                    # urgent needs entirely — 70% work, 30% action
+                    schedule_target = work_loc  # will be blended below
+
             # Determine target position based on action
-            # Social event attendance: move to the event location
+            # Social event attendance: move to the event location (overrides schedule)
             if action.type == ActionType.ATTEND_EVENT:
                 for se in sim.social_events:
                     if char.id in se.invited_ids and se.scheduled_tick <= sim.tick < se.scheduled_tick + se.duration:
@@ -864,7 +973,10 @@ class SimulationEngine:
                     char.position["y"] += (dy / dist) * move
                 continue
 
-            if action.type.value == "rest" and char.house_id:
+            if schedule_target and period in ("sleep", "morning"):
+                # During sleep/morning, schedule dominates movement
+                target_x, target_y = schedule_target
+            elif action.type.value == "rest" and char.house_id:
                 house = house_index.get(char.house_id)
                 if house:
                     target_x = house.position["x"]
@@ -884,6 +996,10 @@ class SimulationEngine:
                     target_y = ty * 0.6 + loc.y * 0.4
                 else:
                     target_x, target_y = tx, ty
+                # During work hours, blend with work location
+                if schedule_target and period == "work":
+                    target_x = target_x * 0.3 + schedule_target[0] * 0.7
+                    target_y = target_y * 0.3 + schedule_target[1] * 0.7
             else:
                 # Try dynamic location lookup first (O(1) with index)
                 loc_type = self._ACTION_LOCATION_TYPE.get(action.type.value)
@@ -893,8 +1009,16 @@ class SimulationEngine:
                 else:
                     fallback = self._ACTION_LOCATION_MAP.get(action.type.value)
                     if fallback is None:
-                        continue
-                    target_x, target_y = fallback
+                        if schedule_target:
+                            target_x, target_y = schedule_target
+                        else:
+                            continue
+                    else:
+                        target_x, target_y = fallback
+                # During work hours, blend with work location
+                if schedule_target and period == "work":
+                    target_x = target_x * 0.3 + schedule_target[0] * 0.7
+                    target_y = target_y * 0.3 + schedule_target[1] * 0.7
 
             dx = target_x - char.position["x"]
             dy = target_y - char.position["y"]
@@ -951,10 +1075,11 @@ class SimulationEngine:
                 char.resources.pop("_move_phase", None)
                 char.resources.pop("_driving", None)
                 speed = self._BASE_SPEED * (0.8 + char.traits.extraversion * 0.4)
-                # Rush home at night
-                hour = sim.tick % 24
-                if (hour >= 21 or hour <= 4) and action.type.value == "rest" and char.house_id:
+                # Rush home at night, hurry to work in morning
+                if period == "sleep" and action.type.value == "rest" and char.house_id:
                     speed *= 1.5
+                elif period == "morning":
+                    speed *= 1.2
                 if dist > 0:
                     move = min(speed, dist)
                     char.position["x"] += (dx / dist) * move

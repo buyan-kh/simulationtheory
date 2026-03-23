@@ -289,19 +289,41 @@ class AgentBrain:
         influence = character.resources.get("influence", 50)
         urgency: dict[ActionType, float] = {}
 
-        # ── Night cycle: agents should sleep at night ──
+        # ── Daily schedule: sleep / work / free time ──
         if state:
             hour = state.tick % 24
-            is_night = hour >= 21 or hour <= 4
-            if is_night:
+
+            # Sleep hours (22-6): strongly boost REST, suppress everything else
+            if hour >= 22 or hour < 6:
                 if character.house_id:
                     urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 5.0
                 else:
                     urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) + 3.0
-                # Penalize ALL non-rest actions at night
                 for at in ActionType:
                     if at != ActionType.REST:
                         urgency[at] = urgency.get(at, 0) - 2.0
+
+            # Work hours (8-17): boost work-related actions based on occupation
+            elif 8 <= hour < 17 and character.occupation:
+                from engine import OCCUPATION_WORK_ACTIONS
+                work_actions = OCCUPATION_WORK_ACTIONS.get(character.occupation, [])
+                for wa in work_actions:
+                    try:
+                        at = ActionType(wa)
+                        urgency[at] = urgency.get(at, 0) + 1.2
+                    except ValueError:
+                        pass
+                # Mild penalty on purely leisure actions during work hours
+                urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) - 0.4
+                urgency[ActionType.REST] = urgency.get(ActionType.REST, 0) - 0.3
+
+            # Free time (17-22): slightly boost social actions
+            elif 17 <= hour < 22:
+                urgency[ActionType.COMMUNICATE] = urgency.get(ActionType.COMMUNICATE, 0) + 0.4
+                urgency[ActionType.COOPERATE] = urgency.get(ActionType.COOPERATE, 0) + 0.3
+                urgency[ActionType.COURT] = urgency.get(ActionType.COURT, 0) + 0.3
+                urgency[ActionType.ATTEND_EVENT] = urgency.get(ActionType.ATTEND_EVENT, 0) + 0.3
+                urgency[ActionType.EXPLORE] = urgency.get(ActionType.EXPLORE, 0) + 0.2
 
         # ── Needs-based urgency (hunger, energy need, social) ──
         hunger = character.needs.hunger
@@ -887,16 +909,34 @@ class AgentBrain:
             scores = [(at, s - 0.8 if at == ActionType.CRAFT else s) for at, s in scores]
             scores.append((ActionType.GATHER, 1.5))
 
-        # Night cycle: override — go to sleep
+        # ── Daily schedule overrides ──
         hour = state.tick % 24
-        is_night = hour >= 21 or hour <= 4
-        if is_night:
-            # Force rest at night by inserting a dominant score
+
+        # Sleep (22-6): strongly push REST
+        if hour >= 22 or hour < 6:
             scores = [(at, s - 2.0) for at, s in scores if at != ActionType.REST]
             if character.house_id:
                 scores.append((ActionType.REST, 5.0))
             else:
                 scores.append((ActionType.REST, 3.0))
+
+        # Work hours (8-17): boost occupation-related actions
+        elif 8 <= hour < 17 and character.occupation:
+            from engine import OCCUPATION_WORK_ACTIONS
+            work_actions = OCCUPATION_WORK_ACTIONS.get(character.occupation, [])
+            for wa in work_actions:
+                try:
+                    at = ActionType(wa)
+                    scores.append((at, 1.5))
+                except ValueError:
+                    pass
+            # Small penalty on leisure during work
+            scores = [(at, s - 0.4 if at == ActionType.EXPLORE else s) for at, s in scores]
+
+        # Free time (17-22): boost social
+        elif 17 <= hour < 22:
+            scores.append((ActionType.COMMUNICATE, 0.8))
+            scores.append((ActionType.COOPERATE, 0.5))
 
         # Pick best
         scores.sort(key=lambda x: x[1], reverse=True)
