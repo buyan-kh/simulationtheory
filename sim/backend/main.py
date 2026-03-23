@@ -12,6 +12,7 @@ from models import (
 )
 from engine import SimulationEngine
 from analytics import SimulationAnalytics
+from agent_memory import AgentMemoryManager
 
 app = FastAPI(title="Multi-Agent Simulation Platform")
 
@@ -562,3 +563,28 @@ def export_csv(sim_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=simulation_{sim_id}.zip"},
     )
+
+
+# ── Agent Memory Files ──
+
+@app.get("/api/simulations/{sim_id}/characters/{char_id}/memory-file")
+def get_agent_memory_file(sim_id: str, char_id: str):
+    """Get the persistent .txt memory file for a specific agent."""
+    sim = _get_sim(sim_id)
+    char = sim.characters.get(char_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    content = engine.agent_memory.read_agent_file(sim_id, char_id, char.name)
+    if content is None:
+        # Generate on the fly if file doesn't exist yet
+        engine.agent_memory.write_agent_file(char, sim)
+        content = engine.agent_memory.read_agent_file(sim_id, char_id, char.name)
+    return {"character_id": char_id, "name": char.name, "content": content}
+
+
+@app.get("/api/simulations/{sim_id}/memory-files")
+def list_agent_memory_files(sim_id: str):
+    """List all agent memory files for a simulation."""
+    _get_sim(sim_id)  # validate sim exists
+    files = engine.agent_memory.list_agent_files(sim_id)
+    return {"sim_id": sim_id, "files": files, "count": len(files)}

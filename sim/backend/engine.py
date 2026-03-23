@@ -16,6 +16,7 @@ from db import SimulationDB
 from spatial import SpatialGrid
 from lod import LODManager, LODTier
 from llm_brain import LLMBrain
+from agent_memory import AgentMemoryManager
 
 # World bounds
 WORLD_BOUND = 300  # sim coords go from -300 to 300
@@ -71,6 +72,7 @@ class SimulationEngine:
         self.grid = SpatialGrid(cell_size=30.0)
         self.lod_managers: dict[str, LODManager] = {}  # sim_id -> LODManager
         self.llm_brain = LLMBrain()
+        self.agent_memory = AgentMemoryManager()
 
     def get_lod(self, sim_id: str) -> LODManager:
         if sim_id not in self.lod_managers:
@@ -112,6 +114,7 @@ class SimulationEngine:
         )
         sim.characters[char.id] = char
         self._assign_house(sim, char)
+        self.agent_memory.write_agent_file(char, sim)
         self.db.save(sim)
         return char
 
@@ -294,6 +297,10 @@ class SimulationEngine:
             sim.characters[char.id] = char
             self._assign_house(sim, char)
             created.append(char)
+
+        # Write persistent memory files for all new agents
+        for char in created:
+            self.agent_memory.write_agent_file(char, sim)
 
         self.db.save(sim)
         return created
@@ -494,6 +501,10 @@ class SimulationEngine:
             self.db.save(sim)
             self.db.save_snapshot(sim)
 
+        # Update persistent agent memory files (same interval as DB saves)
+        if sim.tick % save_interval == 0:
+            self.agent_memory.write_all_agents(sim)
+
         return all_events, chat_messages
 
     def get_state(self, sim_id: str) -> SimulationState:
@@ -518,6 +529,7 @@ class SimulationEngine:
     def delete_simulation(self, sim_id: str):
         if sim_id in self.simulations:
             del self.simulations[sim_id]
+        self.agent_memory.delete_sim_memories(sim_id)
         self.db.delete(sim_id)
 
     def list_summaries(self) -> list[dict]:
