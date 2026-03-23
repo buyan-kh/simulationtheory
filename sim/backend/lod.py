@@ -82,11 +82,21 @@ class LODManager:
 
         alive_ids = [cid for cid, c in characters.items() if c.alive]
 
-        # No spotlight → everyone is active (original behavior)
+        # No spotlight set → auto-promote based on population size
+        # Small populations: everyone is SPOTLIGHT (get full dialogue)
+        # Larger: first 20 SPOTLIGHT, rest ACTIVE
         if not self.spotlight_ids:
-            result[LODTier.ACTIVE] = alive_ids
-            for cid in alive_ids:
-                self.tiers[cid] = LODTier.ACTIVE
+            if len(alive_ids) <= 30:
+                result[LODTier.SPOTLIGHT] = alive_ids
+                for cid in alive_ids:
+                    self.tiers[cid] = LODTier.SPOTLIGHT
+            else:
+                result[LODTier.SPOTLIGHT] = alive_ids[:20]
+                result[LODTier.ACTIVE] = alive_ids[20:]
+                for cid in alive_ids[:20]:
+                    self.tiers[cid] = LODTier.SPOTLIGHT
+                for cid in alive_ids[20:]:
+                    self.tiers[cid] = LODTier.ACTIVE
             return result
 
         # Build the set of active IDs (near spotlight or related)

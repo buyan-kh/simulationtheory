@@ -149,31 +149,38 @@ export default function RelationshipGraph({ simId, selectedCharacterId, onSelect
     for (const node of nodes) {
       const isSelected = node.id === selectedCharacterId;
       const r = isSelected ? 8 : 6;
-      const color = node.group_id ? (groupColorMap.current[node.group_id] || '#888') : '#666';
+      const color = node.group_id ? (groupColorMap.current[node.group_id] || '#6a88b5') : '#4a9aaa';
 
       if (isSelected) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 4, 0, Math.PI * 2);
-        ctx.fillStyle = `${color}40`;
+        ctx.arc(node.x, node.y, r + 5, 0, Math.PI * 2);
+        ctx.fillStyle = `${color}30`;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 2, 0, Math.PI * 2);
+        ctx.arc(node.x, node.y, r + 3, 0, Math.PI * 2);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
 
+      // White fill circle with colored border
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = node.alive ? color : '#333';
+      ctx.fillStyle = node.alive ? '#fff' : '#d8d0c8';
       ctx.fill();
-      ctx.strokeStyle = isSelected ? '#fff' : '#ece5d8';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = node.alive ? color : '#aaa';
+      ctx.lineWidth = isSelected ? 3 : 2;
       ctx.stroke();
+
+      // Inner colored dot
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = node.alive ? color : '#bbb';
+      ctx.fill();
 
       // Label
       ctx.font = '7px monospace';
-      ctx.fillStyle = node.alive ? '#4a4a5a' : '#aaa';
+      ctx.fillStyle = node.alive ? '#3a3a4a' : '#aaa';
       ctx.textAlign = 'center';
       ctx.fillText(node.name.slice(0, 8), node.x, node.y + r + 10);
     }
