@@ -23,6 +23,147 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ANIMATION_FRAME_DIVISOR = 15;
 
+// Camera smoothing
+const CAMERA_LERP_SPEED = 0.08;
+
+// ==================== PARTICLE SYSTEM ====================
+
+export type ParticleType = 'dust' | 'emotion' | 'sparkle' | 'rain' | 'leaf';
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  type: ParticleType;
+  color: string;
+  size: number;
+  emoji?: string;
+}
+
+export class ParticleSystem {
+  private particles: Particle[] = [];
+  private maxParticles = 500;
+
+  emit(worldX: number, worldY: number, type: ParticleType, count: number = 3, emoji?: string) {
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= this.maxParticles) break;
+      const p = this.createParticle(worldX, worldY, type, emoji);
+      if (p) this.particles.push(p);
+    }
+  }
+
+  private createParticle(x: number, y: number, type: ParticleType, emoji?: string): Particle {
+    switch (type) {
+      case 'dust':
+        return {
+          x, y,
+          vx: (Math.random() - 0.5) * 0.8,
+          vy: -Math.random() * 0.5 - 0.2,
+          life: 20 + Math.random() * 15,
+          maxLife: 35,
+          type, color: '#b8a88a', size: 2,
+        };
+      case 'emotion':
+        return {
+          x: x + (Math.random() - 0.5) * 8,
+          y: y - 10,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: -0.6 - Math.random() * 0.3,
+          life: 50 + Math.random() * 20,
+          maxLife: 70,
+          type, color: '#ffffff', size: 8,
+          emoji,
+        };
+      case 'sparkle':
+        return {
+          x: x + (Math.random() - 0.5) * 16,
+          y: y + (Math.random() - 0.5) * 16,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: -Math.random() * 0.3,
+          life: 15 + Math.random() * 10,
+          maxLife: 25,
+          type, color: '#FFD700', size: 2,
+        };
+      case 'rain':
+        return {
+          x: x + (Math.random() - 0.5) * 800,
+          y: y - 400 + Math.random() * 100,
+          vx: -0.5,
+          vy: 6 + Math.random() * 2,
+          life: 80,
+          maxLife: 80,
+          type, color: '#8ab4d4', size: 1,
+        };
+      case 'leaf':
+        return {
+          x: x + (Math.random() - 0.5) * 400,
+          y: y - 200 + Math.random() * 100,
+          vx: 0.5 + Math.random() * 0.5,
+          vy: 0.3 + Math.random() * 0.5,
+          life: 100 + Math.random() * 60,
+          maxLife: 160,
+          type,
+          color: Math.random() < 0.5 ? '#5dc05d' : '#cc8833',
+          size: 3,
+        };
+    }
+  }
+
+  update() {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+
+      // Gravity for leaves
+      if (p.type === 'leaf') {
+        p.vx += Math.sin(p.life * 0.1) * 0.02;
+      }
+
+      if (p.life <= 0) {
+        this.particles[i] = this.particles[this.particles.length - 1];
+        this.particles.pop();
+      }
+    }
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    for (const p of this.particles) {
+      const alpha = Math.min(1, p.life / (p.maxLife * 0.3));
+
+      if (p.type === 'emotion' && p.emoji) {
+        ctx.globalAlpha = alpha;
+        ctx.font = `${p.size}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(p.emoji, p.x, p.y);
+        ctx.textAlign = 'start';
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'rain') {
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha * 0.4;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + p.vx * 2, p.y + p.vy * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  get count() { return this.particles.length; }
+  clear() { this.particles.length = 0; }
+}
+
 // ==================== DAY/NIGHT CYCLE ====================
 
 export type TimeOfDay = 'night' | 'dawn' | 'day' | 'dusk';
@@ -65,6 +206,8 @@ export class PixelRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private camera: Camera = { x: 640, y: 640, zoom: 1 };
+  private targetCamera: Camera = { x: 640, y: 640, zoom: 1 };
+  private smoothCamera = true;
   private sprites: Sprite[] = [];
   private frame: number = 0;
   private rawFrame: number = 0;
@@ -78,6 +221,17 @@ export class PixelRenderer {
   private height: number = 0;
   private dayNight: DayNightState = getDayNightState(8);
   private starPositions: { x: number; y: number; brightness: number }[] = [];
+
+  // Terrain chunk caching
+  private chunkCache = new Map<string, { canvas: OffscreenCanvas; frame: number }>();
+  private lastChunkClearFrame = 0;
+
+  // Particle system
+  particles = new ParticleSystem();
+
+  // Weather
+  private weatherType: 'clear' | 'rain' | 'leaves' = 'clear';
+  private weatherTimer = 0;
 
   // Bound handlers for cleanup
   private boundMouseDown: (e: MouseEvent) => void;
@@ -102,6 +256,9 @@ export class PixelRenderer {
     canvas.addEventListener('mouseup', this.boundMouseUp);
     canvas.addEventListener('mouseleave', this.boundMouseUp);
     canvas.addEventListener('wheel', this.boundWheel, { passive: false });
+
+    // Generate stars once at construction
+    this.generateStars();
   }
 
   setSize(w: number, h: number) {
@@ -113,10 +270,15 @@ export class PixelRenderer {
   }
 
   setCamera(x: number, y: number, zoom?: number) {
+    this.targetCamera.x = x;
+    this.targetCamera.y = y;
+    // Also snap actual camera on explicit setCamera
     this.camera.x = x;
     this.camera.y = y;
     if (zoom !== undefined) {
-      this.camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+      const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+      this.camera.zoom = z;
+      this.targetCamera.zoom = z;
     }
   }
 
@@ -129,8 +291,12 @@ export class PixelRenderer {
   }
 
   centerOn(worldX: number, worldY: number) {
-    this.camera.x = worldX;
-    this.camera.y = worldY;
+    this.targetCamera.x = worldX;
+    this.targetCamera.y = worldY;
+  }
+
+  setWeather(type: 'clear' | 'rain' | 'leaves') {
+    this.weatherType = type;
   }
 
   setSprites(sprites: Sprite[]) {
@@ -184,9 +350,26 @@ export class PixelRenderer {
   private render() {
     const { ctx, width, height, camera, sprites } = this;
 
+    // Smooth camera interpolation
+    if (this.smoothCamera && !this.isDragging) {
+      camera.x += (this.targetCamera.x - camera.x) * CAMERA_LERP_SPEED;
+      camera.y += (this.targetCamera.y - camera.y) * CAMERA_LERP_SPEED;
+    }
+
     // Update module-level glow values for terrain/building draw functions
     setLampGlow(this.dayNight.lampGlow);
     setWindowGlow(this.dayNight.lampGlow);
+
+    // Weather particle spawning
+    this.weatherTimer++;
+    if (this.weatherType === 'rain' && this.weatherTimer % 2 === 0) {
+      this.particles.emit(camera.x, camera.y, 'rain', 3);
+    } else if (this.weatherType === 'leaves' && this.weatherTimer % 8 === 0) {
+      this.particles.emit(camera.x, camera.y, 'leaf', 1);
+    }
+
+    // Update particles
+    this.particles.update();
 
     // Clear
     ctx.clearRect(0, 0, width, height);
@@ -198,7 +381,7 @@ export class PixelRenderer {
     ctx.translate(-camera.x, -camera.y);
 
     // Viewport bounds in world coordinates (with margin for sprites near edges)
-    const margin = 64;
+    const margin = 128;
     const viewLeft = camera.x - (width / 2) / camera.zoom - margin;
     const viewRight = camera.x + (width / 2) / camera.zoom + margin;
     const viewTop = camera.y - (height / 2) / camera.zoom - margin;
@@ -232,6 +415,9 @@ export class PixelRenderer {
       ctx.restore();
     }
 
+    // Draw world-space particles
+    this.particles.draw(ctx);
+
     ctx.restore();
 
     // Day/night overlay (screen-space, after all world sprites)
@@ -241,6 +427,12 @@ export class PixelRenderer {
     this.rawFrame++;
     if (this.rawFrame % ANIMATION_FRAME_DIVISOR === 0) {
       this.frame++;
+    }
+
+    // Clear stale chunk caches periodically (every ~10 seconds at 60fps)
+    if (this.rawFrame - this.lastChunkClearFrame > 600) {
+      this.chunkCache.clear();
+      this.lastChunkClearFrame = this.rawFrame;
     }
   }
 
@@ -274,8 +466,6 @@ export class PixelRenderer {
 
     // Stars at night/dawn/dusk when it's dark enough
     if (dayNight.overlayAlpha >= 0.15) {
-      if (this.starPositions.length === 0) this.generateStars();
-
       const twinklePhase = this.rawFrame * 0.03;
       const starAlpha = Math.min(1, (dayNight.overlayAlpha - 0.15) / 0.3);
 
@@ -315,6 +505,8 @@ export class PixelRenderer {
 
     this.camera.x = this.cameraStart.x - dx / this.camera.zoom;
     this.camera.y = this.cameraStart.y - dy / this.camera.zoom;
+    this.targetCamera.x = this.camera.x;
+    this.targetCamera.y = this.camera.y;
   }
 
   private handleMouseUp(e: MouseEvent) {

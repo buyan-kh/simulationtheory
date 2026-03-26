@@ -255,7 +255,7 @@ const HAT_CROWN: number[][] = [
   [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
 ];
 
-// Map sprite data by direction
+// Map sprite data by direction — 4-frame walk cycle: idle, walk1, idle, walk2
 type SpriteSet = { idle: number[][]; walk1: number[][]; walk2: number[][] };
 
 const SPRITES: Record<Direction, SpriteSet> = {
@@ -264,6 +264,18 @@ const SPRITES: Record<Direction, SpriteSet> = {
   left:  { idle: SPRITE_LEFT_IDLE, walk1: SPRITE_LEFT_WALK1, walk2: SPRITE_LEFT_WALK2 },
   right: { idle: SPRITE_RIGHT_IDLE, walk1: SPRITE_RIGHT_WALK1, walk2: SPRITE_RIGHT_WALK2 },
 };
+
+// 4-frame walk sequence: left-lean, idle, right-lean, idle
+function getWalkFrame(spriteSet: SpriteSet, frame: number): number[][] {
+  const phase = frame % 4;
+  switch (phase) {
+    case 0: return spriteSet.walk1;
+    case 1: return spriteSet.idle;
+    case 2: return spriteSet.walk2;
+    case 3: return spriteSet.idle;
+    default: return spriteSet.idle;
+  }
+}
 
 const HAT_DATA: Record<HatStyle, number[][] | null> = {
   wizard: HAT_WIZARD,
@@ -602,12 +614,12 @@ export function drawCharacter(
 ): void {
   const spriteSet = SPRITES[direction];
 
-  // Pick the right frame
+  // Pick the right frame — 4-frame walk cycle for smoother movement
   let sprite: number[][];
   if (!isWalking || isDead) {
     sprite = spriteSet.idle;
   } else {
-    sprite = frame % 2 === 0 ? spriteSet.walk1 : spriteSet.walk2;
+    sprite = getWalkFrame(spriteSet, frame);
   }
 
   // Apply hat
@@ -621,14 +633,21 @@ export function drawCharacter(
     return;
   }
 
-  // Draw shadow first
+  // Idle breathing — subtle y-offset bob when standing still
+  let drawY = y;
+  if (!isWalking) {
+    const breathe = Math.sin(frame * 0.12) * 0.5;
+    drawY = y + breathe;
+  }
+
+  // Draw shadow first (shadow doesn't bob)
   drawCharacterShadow(ctx, x, y, scale);
 
   // Render the sprite
-  renderSprite(ctx, x, y, sprite, colors, false, scale);
+  renderSprite(ctx, x, drawY, sprite, colors, false, scale);
 
   // Selection indicator
   if (isSelected) {
-    drawSelectionIndicator(ctx, x, y, scale, frame);
+    drawSelectionIndicator(ctx, x, drawY, scale, frame);
   }
 }

@@ -15,6 +15,35 @@ import { drawObject } from '@/lib/sprites/terrain';
 import { InterpolationManager } from '@/lib/interpolation';
 import Minimap from './Minimap';
 
+// Map dominant emotion to emoji for particle effects
+function getEmotionEmoji(char: Character): string | null {
+  const e = char.emotional_state;
+  if (!e) return null;
+  const vals = [
+    { key: 'happiness', val: e.happiness, emoji: '😊' },
+    { key: 'anger', val: e.anger, emoji: '😠' },
+    { key: 'fear', val: e.fear, emoji: '😨' },
+    { key: 'sadness', val: e.sadness, emoji: '😢' },
+    { key: 'surprise', val: e.surprise, emoji: '😲' },
+    { key: 'trust', val: e.trust, emoji: '🤝' },
+    { key: 'disgust', val: e.disgust, emoji: '🤢' },
+  ];
+  const strongest = vals.reduce((a, b) => Math.abs(b.val) > Math.abs(a.val) ? b : a);
+  if (Math.abs(strongest.val) > 0.5) return strongest.emoji;
+  return null;
+}
+
+// Map action type to emoji
+function getActionEmoji(action: string | undefined): string | null {
+  if (!action) return null;
+  const map: Record<string, string> = {
+    trade: '💰', craft: '🔨', rest: '💤', gather: '🌾',
+    attack: '⚔️', court: '💕', communicate: '💬', learn: '📖',
+    teach: '📚', explore: '🧭', build_home: '🏠', form_group: '👥',
+  };
+  return map[action] || null;
+}
+
 interface PixelCanvasProps {
   characters: Record<string, Character>;
   locations: Location[];
@@ -135,10 +164,67 @@ export default function PixelCanvas({
     }
   }, [selectedCharacterId, characters]);
 
-  // Update day/night cycle on renderer
+  // Update day/night cycle and weather on renderer
   useEffect(() => {
-    rendererRef.current?.setDayNight(currentTick);
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setDayNight(currentTick);
+
+    // Occasional weather changes based on pseudo-random tick pattern
+    const day = Math.floor(currentTick / 24);
+    const hour = currentTick % 24;
+    // Rain during some mornings/evenings (seeded by day number)
+    if (day % 5 === 2 && hour >= 8 && hour <= 14) {
+      renderer.setWeather('rain');
+    } else if (day % 7 === 3 && hour >= 15 && hour <= 19) {
+      renderer.setWeather('leaves');
+    } else {
+      renderer.setWeather('clear');
+    }
   }, [currentTick]);
+
+  // Emit particles for character actions and emotions
+  const emitCharacterParticles = useCallback(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    const interp = interpRef.current;
+
+    for (const [id, char] of Object.entries(characters)) {
+      if (!char.alive) continue;
+      const pos = interp.getPosition(id);
+      const sx = pos ? pos.x : char.position.x;
+      const sy = pos ? pos.y : char.position.y;
+      const { wx, wy } = simToWorld(sx, sy);
+      const worldX = wx * SCALE;
+      const worldY = wy * SCALE;
+
+      // Dust particles when walking
+      if (interp.isMoving(id) && Math.random() < 0.15) {
+        renderer.particles.emit(worldX, worldY + 14 * SCALE, 'dust', 1);
+      }
+
+      // Emotion particles (rare, for strong emotions)
+      if (Math.random() < 0.008) {
+        const emoji = getEmotionEmoji(char);
+        if (emoji) {
+          renderer.particles.emit(worldX, worldY - 8, 'emotion', 1, emoji);
+        }
+      }
+
+      // Action particles on selected character
+      if (id === selectedCharacterId && char.last_action && Math.random() < 0.02) {
+        const actionEmoji = getActionEmoji(char.last_action.type);
+        if (actionEmoji) {
+          renderer.particles.emit(worldX + 12, worldY - 4, 'emotion', 1, actionEmoji);
+        }
+      }
+    }
+  }, [characters, selectedCharacterId]);
+
+  // Emit particles each tick
+  useEffect(() => {
+    emitCharacterParticles();
+  }, [currentTick, emitCharacterParticles]);
 
   // Build character sprites — draw functions read interpolated positions at draw time
   const buildCharacterSprites = useCallback((): Sprite[] => {

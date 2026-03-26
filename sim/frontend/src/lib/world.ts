@@ -256,20 +256,39 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
     }
   }
 
-  // Scattered trees throughout meadows
-  for (let i = 0; i < 120; i++) {
+  // Scattered trees throughout meadows — more variety and density
+  for (let i = 0; i < 180; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
       const tile = getTileAt(row, col);
       if (tile.type.startsWith('grass')) {
-        decorations.push({ type: rng() < 0.3 ? 'pine' : 'tree', col, row });
+        const r = rng();
+        const treeType = r < 0.25 ? 'pine' : r < 0.5 ? 'tree2' : r < 0.75 ? 'tree3' : 'tree';
+        decorations.push({ type: treeType, col, row });
       }
     }
   }
 
-  // Bushes
-  for (let i = 0; i < 80; i++) {
+  // Small tree clusters (groups of 3-5 near each other for natural feel)
+  for (let i = 0; i < 20; i++) {
+    const baseRow = 15 + Math.floor(rng() * (WORLD_TILES - 30));
+    const baseCol = 15 + Math.floor(rng() * (WORLD_TILES - 30));
+    const clusterSize = 3 + Math.floor(rng() * 3);
+    for (let j = 0; j < clusterSize; j++) {
+      const row = baseRow + Math.floor(rng() * 5) - 2;
+      const col = baseCol + Math.floor(rng() * 5) - 2;
+      if (row > 0 && row < WORLD_TILES && col > 0 && col < WORLD_TILES && !noSpawn.has(`${row},${col}`)) {
+        const tile = getTileAt(row, col);
+        if (tile.type.startsWith('grass')) {
+          decorations.push({ type: rng() < 0.5 ? 'pine' : 'tree', col, row });
+        }
+      }
+    }
+  }
+
+  // Bushes — more of them
+  for (let i = 0; i < 120; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
@@ -280,13 +299,13 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
     }
   }
 
-  // Rocks
-  for (let i = 0; i < 40; i++) {
+  // Rocks — on dirt, sand, and near river banks
+  for (let i = 0; i < 60; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     const tile = getTileAt(row, col);
-    if (tile.type === 'sand' || tile.type === 'dirt') {
-      decorations.push({ type: rng() < 0.5 ? 'rock_small' : 'rock_large', col, row });
+    if (tile.type === 'sand' || tile.type === 'dirt' || tile.type === 'grass_dark') {
+      decorations.push({ type: rng() < 0.4 ? 'rock_small' : rng() < 0.7 ? 'rock_large' : 'rock_mossy', col, row });
     }
   }
 
@@ -304,8 +323,8 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
     }
   }
 
-  // Flower patches
-  for (let i = 0; i < 40; i++) {
+  // Flower patches — meadow wildflowers for visual richness
+  for (let i = 0; i < 70; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
@@ -369,8 +388,8 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
     }
   }
 
-  // Tall grass
-  for (let i = 0; i < 50; i++) {
+  // Tall grass — denser patches for natural look
+  for (let i = 0; i < 80; i++) {
     const row = Math.floor(rng() * WORLD_TILES);
     const col = Math.floor(rng() * WORLD_TILES);
     if (!noSpawn.has(`${row},${col}`)) {
@@ -379,6 +398,14 @@ function generateDecorations(rng: () => number, locations: Location[]): Decorati
         decorations.push({ type: 'tall_grass', col, row });
       }
     }
+  }
+
+  // Sign posts at some locations
+  for (let i = 0; i < Math.min(locations.length, 4); i++) {
+    const { wx, wy } = simToWorld(locations[i].x, locations[i].y);
+    const cr = Math.floor(wy / TILE_PX);
+    const cc = Math.floor(wx / TILE_PX);
+    decorations.push({ type: 'sign_post', col: cc - 4, row: cr + 2 });
   }
 
   return decorations;
