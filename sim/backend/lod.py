@@ -42,11 +42,16 @@ RELATIONSHIP_ACTIVE_THRESHOLD: float = 0.5
 class LODManager:
     """Classifies agents into LOD tiers and tracks spotlight agents."""
 
-    __slots__ = ("spotlight_ids", "tiers")
+    __slots__ = ("spotlight_ids", "tiers", "viewport_center")
 
     def __init__(self):
         self.spotlight_ids: set[str] = set()
         self.tiers: dict[str, LODTier] = {}
+        self.viewport_center: tuple[float, float] | None = None  # (x, y) from frontend camera
+
+    def set_viewport(self, x: float, y: float) -> None:
+        """Set the current viewport center from the frontend camera."""
+        self.viewport_center = (x, y)
 
     def set_spotlight(self, char_ids: set[str]) -> None:
         """Replace the spotlight set."""
@@ -115,6 +120,18 @@ class LODManager:
             for rel_id, rel_val in spotlight_char.relationships.items():
                 if rel_val >= RELATIONSHIP_ACTIVE_THRESHOLD and rel_id in characters and characters[rel_id].alive:
                     active_ids.add(rel_id)
+
+        # Viewport distance: promote agents visible on screen to at least ACTIVE
+        if self.viewport_center:
+            vx, vy = self.viewport_center
+            viewport_radius = 200.0  # roughly the visible screen area in sim coords
+            for cid, c in characters.items():
+                if not c.alive or cid in valid_spotlight or cid in active_ids:
+                    continue
+                dx = c.position["x"] - vx
+                dy = c.position["y"] - vy
+                if dx * dx + dy * dy < viewport_radius * viewport_radius:
+                    active_ids.add(cid)
 
         # Classify
         for cid in alive_ids:

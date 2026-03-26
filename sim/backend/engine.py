@@ -11,7 +11,7 @@ from agents import AgentBrain, DialogueGenerator
 from events import EventGenerator
 from groups import GroupManager
 from trade import TradeManager
-from crafting import process_crafting
+from crafting import process_crafting, generate_starter_furniture
 from db import SimulationDB
 from spatial import SpatialGrid
 from lod import LODManager, LODTier
@@ -647,6 +647,12 @@ class SimulationEngine:
         sim.environment.houses.append(house)
         char.house_id = house.id
 
+        # Generate starter furniture for the new house
+        furniture = generate_starter_furniture(char, house, sim)
+        sim.world_items.extend(furniture)
+        for item in furniture:
+            char.equipped_items.append(item.id)
+
     # ── Needs decay rates per tick ──
     _NEEDS_DECAY = {"hunger": 2.0, "energy": 3.0, "social": 1.5, "fun": 1.0, "hygiene": 0.5}
 
@@ -791,6 +797,24 @@ class SimulationEngine:
             # Homeless hygiene penalty
             if not char.house_id:
                 needs.hygiene = max(0.0, needs.hygiene - 0.5)
+
+            # ── Schedule-based penalties ──
+            period = get_time_period(sim.tick)
+            if period == "sleep":
+                # Agents who aren't resting at night suffer energy and mood penalties
+                is_resting = action and action.type.value == "rest"
+                if not is_resting:
+                    needs.energy = max(0.0, needs.energy - 4.0)  # double energy drain
+                    char.emotional_state.sadness = min(1.0, char.emotional_state.sadness + 0.05)
+                    # Prolonged sleep deprivation: health damage
+                    if needs.energy < 15:
+                        char.health = max(0.0, char.health - 0.5)
+            elif period == "morning":
+                # Wake-up mechanic: energy boost if rested well (energy > 60)
+                hour = get_hour(sim.tick)
+                if hour == 6 and needs.energy > 60:
+                    char.emotional_state.happiness = min(1.0, char.emotional_state.happiness + 0.1)
+                    needs.fun = min(100.0, needs.fun + 5.0)
 
             # Low needs affect emotions
             if needs.hunger < 20:

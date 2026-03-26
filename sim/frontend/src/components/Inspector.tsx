@@ -6,25 +6,36 @@ import { useSimStore } from '@/lib/store';
 import EmotionDisplay from './EmotionDisplay';
 import TraitSlider from './TraitSlider';
 import ResourceBar from './ResourceBar';
-import { getMemory, getReasoning } from '@/lib/api';
+import { getMemory, getReasoning, getAgentMemoryFile } from '@/lib/api';
 
 interface InspectorProps {
   character: Character;
   allCharacters: Record<string, Character>;
   simId: string;
   worldItems?: WorldItem[];
+  currentTick?: number;
 }
 
-type TabKey = 'stats' | 'memory' | 'relations' | 'mind' | 'items';
+function getScheduleInfo(tick: number): { period: string; label: string; color: string; icon: string } {
+  const hour = tick % 24;
+  if (hour >= 22 || hour < 6) return { period: 'sleep', label: 'Sleeping', color: '#6a5acd', icon: '🌙' };
+  if (hour < 8) return { period: 'morning', label: 'Morning', color: '#daa520', icon: '🌅' };
+  if (hour < 17) return { period: 'work', label: 'Working', color: '#4a9a68', icon: '⚒' };
+  return { period: 'free', label: 'Free Time', color: '#4a9aaa', icon: '✦' };
+}
 
-export default function Inspector({ character, allCharacters, simId, worldItems = [] }: InspectorProps) {
+type TabKey = 'stats' | 'memory' | 'relations' | 'mind' | 'items' | 'file';
+
+export default function Inspector({ character, allCharacters, simId, worldItems = [], currentTick = 0 }: InspectorProps) {
   const { inspectorTab, setInspectorTab } = useSimStore();
   const [memory, setMemory] = useState<Memory | null>(null);
   const [reasoning, setReasoning] = useState<{ reasoning: string; action: { type: string; detail: string } } | null>(null);
   const [loadingMemory, setLoadingMemory] = useState(false);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
+  const [memoryFile, setMemoryFile] = useState<string | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
 
-  const tab = (['stats', 'memory', 'relations', 'mind', 'items'].includes(inspectorTab) ? inspectorTab : 'stats') as TabKey;
+  const tab = (['stats', 'memory', 'relations', 'mind', 'items', 'file'].includes(inspectorTab) ? inspectorTab : 'stats') as TabKey;
 
   useEffect(() => {
     if (tab === 'memory') {
@@ -41,6 +52,13 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
         .catch(() => setReasoning(null))
         .finally(() => setLoadingReasoning(false));
     }
+    if (tab === 'file') {
+      setLoadingFile(true);
+      getAgentMemoryFile(simId, character.id)
+        .then((res) => setMemoryFile(res.content))
+        .catch(() => setMemoryFile(null))
+        .finally(() => setLoadingFile(false));
+    }
   }, [tab, character.id, simId]);
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -49,6 +67,7 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
     { key: 'relations', label: 'Relations' },
     { key: 'mind', label: 'Mind' },
     { key: 'items', label: 'Items' },
+    { key: 'file', label: 'File' },
   ];
 
   const relEntries = Object.entries(character.relationships);
@@ -124,6 +143,38 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
             </div>
 
             <div className="pixel-divider" />
+
+            {/* Schedule */}
+            {character.alive && (
+              <>
+                <div>
+                  <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Schedule</div>
+                  {(() => {
+                    const schedule = getScheduleInfo(currentTick);
+                    const hour = currentTick % 24;
+                    return (
+                      <div className="p-2" style={{ background: '#e8dfd2', border: `1px solid ${schedule.color}` }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span style={{ fontSize: '10px' }}>{schedule.icon}</span>
+                          <span className="font-pixel" style={{ fontSize: '8px', color: schedule.color }}>{schedule.label}</span>
+                          <span className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>Hour {hour}/24</span>
+                        </div>
+                        {character.occupation && schedule.period === 'work' && (
+                          <div className="font-pixel text-pixel-text" style={{ fontSize: '7px' }}>
+                            Working as {character.occupation}
+                          </div>
+                        )}
+                        {/* Day progress bar */}
+                        <div className="mt-1 relative" style={{ height: '4px', background: '#d4c8b8', border: '1px solid #c4b6a2' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${(hour / 24) * 100}%`, background: schedule.color }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className="pixel-divider" />
+              </>
+            )}
 
             {/* Group Info */}
             {character.group_id && (
@@ -562,6 +613,28 @@ export default function Inspector({ character, allCharacters, simId, worldItems 
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {tab === 'file' && (
+          <div className="space-y-2">
+            <div className="font-pixel text-neon-cyan uppercase mb-2" style={{ fontSize: '8px' }}>Agent Memory File</div>
+            {loadingFile ? (
+              <div className="font-pixel text-pixel-text-dim animate-pixel-blink" style={{ fontSize: '8px' }}>
+                Loading file...
+              </div>
+            ) : memoryFile ? (
+              <pre
+                className="font-mono text-pixel-text whitespace-pre-wrap overflow-x-auto p-2"
+                style={{ fontSize: '6px', lineHeight: '1.4', background: '#e8dfd2', border: '1px solid #c4b6a2' }}
+              >
+                {memoryFile}
+              </pre>
+            ) : (
+              <div className="font-pixel text-pixel-text-dim" style={{ fontSize: '7px' }}>
+                No memory file available
+              </div>
+            )}
           </div>
         )}
       </div>

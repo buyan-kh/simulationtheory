@@ -231,6 +231,62 @@ def heal_character(sim_id: str, char_id: str):
     return {"status": "ok", "message": f"{char.name} has been fully healed"}
 
 
+class TeleportRequest(BaseModel):
+    x: float
+    y: float
+
+
+class ModifyTraitsRequest(BaseModel):
+    traits: dict[str, float]
+
+
+class SetRelationshipRequest(BaseModel):
+    target_id: str
+    value: float
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/teleport")
+def teleport_character(sim_id: str, char_id: str, req: TeleportRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    char.position["x"] = max(-300, min(300, req.x))
+    char.position["y"] = max(-300, min(300, req.y))
+    engine.db.save(sim)
+    return {"status": "ok", "position": char.position}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/modify-traits")
+def modify_traits(sim_id: str, char_id: str, req: ModifyTraitsRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    char = sim.characters[char_id]
+    for trait_name, value in req.traits.items():
+        clamped = max(0.0, min(1.0, value))
+        if hasattr(char.traits, trait_name):
+            setattr(char.traits, trait_name, clamped)
+        elif hasattr(char.values, trait_name):
+            setattr(char.values, trait_name, clamped)
+    engine.db.save(sim)
+    return {"status": "ok", "traits": char.traits.model_dump(), "values": char.values.model_dump()}
+
+
+@app.post("/api/simulations/{sim_id}/characters/{char_id}/set-relationship")
+def set_relationship(sim_id: str, char_id: str, req: SetRelationshipRequest):
+    sim = _get_sim(sim_id)
+    if char_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if req.target_id not in sim.characters:
+        raise HTTPException(status_code=404, detail="Target character not found")
+    char = sim.characters[char_id]
+    clamped = max(-1.0, min(1.0, req.value))
+    char.relationships[req.target_id] = clamped
+    engine.db.save(sim)
+    return {"status": "ok", "relationship": clamped}
+
+
 class IntroduceRequest(BaseModel):
     target_id: str
     boost: float = 0.3
@@ -454,6 +510,19 @@ def add_to_spotlight(sim_id: str, char_id: str):
     return {"status": "added", "spotlight": list(lod.spotlight_ids)}
 
 
+class ViewportRequest(BaseModel):
+    x: float
+    y: float
+
+
+@app.put("/api/simulations/{sim_id}/viewport")
+def set_viewport(sim_id: str, req: ViewportRequest):
+    _get_sim(sim_id)
+    lod = engine.get_lod(sim_id)
+    lod.set_viewport(req.x, req.y)
+    return {"status": "ok"}
+
+
 @app.delete("/api/simulations/{sim_id}/spotlight/{char_id}")
 def remove_from_spotlight(sim_id: str, char_id: str):
     lod = engine.get_lod(sim_id)
@@ -475,6 +544,28 @@ def get_replay_state(sim_id: str, tick: int):
     if state is None:
         raise HTTPException(status_code=404, detail="Snapshot not found for this tick")
     return state
+
+
+@app.get("/api/simulations/{sim_id}/replay/summary")
+def get_replay_summary(sim_id: str):
+    """Get a summary of available snapshots with population counts."""
+    _get_sim(sim_id)
+    ticks = engine.db.get_snapshot_ticks(sim_id)
+    summaries = []
+    # Sample up to 100 snapshots for performance
+    sample = ticks if len(ticks) <= 100 else [ticks[i] for i in range(0, len(ticks), max(1, len(ticks) // 100))]
+    for t in sample:
+        snap = engine.db.load_snapshot(sim_id, t)
+        if snap:
+            alive = sum(1 for c in snap.characters.values() if c.alive)
+            summaries.append({
+                "tick": t,
+                "alive_count": alive,
+                "total_count": len(snap.characters),
+                "event_count": len(snap.events),
+                "group_count": sum(1 for g in snap.groups.values() if not g.dissolved),
+            })
+    return {"ticks": ticks, "summaries": summaries, "total_snapshots": len(ticks)}
 
 
 # ── Analytics ──

@@ -210,3 +210,36 @@ export async function addToSpotlight(simId: string, charId: string): Promise<{ s
 export async function removeFromSpotlight(simId: string, charId: string): Promise<{ status: string; spotlight: string[] }> {
   return request(`/simulations/${simId}/spotlight/${charId}`, { method: 'DELETE' });
 }
+
+// Agent Memory Files
+export async function getAgentMemoryFile(simId: string, charId: string): Promise<{ character_id: string; name: string; content: string }> {
+  return request(`/simulations/${simId}/characters/${charId}/memory-file`);
+}
+
+export async function listAgentMemoryFiles(simId: string): Promise<{ sim_id: string; files: string[]; count: number }> {
+  return request(`/simulations/${simId}/memory-files`);
+}
+
+// God Mode: Teleport
+export async function teleportCharacter(simId: string, charId: string, x: number, y: number): Promise<{ status: string }> {
+  return request(`/simulations/${simId}/characters/${charId}/teleport`, {
+    method: 'POST',
+    body: JSON.stringify({ x, y }),
+  });
+}
+
+// God Mode: Modify Traits
+export async function modifyTraits(simId: string, charId: string, traits: Record<string, number>): Promise<{ status: string }> {
+  return request(`/simulations/${simId}/characters/${charId}/modify-traits`, {
+    method: 'POST',
+    body: JSON.stringify({ traits }),
+  });
+}
+
+// God Mode: Set Relationship
+export async function setRelationship(simId: string, charId: string, targetId: string, value: number): Promise<{ status: string }> {
+  return request(`/simulations/${simId}/characters/${charId}/set-relationship`, {
+    method: 'POST',
+    body: JSON.stringify({ target_id: targetId, value }),
+  });
+}
