@@ -1,67 +1,90 @@
-# Simulation Theory
+# Sim26
 
-A world simulation where simple agents create complex societies.
+**Autonomous agents living, fighting, trading, and dying in a persistent pixel-art world.**
 
-Autonomous agents with personalities, memories, and values live in a persistent world — forming relationships, trading resources, building factions, courting partners, and dying from their choices. Emergent civilizations arise from simple interaction rules, not scripted behavior.
+Each agent is a `.txt` file — personality traits, memories, emotions, relationships — readable by both humans and LLMs. Drop agents into the world, press play, and watch societies emerge from simple rules.
 
-## What Happens
+<p align="center">
+  <img src="pic.png" width="100%" />
+</p>
 
-Drop agents into a shared world. Each one gets:
-- **HEXACO personality** (6 traits) + **Schwartz values** (4 dimensions) — drives how they act
-- **Needs** (hunger, energy, social, fun, hygiene) — drives what they prioritize
-- **Memory** (short-term, long-term, beliefs) — shapes future decisions
-- **Emotions** (7 axes) — reacts to events and decays over time
+<p align="center">
+  <img src="pic2.png" width="100%" />
+</p>
 
-They autonomously decide actions each tick: gather food, trade, court a partner, attack a rival, form a group, learn skills, build a home. The simulation resolves interactions (cooperation, betrayal, combat, negotiation), applies consequences, and lets macro patterns emerge.
+## How It Works
 
-### What Emerges
+Agents make decisions every tick based on their personality (HEXACO), values (Schwartz), needs, emotions, and relationships. There's no scripted behavior — agents cooperate, betray, form factions, trade, court, fight, and die based on who they are and what's happening around them.
+
+Spotlight agents get full LLM reasoning with natural dialogue. Everyone else runs on rule-based decision weights derived from their personality. At scale, individual chaos averages out into predictable macro patterns — economies stabilize, alliances form, wars break out.
+
+**The core idea:** simple individual rules, complex emergent society.
+
+## Agent Files
+
+Every agent's entire state lives in a plain `.txt` file:
+
+```
+============================================================
+  AGENT FILE: Amir Hansen
+  Status: ALIVE
+============================================================
+
+── PERSONALITY (HEXACO) ──
+  Openness               0.225  (Low)
+  Conscientiousness      0.666  (High)
+  Extraversion           0.420  (Moderate)
+
+── NEEDS ──
+  Hunger:  [████████████████░░░░] 80.0/100
+  Energy:  [████████████████░░░░] 80.0/100
+
+── EMOTIONAL STATE ──
+  Happiness              +0.05  (Neutral)
+  Anger                  +0.00  (Neutral)
+
+── RELATIONSHIPS ──
+  Dalia Qadir   → Trust: 0.72  Type: friend
+  ...
+```
+
+These files are the source of truth. The LLM reads them to understand who an agent is, and writes back after each decision. You can open any agent file and see exactly what they know, feel, and remember.
+
+## What Emerges
+
 - **Economies** — agents trade surplus resources, prices fluctuate with supply/demand
 - **Factions** — groups form organically from mutual friendships, claim territory, wage wars
-- **Families** — courtship → proposal → marriage → offspring with inherited traits
+- **Families** — courtship, proposal, marriage, offspring with inherited traits and grudges
 - **Social events** — birthday parties, weddings, funerals, community gatherings
 - **Crime & reputation** — attackers gain criminal records, witnesses lose trust
 - **Disease outbreaks** — contagion spreads through proximity
 - **Cultural drift** — isolated groups develop different value distributions over time
 
-## Architecture
+## Features
 
-```
-sim/
-├── backend/          Python (FastAPI)
-│   ├── engine.py     Step loop, LOD tiers, movement, lifecycle
-│   ├── agents.py     AgentBrain decision-making, personality→action mapping
-│   ├── events.py     Action resolution, environmental events, emergent detection
-│   ├── groups.py     Faction formation, territory, warfare
-│   ├── trade.py      Market offers, price dynamics, supply/demand
-│   ├── crafting.py   Item creation, world items
-│   ├── llm_brain.py  Optional Claude AI consciousness for spotlight agents
-│   ├── lod.py        Level-of-detail (SPOTLIGHT / ACTIVE / BACKGROUND)
-│   ├── models.py     Pydantic schemas
-│   └── main.py       30+ API endpoints
-│
-└── frontend/         TypeScript (Next.js 15, React)
-    └── src/
-        ├── app/      Page routes (home, characters, simulation/[id])
-        ├── components/  24 components (PixelCanvas, Inspector, GodMode, etc.)
-        └── lib/      API client, types, Zustand store, pixel art renderer
-```
+- **Personality-driven decisions** — HEXACO traits + Schwartz values shape every action
+- **Persistent memory** — episodic events, long-term beliefs, emotional associations
+- **Rich relationships** — affinity, trust, respect, attraction across friend/rival/romantic/family types
+- **Group dynamics** — factions form organically, claim territory, go to war
+- **Trade & economy** — market system with price dynamics and resource management
+- **Combat & death** — bad decisions have real consequences
+- **Lifecycle** — aging, marriage, children (who inherit grudges)
+- **Crafting** — procedural pixel-art items reflecting agent personality
+- **Level of Detail** — spotlight (full LLM), active (rule-based every tick), background (every 5 ticks)
+- **Daily schedule** — 24-tick day cycle with sleep, work, and free time phases
+- **God mode** — smite agents, gift resources, force actions, spawn events
+- **Replay** — scrub through any tick of the simulation
 
-## Key Systems
+## Tech Stack
 
-**Level of Detail (LOD)** — Scales from 30 to 1000+ agents:
-- *Spotlight*: Full decisions + dialogue + LLM consciousness every tick
-- *Active*: Full decisions every tick, near spotlight agents
-- *Background*: Simplified decisions every 5 ticks
+| Layer | Stack |
+|-------|-------|
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind, Zustand |
+| Backend | Python, FastAPI, Pydantic |
+| Storage | SQLite + `.txt` agent files |
+| AI | Claude API (spotlight agents) |
 
-**Daily Schedule** — 24-tick day cycle:
-- Sleep (22-6): agents go home, energy recovery
-- Morning (6-8): transition from home to work
-- Work (8-17): occupation-based location routing
-- Free time (17-22): action-driven movement
-
-**God Mode** — Direct intervention: force actions, gift resources, smite/heal agents, introduce characters, spawn weather/disasters, teleport, modify traits and relationships.
-
-## Running
+## Getting Started
 
 ```bash
 # Backend
@@ -75,11 +98,32 @@ npm install
 npm run dev
 ```
 
-## Design Philosophy
+Backend runs on `localhost:8000`, frontend on `localhost:3000`.
 
-From `CLAUDE.md` — these principles guide all implementation:
+## Architecture
 
-1. **Simple individual rules create complex societal patterns.** Don't over-engineer agent logic. Complexity comes from interaction, not complicated agents.
-2. **At scale, the Law of Large Numbers smooths individual chaos into predictable macro trends.** Individual agents can be chaotic. At 100K+ agents, statistical patterns emerge reliably.
-3. **Correctly model distributions, interaction rules, feedback loops, and constraints.** Get these right and emergent phenomena arise naturally.
-4. **Never make survival artificially easy.** Agents have the *ability* to survive, not the guarantee. Bad decisions lead to failure. Protect agency, not agents.
+```
+sim/
+├── backend/
+│   ├── engine.py          # Core simulation loop
+│   ├── agents.py          # Decision-making logic
+│   ├── llm_brain.py       # LLM-powered spotlight agents
+│   ├── groups.py          # Faction mechanics
+│   ├── events.py          # Event generation & resolution
+│   ├── trade.py           # Market simulation
+│   ├── agent_memory.py    # .txt file read/write
+│   └── agent_memories/    # Per-agent .txt files
+└── frontend/
+    └── src/
+        ├── app/           # Next.js pages
+        ├── components/    # WorldView, Inspector, ChatLog, etc.
+        └── lib/           # API client, types, state
+```
+
+## Research Foundations
+
+Built on ideas from Dwarf Fortress (facets + values + goals), Stanford's Generative Agents (memory architecture), Schelling segregation, Sugarscape, Axelrod tournaments, and Dunbar's number. The goal isn't to script interesting stories — it's to set up the right distributions, interaction rules, feedback loops, and constraints, then let emergence do the rest.
+
+## License
+
+MIT
