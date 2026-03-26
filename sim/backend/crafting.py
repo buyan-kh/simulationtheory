@@ -7,7 +7,6 @@ Items are stored in SimulationState.world_items and rendered by the frontend.
 """
 
 import random
-import math
 from models import WorldItem, Character, SimulationState
 
 # ── Color palettes by mood/personality ──────────────────────────────────
@@ -537,6 +536,45 @@ _ITEM_NAMES: dict[str, list[str]] = {
     "candle": ["Beeswax Candle", "Tallow Candle", "Prayer Candle", "Night Candle"],
     "rug": ["Woven Rug", "Colorful Carpet", "Floor Mat", "Tapestry Rug"],
 }
+
+
+def generate_starter_furniture(char: Character, house: "House", sim: SimulationState) -> list[WorldItem]:
+    """Generate basic furniture for a new house: bed, table, and a personality-driven item."""
+    from models import House
+    rng = random.Random(hash((char.id, house.id, "starter_furniture")))
+    palette = _pick_palette(char, rng)
+    items: list[WorldItem] = []
+
+    # Every house gets a bed and a table
+    starter_types = ["bed", "table"]
+    # Add a personality-driven third item
+    if char.traits.openness > 0.6:
+        starter_types.append("bookshelf")
+    elif char.traits.extraversion > 0.6:
+        starter_types.append("chair")
+    elif char.traits.neuroticism > 0.6:
+        starter_types.append("candle")
+    else:
+        starter_types.append("lamp")
+
+    for item_kind in starter_types:
+        w, h, gen_fn = _ITEM_GENERATORS[item_kind]
+        pixels = gen_fn(w, h, palette, rng)
+        name = rng.choice(_ITEM_NAMES.get(item_kind, [item_kind.replace("_", " ").title()]))
+        item = WorldItem(
+            name=name,
+            creator_id=char.id,
+            created_tick=sim.tick,
+            position=dict(house.position),
+            width=w,
+            height=h,
+            pixels=pixels,
+            item_type=_ITEM_TYPE_MAP.get(item_kind, "furniture"),
+            placed_in_house=house.id,
+        )
+        items.append(item)
+
+    return items
 
 
 def generate_item(char: Character, sim: SimulationState) -> WorldItem:

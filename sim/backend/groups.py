@@ -1,4 +1,3 @@
-import math
 import random
 from models import (
     Character, Action, ActionType, Event, EventType,

@@ -42,6 +42,10 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
   const [confirmSmite, setConfirmSmite] = useState(false);
   const [introduceTarget, setIntroduceTarget] = useState('');
   const [eventType, setEventType] = useState('weather');
+  const [teleportX, setTeleportX] = useState(0);
+  const [teleportY, setTeleportY] = useState(0);
+  const [relTarget, setRelTarget] = useState('');
+  const [relValue, setRelValue] = useState(0.5);
   const [status, setStatus] = useState<string | null>(null);
 
   const otherChars = Object.values(allCharacters).filter(c => c.id !== characterId && c.alive);
@@ -167,6 +171,77 @@ export default function GodMode({ simId, characterId, characterName, allCharacte
             </button>
           </div>
         </div>
+
+        {/* Teleport */}
+        <div>
+          <div className="font-pixel text-pixel-text-dim uppercase mb-1" style={{ fontSize: '7px' }}>Teleport</div>
+          <div className="flex gap-1">
+            <input
+              type="number"
+              value={teleportX}
+              onChange={(e) => setTeleportX(Number(e.target.value))}
+              placeholder="X"
+              className="pixel-input flex-1"
+              style={{ fontSize: '7px', padding: '2px 4px' }}
+            />
+            <input
+              type="number"
+              value={teleportY}
+              onChange={(e) => setTeleportY(Number(e.target.value))}
+              placeholder="Y"
+              className="pixel-input flex-1"
+              style={{ fontSize: '7px', padding: '2px 4px' }}
+            />
+            <button
+              onClick={() => doAction('Teleport', () => godRequest(`${charUrl}/teleport`, { x: teleportX, y: teleportY }))}
+              className="pixel-btn"
+              style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#8a6aaa', color: '#8a6aaa' }}
+            >
+              Go
+            </button>
+          </div>
+        </div>
+
+        {/* Set Relationship */}
+        {otherChars.length > 0 && (
+          <div>
+            <div className="font-pixel text-pixel-text-dim uppercase mb-1" style={{ fontSize: '7px' }}>Set Relationship</div>
+            <div className="flex gap-1">
+              <select
+                value={relTarget}
+                onChange={(e) => setRelTarget(e.target.value)}
+                className="pixel-select flex-1"
+                style={{ fontSize: '7px', padding: '2px 4px' }}
+              >
+                <option value="">Select...</option>
+                {otherChars.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={relValue}
+                onChange={(e) => setRelValue(Number(e.target.value))}
+                min={-1}
+                max={1}
+                step={0.1}
+                className="pixel-input w-14"
+                style={{ fontSize: '7px', padding: '2px 4px' }}
+              />
+              <button
+                onClick={() => {
+                  if (!relTarget) return;
+                  doAction('Relationship', () => godRequest(`${charUrl}/set-relationship`, { target_id: relTarget, value: relValue }));
+                }}
+                disabled={!relTarget}
+                className="pixel-btn"
+                style={{ fontSize: '7px', padding: '2px 6px', borderColor: '#5a9a5a', color: '#5a9a5a' }}
+              >
+                Set
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Heal & Smite */}
         <div className="flex gap-2">

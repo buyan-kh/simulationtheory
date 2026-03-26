@@ -366,6 +366,7 @@ export default function SimulationPage() {
                   allCharacters={simulation.characters}
                   simId={simId}
                   worldItems={simulation.world_items || []}
+                  currentTick={simulation.tick}
                 />
               </div>
               <div className="w-[200px] border-l-2 border-[#a89880] shrink-0 overflow-y-auto pixel-scrollbar">

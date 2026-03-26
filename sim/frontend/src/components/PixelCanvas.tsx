@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import type { Character, Location, ChatMessage, WorldItem } from '@/lib/types';
-import { PixelRenderer, Sprite, getDayNightState } from '@/lib/sprites/renderer';
+import { PixelRenderer, Sprite } from '@/lib/sprites/renderer';
 import { generateWorld, simToWorld, WORLD_SIZE, SCALE } from '@/lib/world';
 import {
   drawCharacter,
